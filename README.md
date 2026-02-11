@@ -25,13 +25,54 @@
 - 共通: `SUPABASE_ANON_KEY` はクライアント公開キーのみを設定し、`service_role` のようなサーバ専用キーはテンプレートに含めない
 - 運用ルール: Preview環境から本番DBへ接続しない
 
+## テスト実行手順（`npm run test`）
+
+### 前提
+
+1. Node.js / npm が利用可能であること
+2. `npm install` が完了していること
+3. Integrationテスト向けに以下の環境変数が設定されていること
+   - `SUPABASE_ENV`（例: `stg`）
+   - `SUPABASE_URL`（検証環境のURL）
+   - `SUPABASE_ANON_KEY`（検証環境の匿名公開キー）
+4. `SUPABASE_ENV=prod` または本番系URLはテストで禁止されること
+
+### ローカル実行
+
+```bash
+npm run test
+```
+
+### CI実行
+
+- CIのSecrets管理機能で `SUPABASE_ENV` / `SUPABASE_URL` / `SUPABASE_ANON_KEY` を設定する
+- ワークフロー内で `npm ci` 後に `npm run test` を実行する
+- テスト後に `coverage/v8/lcov.info` を成果物として参照する
+
+### 失敗時の確認手順
+
+1. `SUPABASE_ENV` / `SUPABASE_URL` / `SUPABASE_ANON_KEY` の未設定・誤設定を確認する
+2. エラーメッセージが `Missing required environment variables` の場合:
+   - 必須環境変数を設定し直して再実行する
+3. エラーメッセージが `Production environment is forbidden for tests` の場合:
+   - `SUPABASE_ENV` を `stg` 等の非本番値へ修正する
+4. 接続エラーの場合:
+   - `SUPABASE_URL` が検証環境向けであることとネットワーク到達性を確認する
+
+### Secrets運用の注意
+
+- `SUPABASE_ANON_KEY` を含む機密値をREADME・Issue・PRコメントへ平文で貼り付けない
+- シークレット値の共有はGitHub/Vercel/Supabase等の秘密管理機能を使用する
+- ログ出力に機密値が含まれる場合はマスクして共有する
+
 ## 開発コマンド
 
-現時点で統一された実行基盤は未定のため、タスク単位で必要コマンドを定義します。
+統一された実行基盤として `npm run test` を利用します。
 
 - 変更確認: `git status`
 - 差分確認: `git diff`
-- タスク参照: `_tasks/T-001.md`
+- テスト実行: `npm run test`
+- タスク参照: `_tasks/T-003.md`
 
 ## 設計書への導線
 

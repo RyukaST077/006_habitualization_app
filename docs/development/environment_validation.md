@@ -24,3 +24,15 @@
 - [ ] 環境変数の追加/変更があるPRは、接続先の環境区分（Dev/Stg/Prod）を明示している。
 - [ ] シークレットの取り扱い変更があるPRは、秘密管理基盤での設定手順を明示している。
 - [ ] セキュリティ観点（SQLインジェクション対策、XSS対策、認証/認可・RLS維持）をレビュー済みである。
+
+## 6. テスト実行時チェック（ローカル/CI共通）
+- [ ] `npm run test` 実行前に `SUPABASE_ENV` / `SUPABASE_URL` / `SUPABASE_ANON_KEY` が設定されている。
+- [ ] `SUPABASE_ENV` が `prod` / `production` でないことを確認した。
+- [ ] `SUPABASE_URL` が本番環境URLを指していないことを確認した。
+- [ ] テスト失敗時はエラーメッセージ（Missing required env / Production forbidden）に従って設定を修正した。
+- [ ] カバレッジ成果物 `coverage/v8/lcov.info` が生成されることを確認した。
+
+## 7. テスト関連Secretsの取り扱い
+- [ ] テスト手順書・README・PR説明へSecrets平文を記載していない。
+- [ ] CI設定には秘密管理機能（Repository/Environment Secrets）を使用している。
+- [ ] ログ共有時はURL・キー等の機密値をマスクしている。
