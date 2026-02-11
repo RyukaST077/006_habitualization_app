@@ -33,3 +33,5 @@
 ## GitHub運用導線
 
 - PR運用の入口: `.github/README.md`
+- ブランチ運用: `docs/development/branching_strategy.md`
+- マージ条件: `docs/development/merge_policy.md`
