@@ -2,6 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './tests/e2e',
+  globalSetup: './tests/e2e/setup/env-guard.ts',
   timeout: 60_000,
   expect: {
     timeout: 10_000,

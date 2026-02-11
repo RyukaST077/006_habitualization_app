@@ -56,7 +56,19 @@ npm run test
 1. 依存関係をインストールする
    - `npm install`
 2. Chrome が実行環境にインストールされていること
-3. 必要に応じて `E2E_BASE_URL` を設定する（未設定時は `http://127.0.0.1:3000`）
+3. `SUPABASE_ENV` / `SUPABASE_URL` / `SUPABASE_ANON_KEY` が設定済みであること
+4. `SUPABASE_ENV` が `prod` / `production` ではないこと
+5. `SUPABASE_URL` が本番環境URLを指していないこと
+6. 必要に応じて `E2E_BASE_URL` を設定する（未設定時は `http://127.0.0.1:3000`）
+
+#### E2E前提条件（共通）
+
+- 依存関係をインストールする（`npm install`）。
+- Chrome が実行環境にインストールされている。
+- `SUPABASE_ENV` / `SUPABASE_URL` / `SUPABASE_ANON_KEY` が設定済みである。
+- `SUPABASE_ENV` が `prod` / `production` ではない。
+- `SUPABASE_URL` が本番環境URLを指していない。
+- 必要に応じて `E2E_BASE_URL` を設定する（未設定時は `http://127.0.0.1:3000`）。
 
 ### 実行
 
@@ -64,8 +76,14 @@ npm run test
 # テスト検出のみ
 npm run test:e2e -- --list
 
+# スモーク対象のみ（本番接続ガード有効）
+npm run test:e2e:smoke:list
+
 # E2E実行
 npm run test:e2e
+
+# スモーク実行（本番接続ガード有効）
+npm run test:e2e:smoke
 ```
 
 ### 失敗時の証跡
@@ -76,11 +94,13 @@ npm run test:e2e
 ### 失敗時の確認手順
 
 1. `SUPABASE_ENV` / `SUPABASE_URL` / `SUPABASE_ANON_KEY` の未設定・誤設定を確認する
-2. エラーメッセージが `Missing required environment variables` の場合:
+2. エラーメッセージが `[E2E-GUARD] Missing required environment variables` の場合:
    - 必須環境変数を設定し直して再実行する
-3. エラーメッセージが `Production environment is forbidden for tests` の場合:
+3. エラーメッセージが `[E2E-GUARD] Production environment is forbidden for smoke tests` の場合:
    - `SUPABASE_ENV` を `stg` 等の非本番値へ修正する
-4. 接続エラーの場合:
+4. エラーメッセージが `[E2E-GUARD] Production-like URL is forbidden for smoke tests` の場合:
+   - `SUPABASE_URL` を検証環境向けURLに修正する
+5. 接続エラーの場合:
    - `SUPABASE_URL` が検証環境向けであることとネットワーク到達性を確認する
 
 ### Secrets運用の注意

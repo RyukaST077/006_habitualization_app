@@ -32,6 +32,24 @@
 - [ ] テスト失敗時はエラーメッセージ（Missing required env / Production forbidden）に従って設定を修正した。
 - [ ] カバレッジ成果物 `coverage/v8/lcov.info` が生成されることを確認した。
 
+## 8. E2Eスモーク実行前チェック（READMEと同一）
+### E2E前提条件（共通）
+- [ ] 依存関係をインストールする（`npm install`）。
+- [ ] Chrome が実行環境にインストールされている。
+- [ ] `SUPABASE_ENV` / `SUPABASE_URL` / `SUPABASE_ANON_KEY` が設定済みである。
+- [ ] `SUPABASE_ENV` が `prod` / `production` ではない。
+- [ ] `SUPABASE_URL` が本番環境URLを指していない。
+- [ ] 必要に応じて `E2E_BASE_URL` を設定する（未設定時は `http://127.0.0.1:3000`）。
+
+実行コマンド:
+- [ ] `npm run test:e2e:smoke:list`（スモーク検出、本番接続ガード有効）
+- [ ] `npm run test:e2e:smoke`（スモーク実行、本番接続ガード有効）
+
+失敗時確認:
+- [ ] `[E2E-GUARD] Missing required environment variables` の場合は欠落キーを設定して再実行する。
+- [ ] `[E2E-GUARD] Production environment is forbidden for smoke tests` の場合は `SUPABASE_ENV` を非本番値へ修正する。
+- [ ] `[E2E-GUARD] Production-like URL is forbidden for smoke tests` の場合は `SUPABASE_URL` を検証環境向けへ修正する。
+
 ## 7. テスト関連Secretsの取り扱い
 - [ ] テスト手順書・README・PR説明へSecrets平文を記載していない。
 - [ ] CI設定には秘密管理機能（Repository/Environment Secrets）を使用している。

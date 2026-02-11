@@ -5,7 +5,9 @@
   "scripts": {
     "test": "vitest run --coverage",
     "test:watch": "vitest",
-    "test:e2e": "playwright test --pass-with-no-tests"
+    "test:e2e": "playwright test --pass-with-no-tests",
+    "test:e2e:smoke": "E2E_SMOKE_GUARD=1 playwright test tests/e2e/smoke --pass-with-no-tests",
+    "test:e2e:smoke:list": "E2E_SMOKE_GUARD=1 playwright test tests/e2e/smoke --pass-with-no-tests --list"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
