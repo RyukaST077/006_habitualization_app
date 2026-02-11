@@ -38,6 +38,7 @@
 - 実装計画: `docs/implements_plan.md`
 - プロジェクト設計: `docs/01_Project_Design/`
 - Secrets管理方針: `docs/development/secrets_management.md`
+- 環境/Secrets検証手順: `docs/development/environment_validation.md`
 
 ## セキュリティ運用ルール
 
@@ -52,4 +53,5 @@
 - PR運用の入口: `.github/README.md`
 - ブランチ運用: `docs/development/branching_strategy.md`
 - マージ条件: `docs/development/merge_policy.md`
+- 環境/Secrets点検: `docs/development/environment_validation.md`
 - CODEOWNERS: `.github/CODEOWNERS`
