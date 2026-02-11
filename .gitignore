@@ -15,7 +15,8 @@ dist/
 build/
 
 # Test and coverage outputs
-coverage/
+coverage/*
+!coverage/.gitkeep
 
 # Logs
 *.log
