@@ -37,12 +37,15 @@
 
 - 実装計画: `docs/implements_plan.md`
 - プロジェクト設計: `docs/01_Project_Design/`
+- Secrets管理方針: `docs/development/secrets_management.md`
 
 ## セキュリティ運用ルール
 
 - `.env*` はリポジトリにコミットしない。
 - シークレットを平文でリポジトリに保存しない。
 - 認証情報は必要最小権限で発行し、漏えい時は速やかにローテーションする。
+- `service_role` はサーバコンテキスト限定で利用する。
+- 運用者特権はMFA必須、共有アカウント禁止で運用する。
 
 ## GitHub運用導線
 
