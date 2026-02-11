@@ -6,10 +6,24 @@
 
 1. 必要ツールを確認する
    - `git`
-2. 環境変数ファイルを準備する
-   - `.env.example` または `.env.template` を複製して `.env.local` などを作成
-3. シークレットをローカルに設定する
+2. 環境変数テンプレートを確認する
+   - 共通必須キー: `.env.example`
+   - 開発環境（Dev）: `.env.dev.example`（日次開発、ダミーデータのみ）
+   - 検証環境（Stg）: `.env.stg.example`（受入試験、本番相当設定 + 匿名化データ）
+   - 本番環境（Prod）: `.env.prod.example`（本番運用、実データ）
+3. 利用環境に応じたファイルを作成する
+   - 例: `cp .env.dev.example .env.local`
+   - Stg/Prod はローカル複製ではなく、秘密管理基盤（GitHub/Vercel/Supabase）への設定を前提とする
+4. シークレットをローカルに設定する
    - APIキーや認証情報はローカル環境変数のみで管理
+
+## 環境ごとの差分方針
+
+- Dev: `SUPABASE_URL` は開発用接続先を使用し、データはダミーデータのみを扱う
+- Stg: `SUPABASE_URL` はステージング接続先を使用し、本番相当設定で匿名化データを扱う
+- Prod: `SUPABASE_URL` は本番接続先を使用し、実データを扱う
+- 共通: `SUPABASE_ANON_KEY` はクライアント公開キーのみを設定し、`service_role` のようなサーバ専用キーはテンプレートに含めない
+- 運用ルール: Preview環境から本番DBへ接続しない
 
 ## 開発コマンド
 
