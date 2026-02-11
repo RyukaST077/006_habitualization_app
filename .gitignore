@@ -1,6 +1,9 @@
 # Secrets and local environment files
 .env*
 !.env.example
+!.env.dev.example
+!.env.stg.example
+!.env.prod.example
 !.env.template
 
 # Dependency directories
