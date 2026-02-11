@@ -49,6 +49,30 @@ npm run test
 - ワークフロー内で `npm ci` 後に `npm run test` を実行する
 - テスト後に `coverage/v8/lcov.info` を成果物として参照する
 
+## E2E実行手順（Playwright）
+
+### 前提
+
+1. 依存関係をインストールする
+   - `npm install`
+2. Chrome が実行環境にインストールされていること
+3. 必要に応じて `E2E_BASE_URL` を設定する（未設定時は `http://127.0.0.1:3000`）
+
+### 実行
+
+```bash
+# テスト検出のみ
+npm run test:e2e -- --list
+
+# E2E実行
+npm run test:e2e
+```
+
+### 失敗時の証跡
+
+- `playwright-report/`: HTMLレポート
+- `test-results/`: 失敗時トレース・スクリーンショット・動画
+
 ### 失敗時の確認手順
 
 1. `SUPABASE_ENV` / `SUPABASE_URL` / `SUPABASE_ANON_KEY` の未設定・誤設定を確認する

@@ -17,6 +17,8 @@ build/
 # Test and coverage outputs
 coverage/*
 !coverage/.gitkeep
+playwright-report/
+test-results/
 
 # Logs
 *.log
