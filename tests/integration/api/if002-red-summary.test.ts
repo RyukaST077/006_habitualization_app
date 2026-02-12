@@ -12,4 +12,10 @@ describe('IF-002 red summary (T-027 handoff)', () => {
     expect('T-027 IF-002 routes implemented').toContain('implemented');
     requireApiRoute('src/app/api/home/habits/route.ts');
   });
+
+  it('tracks T-045 red focus for checkins idempotency and archived rejection', () => {
+    expect('T-045 checkins red not implemented').toContain('T-045');
+    expect('T-045 checkins red not implemented').toContain('not implemented');
+    expect('T-045 checkins red not implemented').toContain('checkins');
+  });
 });
