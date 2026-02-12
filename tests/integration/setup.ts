@@ -32,6 +32,12 @@ function parseIntegrationEnv(env: NodeJS.ProcessEnv = process.env): IntegrationE
   return { supabaseUrl, supabaseAnonKey, targetEnv };
 }
 
+export function hasIntegrationEnv(env: NodeJS.ProcessEnv = process.env): boolean {
+  return Boolean(
+    env.SUPABASE_URL?.trim() && env.SUPABASE_ANON_KEY?.trim() && env.SUPABASE_ENV?.trim(),
+  );
+}
+
 function assertNotProductionTarget({ supabaseUrl, targetEnv }: IntegrationEnv): void {
   const normalizedEnv = normalize(targetEnv);
   if (PROD_ENV_NAMES.has(normalizedEnv)) {

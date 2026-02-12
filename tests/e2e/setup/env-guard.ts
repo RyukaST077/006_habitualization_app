@@ -37,7 +37,8 @@ function assertNotProduction(): void {
   }
 }
 
-export default async function globalSetup(_: FullConfig): Promise<void> {
+export default async function globalSetup(config: FullConfig): Promise<void> {
+  void config;
   if (!isSmokeGuardEnabled()) {
     return;
   }
