@@ -125,3 +125,9 @@ export const REPOSITORY_CONTRACT_TEST_GLOBS = [
 export const IF002_CONTRACT_TEST_GLOBS = [
   'tests/integration/api/*.test.ts',
 ] as const;
+
+export const FNC013_CONTRACT_TEST_GLOBS = [
+  'tests/integration/db/fnc013-rls-policy.contract.test.ts',
+  'tests/integration/security/fnc013-authorization-policy.contract.test.ts',
+  'tests/integration/security/fnc013-red-summary.test.ts',
+] as const;
