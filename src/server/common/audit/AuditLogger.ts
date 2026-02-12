@@ -1,6 +1,12 @@
+export type HabitAuditAction =
+  | 'HABIT_CREATE'
+  | 'HABIT_UPDATE'
+  | 'HABIT_ARCHIVE'
+  | 'HABIT_RESUME';
+
 export type AuditRecord = {
   audit: true;
-  action: string;
+  action: HabitAuditAction | string;
   result: 'success' | 'failure';
   trace_id: string;
   actorId?: string;
