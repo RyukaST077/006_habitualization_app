@@ -109,20 +109,45 @@ export class HabitRepository {
     habitId: string,
     logDate: string,
     checkedInAt: string,
-  ): Promise<void> {
-    const { error } = await this.client.from('habit_logs').upsert(
-      {
-        user_id: userId,
-        habit_id: habitId,
-        log_date: logDate,
-        checked_in_at: checkedInAt,
-      },
-      { onConflict: 'habit_id,log_date' },
-    );
+  ): Promise<{ idempotent: boolean }> {
+    const { error } = await this.client.from('habit_logs').insert({
+      user_id: userId,
+      habit_id: habitId,
+      log_date: logDate,
+      checked_in_at: checkedInAt,
+    });
+
+    if (!error) {
+      return { idempotent: false };
+    }
+
+    if (error.code === '23505') {
+      return { idempotent: true };
+    }
+
+    throw new Error(`CHECKIN_CONFLICT:${error.message}`);
+  }
+
+  async findOwnedHabitStatus(
+    userId: string,
+    habitId: string,
+  ): Promise<HabitStatus | null> {
+    const { data, error } = await this.client
+      .from('habits')
+      .select('status')
+      .eq('id', habitId)
+      .eq('user_id', userId)
+      .maybeSingle();
 
     if (error) {
-      throw new Error(`CHECKIN_CONFLICT:${error.message}`);
+      throw new Error(`HABIT_NOT_FOUND:${error.message}`);
     }
+
+    if (!data) {
+      return null;
+    }
+
+    return data.status as HabitStatus;
   }
 
   async deleteCheckin(userId: string, habitId: string, logDate: string): Promise<void> {

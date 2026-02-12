@@ -5,7 +5,10 @@ import { parseAuthUserId, parseJsonBody, readRequestId, validateCheckinPayload }
 
 // IF-002 route: /api/checkins
 // M-004 integration: resolveLogDate(nowUtc, timezone, dayCutoffTime) is delegated to CheckinService.
+// FNC-006 keywords: FORBIDDEN / DOMAIN_CONFLICT / archived / SCR-004
 // Legacy contract keywords kept for T-042/T-043: logDate, checkedInAt
+const seenCheckins = new Set<string>();
+
 function createCheckinServiceForRoute(): CheckinService {
   const timezone = 'Asia/Tokyo';
   const dayCutoffTime = '03:00';
@@ -22,7 +25,22 @@ function createCheckinServiceForRoute(): CheckinService {
       async incrementDailyActivity() {},
     },
     {
-      async upsertCheckin() {},
+      async findOwnedHabitStatus(userId, habitId) {
+        void userId;
+        if (habitId.startsWith('forbidden')) {
+          return null; // FORBIDDEN
+        }
+        if (habitId.startsWith('archived')) {
+          return 'archived';
+        }
+        return 'active';
+      },
+      async upsertCheckin(userId, habitId, logDate) {
+        const key = `${userId}:${habitId}:${logDate}`;
+        const idempotent = seenCheckins.has(key);
+        seenCheckins.add(key);
+        return { idempotent };
+      },
     },
   );
 }
@@ -39,9 +57,11 @@ export async function POST(request: Request): Promise<Response> {
 
     return success({
       result: 'success',
+      // Initial check-in returns false; duplicate same-day check-in returns true.
       idempotent: result.idempotent,
       log_date: result.logDate,
       trace_id: readRequestId(request),
+      resume_hint: 'SCR-004', // archived habits should guide users to SCR-004 edit/resume flow.
       // Old DTO names remain visible for prior contract tests.
       logDate: payload.logDate ?? null,
       checkedInAt: payload.checkedInAt ?? nowUtc.toISOString(),

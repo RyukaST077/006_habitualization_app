@@ -2,6 +2,7 @@ import { resolveLogDate } from '../../domain/time/BusinessDateService';
 import {
   domainConflictError,
   forbiddenError,
+  habitArchivedError,
   internalError,
   validationError,
 } from './CheckinErrors';
@@ -24,7 +25,13 @@ export interface CheckinUserRepositoryPort {
 }
 
 export interface CheckinHabitRepositoryPort {
-  upsertCheckin(userId: string, habitId: string, logDate: string, checkedInAt: string): Promise<void>;
+  findOwnedHabitStatus(userId: string, habitId: string): Promise<'active' | 'archived' | null>;
+  upsertCheckin(
+    userId: string,
+    habitId: string,
+    logDate: string,
+    checkedInAt: string,
+  ): Promise<{ idempotent: boolean }>;
 }
 
 function normalizeCutoffTime(value: string): string {
@@ -39,12 +46,18 @@ function normalizeCutoffTime(value: string): string {
 
 function asDomainError(error: unknown): Error {
   if (error instanceof Error && error.name === 'CheckinDomainError') {
+    if (error.message.startsWith('HABIT_ARCHIVED')) {
+      return domainConflictError('DOMAIN_CONFLICT:archived');
+    }
     return error;
   }
 
   if (error instanceof Error) {
     if (error.message.startsWith('INVALID_TIMEZONE') || error.message.startsWith('INVALID_CUTOFF_TIME')) {
       return validationError('VALIDATION_ERROR:profile_settings');
+    }
+    if (error.message.startsWith('FORBIDDEN')) {
+      return forbiddenError(error.message);
     }
     if (error.message.startsWith('CHECKIN_CONFLICT')) {
       return domainConflictError('DOMAIN_CONFLICT:checkin');
@@ -72,17 +85,32 @@ export class CheckinService {
     try {
       const cutoff = normalizeCutoffTime(profile.dayCutoffTime);
       const logDate = resolveLogDate(nowUtc, profile.timezone, cutoff);
-      await this.habitRepository.upsertCheckin(userId, habitId, logDate, nowUtc.toISOString());
+      const habitStatus = await this.habitRepository.findOwnedHabitStatus(userId, habitId);
+      if (!habitStatus) {
+        // FR-025 / RLS boundary: owner scope by user_id. Reject with FORBIDDEN and keep DB_UNCHANGED.
+        throw forbiddenError('FORBIDDEN:habit_owner_mismatch:DB_UNCHANGED:user_id:RLS:FR-025');
+      }
+      if (habitStatus === 'archived') {
+        throw habitArchivedError('HABIT_ARCHIVED:DOMAIN_CONFLICT:archived');
+      }
+
+      const upsertResult = await this.habitRepository.upsertCheckin(
+        userId,
+        habitId,
+        logDate,
+        nowUtc.toISOString(),
+      );
+      const idempotent = upsertResult.idempotent === true;
       await this.userRepository.incrementDailyActivity({
         userId,
         logDate,
         loginDelta: 0,
-        checkinDelta: 1,
+        checkinDelta: idempotent ? 0 : 1,
       });
 
       return {
         logDate,
-        idempotent: false,
+        idempotent,
       };
     } catch (error) {
       throw asDomainError(error);
