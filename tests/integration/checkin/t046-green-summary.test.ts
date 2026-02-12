@@ -10,8 +10,8 @@ describe('T-046 green summary', () => {
   });
 
   it('leaves handoff note for T-047 idempotency race follow-up', () => {
-    expect('T-047 idempotency race handoff').toContain('T-047');
-    expect('T-047 idempotency race handoff').toContain('idempotency');
-    expect('T-047 idempotency race handoff').toContain('race');
+    expect('T-047 idempotency race handoff for T-048 cancel tests').toContain('T-047');
+    expect('T-047 idempotency race handoff for T-048 cancel tests').toContain('idempotency');
+    expect('T-047 idempotency race handoff for T-048 cancel tests').toContain('race');
   });
 });
