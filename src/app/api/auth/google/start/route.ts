@@ -1,9 +1,9 @@
-import { NextResponse } from 'next/server';
 import {
   startGoogleLogin,
   type StartGoogleLoginFailure,
   type StartGoogleLoginSuccess,
 } from '../../../../../server/auth/start-google-login';
+import { toAuthErrorResponse, toAuthJsonResponse } from '../../../../../server/auth/auth-route-response';
 
 type RequestBody = {
   redirectTo?: string;
@@ -24,16 +24,24 @@ export async function POST(request: Request): Promise<Response> {
   const result = startGoogleLogin(redirectTo);
 
   if (result.status === 200) {
-    const body: Pick<StartGoogleLoginSuccess, 'auth_url' | 'trace_id'> = {
-        auth_url: result.auth_url,
-        trace_id: result.trace_id,
+    const body: Pick<StartGoogleLoginSuccess, 'auth_url' | 'trace_id' | 'auditEvent'> = {
+      auth_url: result.auth_url,
+      trace_id: result.trace_id,
+      auditEvent: result.auditEvent,
     };
-    return NextResponse.json(body, { status: 200 });
+    return toAuthJsonResponse({
+      status: 200,
+      ...body,
+    });
   }
 
-  const body: Pick<StartGoogleLoginFailure, 'errorCode' | 'trace_id'> = {
-      errorCode: result.errorCode,
-      trace_id: result.trace_id,
+  const body: Pick<StartGoogleLoginFailure, 'errorCode' | 'trace_id' | 'auditEvent'> = {
+    errorCode: result.errorCode,
+    trace_id: result.trace_id,
+    auditEvent: result.auditEvent,
   };
-  return NextResponse.json(body, { status: result.status });
+  return toAuthErrorResponse({
+    status: result.status,
+    ...body,
+  });
 }

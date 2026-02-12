@@ -1,6 +1,10 @@
-import { NextResponse } from 'next/server';
-
 import { completeGoogleLogin } from '../../../../../../server/auth/complete-google-login';
+import { toAuthErrorResponse, toAuthJsonResponse } from '../../../../../../server/auth/auth-route-response';
+
+const AUTH_CALLBACK_ERROR_ALIASES = {
+  AUTH_FAILED: 'AUTH_FAILED',
+  AUTH_PROVIDER_ERROR: 'AUTH_PROVIDER_ERROR',
+} as const;
 
 export async function GET(request: Request): Promise<Response> {
   const url = new URL(request.url);
@@ -10,24 +14,23 @@ export async function GET(request: Request): Promise<Response> {
   );
 
   if (result.status === 200) {
-    return NextResponse.json(
-      {
-        callback: result.callback,
-        redirectTo: result.redirectTo,
-        trace_id: result.trace_id,
-      },
-      { status: 200 },
-    );
+    return toAuthJsonResponse({
+      status: 200,
+      callback: result.callback,
+      redirectTo: result.redirectTo,
+      trace_id: result.trace_id,
+      auditEvent: result.auditEvent,
+    });
   }
 
-  return NextResponse.json(
+  return toAuthErrorResponse(
     {
+      status: result.status,
       callback: result.callback,
       errorCode: result.errorCode,
       trace_id: result.trace_id,
-      AUTH_FAILED: 'AUTH_FAILED',
-      AUTH_PROVIDER_ERROR: 'AUTH_PROVIDER_ERROR',
+      auditEvent: result.auditEvent,
     },
-    { status: result.status },
+    AUTH_CALLBACK_ERROR_ALIASES,
   );
 }
