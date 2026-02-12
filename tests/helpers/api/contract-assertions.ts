@@ -15,3 +15,9 @@ export function expectValidationKeywords(sourceCode: string, keywords: string[])
   }
 }
 
+export function expectErrorResponseContract(sourceCode: string): void {
+  expect(sourceCode).toContain('FORBIDDEN');
+  expect(sourceCode).toContain('DOMAIN_CONFLICT');
+  expect(sourceCode).toContain('INTERNAL_ERROR');
+  expect(sourceCode).toContain('trace_id');
+}
