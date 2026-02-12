@@ -95,3 +95,7 @@ export async function probeSupabaseConnection(env: NodeJS.ProcessEnv = process.e
 export function loadCoreMigrationSql(): string {
   return loadMigrationSql();
 }
+
+export function loadIntegrationMigrationSql(): string {
+  return loadMigrationSql();
+}
