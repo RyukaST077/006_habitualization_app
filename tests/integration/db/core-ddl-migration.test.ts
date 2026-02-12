@@ -1,19 +1,20 @@
 import { describe, expect, test } from 'vitest';
 
-import { loadCoreMigrationSql } from '../setup';
+import { hasDdlMatcher } from '../../helpers/db/schema-introspection';
+import { loadMigrationSql } from '../../helpers/db/migration-runner';
 
 describe('core DDL migration contract (Red)', () => {
   test('[migration] core tables are applied in init migration', () => {
-    const sql = loadCoreMigrationSql();
+    const sql = loadMigrationSql();
 
-    expect(sql).toMatch(/create\s+table\s+profiles/i);
-    expect(sql).toMatch(/create\s+table\s+habits/i);
-    expect(sql).toMatch(/create\s+table\s+habit_logs/i);
+    expect(hasDdlMatcher(sql, /create\s+table\s+profiles/i)).toBe(true);
+    expect(hasDdlMatcher(sql, /create\s+table\s+habits/i)).toBe(true);
+    expect(hasDdlMatcher(sql, /create\s+table\s+habit_logs/i)).toBe(true);
   });
 
   test('[migration] placeholder is removed after DDL implementation', () => {
-    const sql = loadCoreMigrationSql();
+    const sql = loadMigrationSql();
 
-    expect(sql).not.toMatch(/placeholder:\s+no\s+schema\s+changes/i);
+    expect(hasDdlMatcher(sql, /placeholder:\s+no\s+schema\s+changes/i)).toBe(false);
   });
 });
