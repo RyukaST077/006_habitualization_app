@@ -14,6 +14,24 @@ export type FixtureUsers = {
   OPS_1: FixtureUser;
 };
 
+export type AuthConsentFixtureState =
+  | 'unauthenticated'
+  | 'authenticated_without_consent'
+  | 'authenticated_with_consent';
+
+export type AuthConsentFixture = {
+  actorId: string;
+  state: AuthConsentFixtureState;
+  hasSession: boolean;
+  hasConsented: boolean;
+};
+
+export type AuthConsentFixtures = {
+  UNAUTHENTICATED: AuthConsentFixture;
+  AUTHENTICATED_WITHOUT_CONSENT: AuthConsentFixture;
+  AUTHENTICATED_WITH_CONSENT: AuthConsentFixture;
+};
+
 const BASE_USERS: FixtureUsers = {
   // USER_A: normal user for successful self-owned operations.
   USER_A: {
@@ -47,10 +65,39 @@ const BASE_USERS: FixtureUsers = {
   },
 };
 
+const BASE_AUTH_CONSENT_FIXTURES: AuthConsentFixtures = {
+  UNAUTHENTICATED: {
+    actorId: 'actor-unauthenticated',
+    state: 'unauthenticated',
+    hasSession: false,
+    hasConsented: false,
+  },
+  AUTHENTICATED_WITHOUT_CONSENT: {
+    actorId: 'actor-auth-without-consent',
+    state: 'authenticated_without_consent',
+    hasSession: true,
+    hasConsented: false,
+  },
+  AUTHENTICATED_WITH_CONSENT: {
+    actorId: 'actor-auth-with-consent',
+    state: 'authenticated_with_consent',
+    hasSession: true,
+    hasConsented: true,
+  },
+};
+
 export function createFixtureUsers(): FixtureUsers {
   return {
     USER_A: { ...BASE_USERS.USER_A },
     USER_B: { ...BASE_USERS.USER_B },
     OPS_1: { ...BASE_USERS.OPS_1 },
+  };
+}
+
+export function createAuthConsentFixtures(): AuthConsentFixtures {
+  return {
+    UNAUTHENTICATED: { ...BASE_AUTH_CONSENT_FIXTURES.UNAUTHENTICATED },
+    AUTHENTICATED_WITHOUT_CONSENT: { ...BASE_AUTH_CONSENT_FIXTURES.AUTHENTICATED_WITHOUT_CONSENT },
+    AUTHENTICATED_WITH_CONSENT: { ...BASE_AUTH_CONSENT_FIXTURES.AUTHENTICATED_WITH_CONSENT },
   };
 }

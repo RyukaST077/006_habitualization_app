@@ -25,3 +25,11 @@ export function expectGuardRedirect(
 export function expectSessionDestroyed(actual: boolean, expected: boolean): void {
   expect(actual).toBe(expected);
 }
+
+export function expectGuardFailureReason(
+  actualMessage: string,
+  expectedRedirect: '/login' | '/policy-consent' | '/home',
+): void {
+  expect(actualMessage).toContain('Guard not implemented');
+  expect(actualMessage).toContain(expectedRedirect);
+}

@@ -5,11 +5,21 @@ import {
   ROUTING_ACTORS,
   type RoutingActor,
 } from '../../helpers/routing-actors';
-import { expectGuardRedirect, expectSessionDestroyed } from '../../helpers/assertions';
+import {
+  expectGuardFailureReason,
+  expectGuardRedirect,
+  expectSessionDestroyed,
+} from '../../helpers/assertions';
 
 type GuardResolution = {
   nextPath: '/login' | '/policy-consent' | '/home';
   sessionDestroyed: boolean;
+};
+
+type GuardFailureHint = {
+  state: RoutingActor['state'];
+  requestedPath: '/home' | '/policy-consent';
+  expectedRedirect: GuardResolution['nextPath'];
 };
 
 function resolveGuardedTransition(
@@ -38,6 +48,11 @@ function resolveGuardedTransition(
   }
 
   throw new Error('Guard not implemented: no transition rule for this case');
+}
+
+function expectResolvedGuard(result: GuardResolution, expectedPath: GuardResolution['nextPath'], sessionDestroyed: boolean): void {
+  expectGuardRedirect(result.nextPath, expectedPath);
+  expectSessionDestroyed(result.sessionDestroyed, sessionDestroyed);
 }
 
 describe('auth consent guard transitions (Red)', () => {
@@ -79,10 +94,37 @@ describe('auth consent guard transitions (Red)', () => {
     expect(tags).toContain('POLICY_CONSENT_REJECT');
   });
 
+  it('keeps reusable guard failure reason hints for expected redirects', () => {
+    const failureHints: GuardFailureHint[] = [
+      { state: 'unauthenticated', requestedPath: '/home', expectedRedirect: '/login' },
+      {
+        state: 'authenticated_without_consent',
+        requestedPath: '/home',
+        expectedRedirect: '/policy-consent',
+      },
+      {
+        state: 'authenticated_without_consent',
+        requestedPath: '/policy-consent',
+        expectedRedirect: '/login',
+      },
+      {
+        state: 'authenticated_with_consent',
+        requestedPath: '/policy-consent',
+        expectedRedirect: '/home',
+      },
+    ];
+
+    for (const hint of failureHints) {
+      expectGuardFailureReason(
+        `Guard not implemented: expected redirect to ${hint.expectedRedirect}`,
+        hint.expectedRedirect,
+      );
+    }
+  });
+
   it('[TC-IT-FR-003-002][FNC-001][SCR-002->SCR-001] 未認証で/home直アクセス時に/loginへ遷移する', () => {
     const result = resolveGuardedTransition(ROUTING_ACTORS.UNAUTHENTICATED, '/home');
-    expectGuardRedirect(result.nextPath, '/login');
-    expectSessionDestroyed(result.sessionDestroyed, false);
+    expectResolvedGuard(result, '/login', false);
   });
 
   it('[TC-IT-FR-003-002][FNC-002][SCR-002->SCR-008] 認証済み未同意で/home直アクセス時に/policy-consentへ遷移する', () => {
@@ -90,8 +132,7 @@ describe('auth consent guard transitions (Red)', () => {
       ROUTING_ACTORS.AUTHENTICATED_WITHOUT_CONSENT,
       '/home',
     );
-    expectGuardRedirect(result.nextPath, '/policy-consent');
-    expectSessionDestroyed(result.sessionDestroyed, false);
+    expectResolvedGuard(result, '/policy-consent', false);
   });
 
   it('[TC-ST-FR-004-004][FNC-002][SCR-008->SCR-001] 同意拒否時にセッション破棄して/loginへ遷移する', () => {
@@ -100,8 +141,7 @@ describe('auth consent guard transitions (Red)', () => {
       '/policy-consent',
       'reject',
     );
-    expectGuardRedirect(result.nextPath, '/login');
-    expectSessionDestroyed(result.sessionDestroyed, true);
+    expectResolvedGuard(result, '/login', true);
   });
 
   it('[TC-IT-FR-002-001][FNC-001/FNC-002][SCR-001->SCR-002] 同意済みなら/homeへ到達可能', () => {
@@ -115,7 +155,6 @@ describe('auth consent guard transitions (Red)', () => {
 
   it('[TC-IT-FR-002-001][FNC-002][SCR-008->SCR-002] 同意済みで/policy-consent到達時は/homeへ遷移する', () => {
     const result = resolveGuardedTransition(ROUTING_ACTORS.AUTHENTICATED_WITH_CONSENT, '/policy-consent');
-    expectGuardRedirect(result.nextPath, '/home');
-    expectSessionDestroyed(result.sessionDestroyed, false);
+    expectResolvedGuard(result, '/home', false);
   });
 });
