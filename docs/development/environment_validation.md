@@ -69,3 +69,23 @@
 - [ ] DDL変更時に `supabase db diff -f <name>` で migration を生成している。
 - [ ] `supabase db reset` で migration 再適用と seed 初期化を検証している。
 - [ ] 反映前に `supabase db push` の対象差分を確認している。
+
+## 10. DBセットアップとRLS確認（PR-004）
+- [ ] `db:start -> migration適用 -> db:seed -> db:test` の順序で実行している。
+- [ ] `SUPABASE_ENV` が `prod` / `production` ではない。
+- [ ] `SUPABASE_URL` が本番環境URL（production系）を指していない。
+- [ ] `npm run db:test`（= `npm run test`）が成功している。
+- [ ] RLS拒否確認SQLを実行し、他ユーザーデータが `0 rows` または `permission denied` であることを確認している。
+
+RLS拒否確認SQL（例）:
+- [ ] `select * from public.habit_records where user_id <> auth.uid();`
+
+後続タスク前提コマンド:
+- [ ] `T-018` 実施前に `npm run db:status` と `test -f supabase/migrations/00000000000000_init.sql` を確認した。
+- [ ] `T-020` 実施前に `npm run db:status` と `test -f supabase/seed.sql` を確認した。
+- [ ] `T-022` 実施前に `npm run db:status` と `npm run db:test` を確認した。
+
+失敗時切り分け:
+- [ ] env不足時は `SUPABASE_ENV` / `SUPABASE_URL` / `SUPABASE_ANON_KEY` の設定漏れを確認する。
+- [ ] 本番URL誤設定時は `SUPABASE_ENV` と `SUPABASE_URL` の値を非本番へ修正する。
+- [ ] migration不整合時は `supabase db reset` を再実行し、migration適用順と失敗SQLを確認する。

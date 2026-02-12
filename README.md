@@ -191,6 +191,47 @@ order by policy_type;
 - RLS/監査の統合試験は固定ユーザー `USER-A` / `USER-B` と運用ロール `ROLE-002` を利用する。
 - 本PRでは `policy_settings` 初期値（terms/privacy v1.0）を `supabase/seed.sql` で投入する。
 
+## DBセットアップ・検証フロー（T-018/T-020/T-022 前提）
+
+順序は `db:start -> migration適用 -> db:seed -> db:test` を必ず守る。
+
+```bash
+# 1) DB起動
+npm run db:start
+
+# 2) migration適用（ローカル再作成で整合性検証）
+supabase db reset
+
+# 3) seed投入
+npm run db:seed
+
+# 4) DB関連テスト実行
+npm run db:test
+```
+
+### RLS拒否確認（手動確認）
+
+```sql
+-- anon/一般ユーザーで、他ユーザーのhabit_records等が参照不可であることを確認する
+-- 実行結果は 0 rows または permission denied を期待値とする
+select * from public.habit_records where user_id <> auth.uid();
+```
+
+### 事前確認コマンド（後続タスク向け）
+
+- `T-018` 前提: `npm run db:status` / `test -f supabase/migrations/00000000000000_init.sql`
+- `T-020` 前提: `npm run db:status` / `test -f supabase/seed.sql`
+- `T-022` 前提: `npm run db:status` / `npm run db:test`
+
+### 失敗時の切り分け
+
+1. env不足:
+   - `SUPABASE_ENV` / `SUPABASE_URL` / `SUPABASE_ANON_KEY` が設定されているか確認する。
+2. 本番URL誤設定:
+   - `SUPABASE_ENV=prod|production` または `SUPABASE_URL` に `prod`/`production` が含まれていないか確認する。
+3. migration不整合:
+   - `supabase db reset` を再実行し、`supabase/migrations` の適用順とSQLエラーを確認する。
+
 ## 設計書への導線
 
 - 実装計画: `docs/implements_plan.md`
