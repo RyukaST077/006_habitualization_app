@@ -4,17 +4,19 @@ import { describe, expect, it } from 'vitest';
 
 describe('footer component contracts (Red)', () => {
   it('SCR-COM-3.1-F: 利用規約/プライバシーポリシー/コピーライトを表示する', () => {
-    const policyPage = readFileSync(resolve('src/app/policy-consent/page.tsx'), 'utf8');
+    const footerComponent = readFileSync(resolve('src/components/common/app-footer.tsx'), 'utf8');
 
-    expect(policyPage).toContain('利用規約');
-    expect(policyPage).toContain('プライバシーポリシー');
-    expect(policyPage).toContain('コピーライト');
+    expect(footerComponent).toContain('利用規約');
+    expect(footerComponent).toContain('プライバシーポリシー');
+    expect(footerComponent).toContain('コピーライト');
   });
 
   it('SCR-COM-3.1-F: 利用規約とプライバシーポリシーへのリンクを持つ', () => {
     const policyPage = readFileSync(resolve('src/app/policy-consent/page.tsx'), 'utf8');
+    const footerComponent = readFileSync(resolve('src/components/common/app-footer.tsx'), 'utf8');
 
-    expect(policyPage).toContain('href="/terms"');
-    expect(policyPage).toContain('href="/privacy"');
+    expect(policyPage).toContain('AppFooter');
+    expect(footerComponent).toContain('href="/terms"');
+    expect(footerComponent).toContain('href="/privacy"');
   });
 });

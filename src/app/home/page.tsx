@@ -1,8 +1,10 @@
 import { HOME_TRANSITION_LINKS } from '../../client/routing/transition-map';
+import { AppHeader } from '../../components/common/app-header';
 
 export default function HomePage() {
   return (
     <main>
+      <AppHeader />
       <h1>SCR-002 ホーム</h1>
       <p>/home</p>
       <p>同意済みユーザーの到達先画面です。</p>

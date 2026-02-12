@@ -4,6 +4,7 @@ import {
   POLICY_CONSENT_TRANSITION,
   POLICY_REJECT_TRANSITION,
 } from '../../client/routing/transition-map';
+import { AppFooter } from '../../components/common/app-footer';
 
 export default function PolicyConsentPage() {
   function handleAccept(): void {
@@ -29,6 +30,7 @@ export default function PolicyConsentPage() {
       </div>
       <a href={POLICY_CONSENT_TRANSITION.href}>{POLICY_CONSENT_TRANSITION.label}</a>
       <a href={POLICY_REJECT_TRANSITION.href}>{POLICY_REJECT_TRANSITION.label}</a>
+      <AppFooter />
     </main>
   );
 }
