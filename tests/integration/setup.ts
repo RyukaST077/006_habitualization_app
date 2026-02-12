@@ -103,3 +103,7 @@ export function loadIntegrationMigrationSql(): string {
 export function loadPolicyAuditMigrationSql(): string {
   return loadMigrationSql();
 }
+
+export function loadAggregationWithdrawalAlertMigrationSql(): string {
+  return loadMigrationSql();
+}
