@@ -31,3 +31,12 @@ export function hasConstraintName(sql: string, constraintName: string): boolean 
 export function hasIndexName(sql: string, indexName: string): boolean {
   return listIndexNames(sql).includes(indexName);
 }
+
+export function hasCreateTable(sql: string, tableName: string): boolean {
+  const pattern = new RegExp(`create\\s+table\\s+${tableName}\\b`, 'i');
+  return hasDdlMatcher(sql, pattern);
+}
+
+export function listCreateTableNames(sql: string): string[] {
+  return collectNamedObjects(sql, /create\s+table\s+([a-zA-Z0-9_]+)/gi);
+}

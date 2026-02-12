@@ -111,3 +111,9 @@ export function loadAggregationWithdrawalAlertMigrationSql(): string {
 export function loadAggregationWithdrawalAlertIntegrationMigrationSql(): string {
   return loadMigrationSql();
 }
+
+export const AGGREGATION_WITHDRAWAL_ALERT_DDL_TEST_GLOBS = [
+  'tests/integration/db/*withdrawal*.test.ts',
+  'tests/integration/db/*aggregation*.test.ts',
+  'tests/integration/db/*alert*.test.ts',
+] as const;
