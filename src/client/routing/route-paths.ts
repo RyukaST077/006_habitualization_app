@@ -12,6 +12,18 @@ export type ResolveRouteParams = {
   habitId?: string;
 };
 
+export const HABIT_API_BASE_PATH = '/api/habits';
+
+export function resolveHabitArchivePath(habitId: string): string {
+  const safeHabitId = assertValidHabitId(habitId);
+  return `${HABIT_API_BASE_PATH}/${safeHabitId}/archive`;
+}
+
+export function resolveHabitResumePath(habitId: string): string {
+  const safeHabitId = assertValidHabitId(habitId);
+  return `${HABIT_API_BASE_PATH}/${safeHabitId}/resume`;
+}
+
 const FIXED_ROUTE_PATHS: Record<Exclude<ScreenId, 'SCR-004'>, string> = {
   'SCR-001': '/login',
   'SCR-002': '/home',
