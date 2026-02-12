@@ -177,5 +177,6 @@ export const T040_CONTRACT_TEST_GLOBS = [
 
 export const T042_CONTRACT_TEST_GLOBS = [
   'tests/integration/checkin/business-date.service.contract.test.ts',
+  'tests/integration/api/checkins-business-date.contract.test.ts',
   'tests/integration/checkin/t042-red-summary.test.ts',
 ] as const;

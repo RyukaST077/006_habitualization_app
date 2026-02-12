@@ -5,6 +5,7 @@ import { T042_CONTRACT_TEST_GLOBS } from '../setup';
 describe('T-042 red summary (T-043 handoff)', () => {
   it('keeps a single command entrypoint for business date red tests', () => {
     expect(T042_CONTRACT_TEST_GLOBS).toContain('tests/integration/checkin/business-date.service.contract.test.ts');
+    expect(T042_CONTRACT_TEST_GLOBS).toContain('tests/integration/api/checkins-business-date.contract.test.ts');
     expect(T042_CONTRACT_TEST_GLOBS).toContain('tests/integration/checkin/t042-red-summary.test.ts');
   });
 
