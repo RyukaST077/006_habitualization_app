@@ -18,7 +18,7 @@ describe('auth start redirect validation (Green)', () => {
     });
 
     expect(result.status).toBe(400);
-    expect(result.errorCode).toBe('INVALID_REDIRECT');
+    expect('errorCode' in result && result.errorCode).toBe('INVALID_REDIRECT');
     expect(result.sessionCreated).toBe(false);
     expect(result.auditEvent).toBe('LOGIN_FAILED');
     expect(result.trace_id).toBe('trace-invalid-redirect');
@@ -31,7 +31,7 @@ describe('auth start redirect validation (Green)', () => {
     });
 
     expect(result.status).toBe(200);
-    expect(result.auth_url).toContain('https://auth.example.local/google/start');
+    expect('auth_url' in result && result.auth_url).toContain('https://auth.example.local/google/start');
     expect(result.sessionCreated).toBe(true);
     expect(result.auditEvent).toBe('LOGIN_START');
     expect(result.trace_id).toBe('trace-success');
@@ -44,7 +44,7 @@ describe('auth start redirect validation (Green)', () => {
     });
 
     expect(result.status).toBe(401);
-    expect(result.errorCode).toBe('AUTH_FAILED');
+    expect('errorCode' in result && result.errorCode).toBe('AUTH_FAILED');
     expect(result.sessionCreated).toBe(false);
     expect(result.auditEvent).toBe('LOGIN_FAILED');
     expect(result.trace_id).toBe('trace-auth-failed');
@@ -57,7 +57,7 @@ describe('auth start redirect validation (Green)', () => {
     });
 
     expect(result.status).toBe(500);
-    expect(result.errorCode).toBe('AUTH_PROVIDER_ERROR');
+    expect('errorCode' in result && result.errorCode).toBe('AUTH_PROVIDER_ERROR');
     expect(result.sessionCreated).toBe(false);
     expect(result.auditEvent).toBe('LOGIN_FAILED');
     expect(result.trace_id).toBe('trace-provider-error');
