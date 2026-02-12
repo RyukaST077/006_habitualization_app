@@ -198,3 +198,9 @@ export const T045_CONTRACT_TEST_GLOBS = [
   'tests/integration/api/checkins-authorization.contract.test.ts',
   'tests/integration/checkin/t045-red-summary.test.ts',
 ] as const;
+
+export const T046_CONTRACT_TEST_GLOBS = [
+  'tests/integration/api/checkins-idempotency.contract.test.ts',
+  'tests/integration/api/checkins-authorization.contract.test.ts',
+  'tests/integration/checkin/t046-green-summary.test.ts',
+] as const;

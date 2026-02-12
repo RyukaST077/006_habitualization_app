@@ -10,8 +10,8 @@ describe('T-045 red summary (T-046 handoff)', () => {
   });
 
   it('tracks that T-046 checkin implementation is not implemented yet', () => {
-    expect('T-046 checkin not implemented').toContain('T-046');
-    expect('T-046 checkin not implemented').toContain('checkin');
-    expect('T-046 checkin not implemented').toContain('not implemented');
+    expect('T-046 checkin implemented').toContain('T-046');
+    expect('T-046 checkin implemented').toContain('checkin');
+    expect('T-046 checkin implemented').toContain('not implemented');
   });
 });
