@@ -6,7 +6,20 @@ type LocalDateTimeParts = {
   minute: number;
 };
 
+type DateParts = {
+  year: number;
+  month: number;
+  day: number;
+};
+
 const CUTOFF_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
+
+function assertValidNowUtc(nowUtc: Date): void {
+  if (!(nowUtc instanceof Date) || Number.isNaN(nowUtc.getTime())) {
+    // Keep INVALID_TIMEZONE for compatibility with existing error contracts.
+    throw new Error('INVALID_TIMEZONE');
+  }
+}
 
 function assertValidTimezone(timezone: string): void {
   try {
@@ -60,7 +73,7 @@ function formatYmd(year: number, month: number, day: number): string {
   return `${y}-${m}-${d}`;
 }
 
-function previousDate(year: number, month: number, day: number): { year: number; month: number; day: number } {
+function toPreviousDate({ year, month, day }: DateParts): DateParts {
   const utcMidnight = new Date(Date.UTC(year, month - 1, day));
   utcMidnight.setUTCDate(utcMidnight.getUTCDate() - 1);
   return {
@@ -70,20 +83,27 @@ function previousDate(year: number, month: number, day: number): { year: number;
   };
 }
 
-export function resolveLogDate(nowUtc: Date, timezone: string, cutoffTime: string): string {
-  if (!(nowUtc instanceof Date) || Number.isNaN(nowUtc.getTime())) {
-    throw new Error('INVALID_TIMEZONE');
-  }
+function currentDate(local: LocalDateTimeParts): DateParts {
+  return {
+    year: local.year,
+    month: local.month,
+    day: local.day,
+  };
+}
 
+function resolveBusinessDate(local: LocalDateTimeParts, cutoffMinutes: number): DateParts {
+  const localMinutes = local.hour * 60 + local.minute;
+  if (localMinutes < cutoffMinutes) {
+    return toPreviousDate(currentDate(local));
+  }
+  return currentDate(local);
+}
+
+export function resolveLogDate(nowUtc: Date, timezone: string, cutoffTime: string): string {
+  assertValidNowUtc(nowUtc);
   assertValidTimezone(timezone);
   const cutoffMinutes = parseCutoffMinutes(cutoffTime);
   const local = getLocalDateTimeParts(nowUtc, timezone);
-  const localMinutes = local.hour * 60 + local.minute;
-
-  if (localMinutes < cutoffMinutes) {
-    const prev = previousDate(local.year, local.month, local.day);
-    return formatYmd(prev.year, prev.month, prev.day);
-  }
-
-  return formatYmd(local.year, local.month, local.day);
+  const businessDate = resolveBusinessDate(local, cutoffMinutes);
+  return formatYmd(businessDate.year, businessDate.month, businessDate.day);
 }
