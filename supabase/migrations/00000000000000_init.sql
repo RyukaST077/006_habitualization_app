@@ -47,6 +47,43 @@ create table habit_logs (
   version integer not null default 1
 );
 
+create table policy_settings (
+  policy_type varchar(16) primary key,
+  current_version varchar(20) not null,
+  effective_from timestamptz not null default now(),
+  document_url varchar(255) not null,
+  updated_by uuid,
+  updated_at timestamptz not null default now(),
+  created_at timestamptz not null default now()
+);
+
+create table policy_consents (
+  id bigserial primary key,
+  user_id uuid not null,
+  policy_type varchar(16) not null,
+  policy_version varchar(20) not null,
+  consented_at timestamptz not null default now(),
+  consent_source varchar(16) not null default 'web',
+  user_agent text,
+  created_at timestamptz not null default now()
+);
+
+create table audit_logs (
+  id bigserial primary key,
+  occurred_at timestamptz not null default now(),
+  actor_user_id uuid,
+  actor_role varchar(32) not null,
+  action varchar(64) not null,
+  target_type varchar(64) not null,
+  target_id varchar(128) not null,
+  result varchar(16) not null,
+  reason text,
+  requirement_id varchar(16),
+  trace_id uuid,
+  metadata_json jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
 alter table profiles
   add constraint chk_profiles_cutoff
   check (day_cutoff_time >= time '00:00:00' and day_cutoff_time <= time '23:59:00');
