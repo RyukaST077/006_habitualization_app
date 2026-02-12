@@ -185,6 +185,77 @@ begin
 end;
 $$ language plpgsql;
 
+create or replace function fn_policy_consents_insert_audit()
+returns trigger as $$
+begin
+  insert into audit_logs (
+    occurred_at,
+    actor_user_id,
+    actor_role,
+    action,
+    target_type,
+    target_id,
+    result,
+    requirement_id,
+    metadata_json,
+    created_at
+  ) values (
+    now(),
+    new.user_id,
+    'user',
+    'policy_consent_insert',
+    'policy_consents',
+    new.id::varchar(128),
+    'success',
+    'FR-026',
+    jsonb_build_object(
+      'policy_type', new.policy_type,
+      'policy_version', new.policy_version,
+      'consent_source', new.consent_source
+    ),
+    now()
+  );
+  return new;
+end;
+$$ language plpgsql;
+
+create or replace function fn_policy_settings_update_audit()
+returns trigger as $$
+begin
+  insert into audit_logs (
+    occurred_at,
+    actor_user_id,
+    actor_role,
+    action,
+    target_type,
+    target_id,
+    result,
+    requirement_id,
+    metadata_json,
+    created_at
+  ) values (
+    now(),
+    new.updated_by,
+    case
+      when new.updated_by is null then 'system'
+      else 'service_role'
+    end,
+    'policy_settings_update',
+    'policy_settings',
+    new.policy_type,
+    'success',
+    'FR-026',
+    jsonb_build_object(
+      'old_version', old.current_version,
+      'new_version', new.current_version,
+      'policy_type', new.policy_type
+    ),
+    now()
+  );
+  return new;
+end;
+$$ language plpgsql;
+
 create trigger trg_profiles_updated_at
 before update on profiles
 for each row
@@ -204,6 +275,16 @@ create trigger trg_habit_logs_updated_at
 before update on habit_logs
 for each row
 execute function fn_set_updated_at();
+
+create trigger trg_policy_consents_insert_audit
+after insert on policy_consents
+for each row
+execute function fn_policy_consents_insert_audit();
+
+create trigger trg_policy_settings_update_audit
+after update on policy_settings
+for each row
+execute function fn_policy_settings_update_audit();
 
 alter table profiles enable row level security;
 alter table habits enable row level security;
