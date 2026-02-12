@@ -26,6 +26,16 @@ export function expectSessionDestroyed(actual: boolean, expected: boolean): void
   expect(actual).toBe(expected);
 }
 
+export function expectGuardResolution(
+  actualPath: '/login' | '/policy-consent' | '/home',
+  expectedPath: '/login' | '/policy-consent' | '/home',
+  actualSessionDestroyed: boolean,
+  expectedSessionDestroyed: boolean,
+): void {
+  expectGuardRedirect(actualPath, expectedPath);
+  expectSessionDestroyed(actualSessionDestroyed, expectedSessionDestroyed);
+}
+
 export function expectGuardFailureReason(
   actualMessage: string,
   expectedRedirect: '/login' | '/policy-consent' | '/home',

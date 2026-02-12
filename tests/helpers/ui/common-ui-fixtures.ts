@@ -14,6 +14,17 @@ export type CommonUiErrorDisplayFixtures = {
   INTERNAL_500_TRACE_BOUNDARY: CommonUiErrorDisplayFixture;
 };
 
+export type CommonShellSourcePaths = {
+  LOGIN_PAGE: string;
+  POLICY_PAGE: string;
+  HOME_PAGE: string;
+  SETTINGS_PAGE: string;
+  ANALYTICS_PAGE: string;
+  HEADER_COMPONENT: string;
+  FOOTER_COMPONENT: string;
+  ERROR_DISPLAY_COMPONENT: string;
+};
+
 const BASE_ERROR_DISPLAY_FIXTURES: CommonUiErrorDisplayFixtures = {
   FORBIDDEN_403: {
     id: 'SCR-COM-3.2-403',
@@ -62,6 +73,19 @@ export const COMMON_UI_FOOTER_REQUIRED_ITEMS = ['利用規約', 'プライバシ
 
 export const COMMON_UI_HEADER_PERSISTENCE_ITEMS = ['ホーム', '履歴', '設定'] as const;
 
+export const COMMON_UI_ANALYTICS_REQUIRED_ITEMS = ['SCR-006', '/analytics', '任意機能', 'モック'] as const;
+
+const BASE_COMMON_SHELL_SOURCE_PATHS: CommonShellSourcePaths = {
+  LOGIN_PAGE: 'src/app/login/page.tsx',
+  POLICY_PAGE: 'src/app/policy-consent/page.tsx',
+  HOME_PAGE: 'src/app/home/page.tsx',
+  SETTINGS_PAGE: 'src/app/settings/page.tsx',
+  ANALYTICS_PAGE: 'src/app/analytics/page.tsx',
+  HEADER_COMPONENT: 'src/components/common/app-header.tsx',
+  FOOTER_COMPONENT: 'src/components/common/app-footer.tsx',
+  ERROR_DISPLAY_COMPONENT: 'src/components/common/error-display.tsx',
+};
+
 export function createCommonUiErrorDisplayFixtures(): CommonUiErrorDisplayFixtures {
   return {
     FORBIDDEN_403: {
@@ -80,4 +104,8 @@ export function createCommonUiErrorDisplayFixtures(): CommonUiErrorDisplayFixtur
       forbiddenTokens: [...BASE_ERROR_DISPLAY_FIXTURES.INTERNAL_500_TRACE_BOUNDARY.forbiddenTokens],
     },
   };
+}
+
+export function createCommonShellSourcePaths(): CommonShellSourcePaths {
+  return { ...BASE_COMMON_SHELL_SOURCE_PATHS };
 }

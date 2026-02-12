@@ -5,13 +5,27 @@ import { expect } from 'vitest';
 import { getSafeErrorMessage, shouldDisplayTraceId } from '../../../src/components/common/common-ui-types';
 import type { CommonUiErrorDisplayFixture } from './common-ui-fixtures';
 
+const sourceFileCache = new Map<string, string>();
+
 export function expectSourceFileExists(relativePath: string): boolean {
   const absolutePath = resolve(relativePath);
   return existsSync(absolutePath);
 }
 
 export function readSourceFile(relativePath: string): string {
-  return readFileSync(resolve(relativePath), 'utf8');
+  const absolutePath = resolve(relativePath);
+  const cached = sourceFileCache.get(absolutePath);
+  if (cached) {
+    return cached;
+  }
+
+  const source = readFileSync(absolutePath, 'utf8');
+  sourceFileCache.set(absolutePath, source);
+  return source;
+}
+
+export function readSourceFiles(relativePaths: readonly string[]): Record<string, string> {
+  return Object.fromEntries(relativePaths.map((path) => [path, readSourceFile(path)]));
 }
 
 export function expectContainsAll(content: string, requiredTokens: readonly string[]): void {

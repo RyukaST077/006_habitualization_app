@@ -7,7 +7,7 @@ import {
 } from '../../helpers/routing-actors';
 import {
   expectGuardRedirect,
-  expectSessionDestroyed,
+  expectGuardResolution,
 } from '../../helpers/assertions';
 import {
   resolveAuthConsentGuard,
@@ -29,10 +29,42 @@ function resolveGuardedTransition(
   return resolveAuthConsentGuard(actor, requestedPath, decision);
 }
 
-function expectResolvedGuard(result: GuardResolution, expectedPath: GuardResolution['nextPath'], sessionDestroyed: boolean): void {
-  expectGuardRedirect(result.nextPath, expectedPath);
-  expectSessionDestroyed(result.sessionDestroyed, sessionDestroyed);
-}
+const DIRECT_GUARD_CASES = [
+  {
+    title: '[TC-IT-FR-003-002][FNC-001][SCR-002->SCR-001] 未認証で/home直アクセス時に/loginへ遷移する',
+    actor: ROUTING_ACTORS.UNAUTHENTICATED,
+    requestedPath: '/home' as const,
+    decision: 'none' as const,
+    expectedPath: '/login' as const,
+    expectedSessionDestroyed: false,
+  },
+  {
+    title:
+      '[TC-IT-FR-003-002][FNC-002][SCR-002->SCR-008] 認証済み未同意で/home直アクセス時に/policy-consentへ遷移する',
+    actor: ROUTING_ACTORS.AUTHENTICATED_WITHOUT_CONSENT,
+    requestedPath: '/home' as const,
+    decision: 'none' as const,
+    expectedPath: '/policy-consent' as const,
+    expectedSessionDestroyed: false,
+  },
+  {
+    title: '[TC-ST-FR-004-004][FNC-002][SCR-008->SCR-001] 同意拒否時にセッション破棄して/loginへ遷移する',
+    actor: ROUTING_ACTORS.AUTHENTICATED_WITHOUT_CONSENT,
+    requestedPath: '/policy-consent' as const,
+    decision: 'reject' as const,
+    expectedPath: '/login' as const,
+    expectedSessionDestroyed: true,
+  },
+  {
+    title:
+      '[TC-IT-FR-002-001][FNC-002][SCR-008->SCR-002] 同意済みで/policy-consent到達時は/homeへ遷移する',
+    actor: ROUTING_ACTORS.AUTHENTICATED_WITH_CONSENT,
+    requestedPath: '/policy-consent' as const,
+    decision: 'none' as const,
+    expectedPath: '/home' as const,
+    expectedSessionDestroyed: false,
+  },
+];
 
 describe('auth consent guard transitions (Green)', () => {
   it('defines observable guard expectations: unauthenticated/unconsented cannot reach /home', () => {
@@ -107,39 +139,18 @@ describe('auth consent guard transitions (Green)', () => {
     }
   });
 
-  it('[TC-IT-FR-003-002][FNC-001][SCR-002->SCR-001] 未認証で/home直アクセス時に/loginへ遷移する', () => {
-    const result = resolveGuardedTransition(ROUTING_ACTORS.UNAUTHENTICATED, '/home');
-    expectResolvedGuard(result, '/login', false);
-  });
-
-  it('[TC-IT-FR-003-002][FNC-002][SCR-002->SCR-008] 認証済み未同意で/home直アクセス時に/policy-consentへ遷移する', () => {
-    const result = resolveGuardedTransition(
-      ROUTING_ACTORS.AUTHENTICATED_WITHOUT_CONSENT,
-      '/home',
+  it.each(DIRECT_GUARD_CASES)('$title', ({ actor, requestedPath, decision, expectedPath, expectedSessionDestroyed }) => {
+    const result = resolveGuardedTransition(actor, requestedPath, decision);
+    expectGuardResolution(
+      result.nextPath,
+      expectedPath,
+      result.sessionDestroyed,
+      expectedSessionDestroyed,
     );
-    expectResolvedGuard(result, '/policy-consent', false);
   });
 
-  it('[TC-ST-FR-004-004][FNC-002][SCR-008->SCR-001] 同意拒否時にセッション破棄して/loginへ遷移する', () => {
-    const result = resolveGuardedTransition(
-      ROUTING_ACTORS.AUTHENTICATED_WITHOUT_CONSENT,
-      '/policy-consent',
-      'reject',
-    );
-    expectResolvedGuard(result, '/login', true);
-  });
-
-  it('[TC-IT-FR-002-001][FNC-001/FNC-002][SCR-001->SCR-002] 同意済みなら/homeへ到達可能', () => {
-    const consentedHomeCase = AUTH_CONSENT_GUARD_CASES.find(
-      (transitionCase) => transitionCase.caseId === 'TC-IT-FR-002-001-CONSENTED-HOME',
-    );
-
-    expect(consentedHomeCase).toBeDefined();
-    expect(consentedHomeCase?.expectedPath).toBe('/home');
-  });
-
-  it('[TC-IT-FR-002-001][FNC-002][SCR-008->SCR-002] 同意済みで/policy-consent到達時は/homeへ遷移する', () => {
-    const result = resolveGuardedTransition(ROUTING_ACTORS.AUTHENTICATED_WITH_CONSENT, '/policy-consent');
-    expectResolvedGuard(result, '/home', false);
+  it('[TC-IT-FR-002-001][FNC-001/FNC-002][SCR-001->SCR-002] 同意済みならセッションを維持して/homeへ到達可能', () => {
+    const result = resolveGuardedTransition(ROUTING_ACTORS.AUTHENTICATED_WITH_CONSENT, '/home');
+    expectGuardResolution(result.nextPath, '/home', result.sessionDestroyed, false);
   });
 });
