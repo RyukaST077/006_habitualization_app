@@ -6,7 +6,7 @@ import {
   hasDdlMatcher,
   hasIndexName,
 } from './schema-introspection';
-import { expectUserScopedRls } from './rls-assertions';
+import { expectRoleRestrictedReadRls, expectUserScopedRls } from './rls-assertions';
 
 export function expectAggregationWithdrawalAlertTable(sql: string, tableName: string): void {
   expect(hasCreateTable(sql, tableName)).toBe(true);
@@ -25,6 +25,10 @@ export function expectAggregationWithdrawalAlertIndex(sql: string, indexName: st
 
 export function expectAggregationUserScopedRls(sql: string): void {
   expectUserScopedRls(sql, 'user_daily_activity');
+}
+
+export function expectAggregationKpiRoleRestrictedRls(sql: string): void {
+  expectRoleRestrictedReadRls(sql, 'analytics_daily_kpi');
 }
 
 export function expectAccountDeletionLifecycleTokens(sql: string): void {

@@ -398,10 +398,19 @@ alter table profiles enable row level security;
 alter table habits enable row level security;
 alter table habit_logs enable row level security;
 alter table policy_consents enable row level security;
+alter table user_daily_activity enable row level security;
+alter table analytics_daily_kpi enable row level security;
 
 create policy p_profiles_user_scope on profiles for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy p_habits_user_scope on habits for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy p_habit_logs_user_scope on habit_logs for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy p_policy_consents_user_scope on policy_consents for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy p_user_daily_activity_user_scope on user_daily_activity for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy p_analytics_daily_kpi_role_002_select on analytics_daily_kpi for select to authenticated using ((auth.jwt() ->> 'role') = 'ROLE-002');
+create policy p_analytics_daily_kpi_service_role_select on analytics_daily_kpi for select to service_role using (true);
+
+revoke all on analytics_daily_kpi from anon;
+revoke all on analytics_daily_kpi from authenticated;
+grant select on analytics_daily_kpi to service_role;
 
 commit;

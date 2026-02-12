@@ -108,4 +108,14 @@ create index idx_monitoring_alert_events_status
 create index idx_monitoring_alert_events_level_time
   on monitoring_alert_events (alert_level, created_at desc);
 
+alter table user_daily_activity enable row level security;
+create policy p_user_daily_activity_user_scope on user_daily_activity for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+alter table analytics_daily_kpi enable row level security;
+revoke all on analytics_daily_kpi from anon;
+revoke all on analytics_daily_kpi from authenticated;
+grant select on analytics_daily_kpi to service_role;
+create policy p_analytics_daily_kpi_role_002_select on analytics_daily_kpi for select to authenticated using ((auth.jwt() ->> 'role') = 'ROLE-002');
+create policy p_analytics_daily_kpi_service_role_select on analytics_daily_kpi for select to service_role using (true);
+
 commit;
