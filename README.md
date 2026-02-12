@@ -63,6 +63,20 @@ npm run build
 - `lint` / `typecheck` / `test` は PR必須チェックと同一。
 - `build` は main向けゲート（`lint/typecheck/test` を内部実行）。
 
+## セキュリティヘッダ確認手順（PR-003）
+
+### 自動確認
+
+```bash
+npm run test -- tests/security/headers.spec.ts
+```
+
+### 手動確認（ローカル起動後）
+
+```bash
+curl -I http://127.0.0.1:3000 | rg "Content-Security-Policy|X-Content-Type-Options|Referrer-Policy|X-Frame-Options"
+```
+
 ## E2E実行手順（Playwright）
 
 ### 前提
