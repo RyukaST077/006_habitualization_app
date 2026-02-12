@@ -71,7 +71,7 @@ describe('auth consent guard transitions (Red)', () => {
     expect(tags).toContain('TC-ST-FR-004-004');
   });
 
-  it('[TC-IT-FR-003-002] 未認証で/home直アクセス時に/loginへ遷移する', () => {
+  it('[TC-IT-FR-003-002][FNC-001][SCR-002->SCR-001] 未認証で/home直アクセス時に/loginへ遷移する', () => {
     const result = resolveGuardedTransition(ROUTING_ACTORS.UNAUTHENTICATED, '/home');
     expect(result.nextPath).toBe('/login');
     expect(result.sessionDestroyed).toBe(false);
