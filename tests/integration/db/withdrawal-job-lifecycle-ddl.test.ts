@@ -10,7 +10,7 @@ import {
 import { hasDdlMatcher } from '../../helpers/db/schema-introspection';
 import { loadMigrationSql } from '../../helpers/db/migration-runner';
 
-describe('withdrawal job lifecycle DDL (Red)', () => {
+describe('withdrawal job lifecycle DDL', () => {
   test('[TBL-009][account_deletion_jobs][状態遷移違反] queued -> in_progress -> completed/failed constraint is defined', () => {
     const sql = loadMigrationSql();
 

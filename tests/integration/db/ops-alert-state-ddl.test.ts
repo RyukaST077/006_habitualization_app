@@ -10,7 +10,7 @@ import {
 import { hasDdlMatcher } from '../../helpers/db/schema-introspection';
 import { loadMigrationSql } from '../../helpers/db/migration-runner';
 
-describe('ops alert state DDL (Red)', () => {
+describe('ops alert state DDL', () => {
   test('[TBL-010][monitoring_alert_events][状態遷移違反] pending/sent/failed constraint and indexes are defined', () => {
     const sql = loadMigrationSql();
 

@@ -19,4 +19,17 @@ describe('aggregation/withdrawal/alert DDL migration contract', () => {
 
     expect(hasDdlMatcher(sql, /placeholder:\s+no\s+schema\s+changes/i)).toBe(false);
   });
+
+  test('[IF-005] operational SQL referenced columns exist in migration DDL', () => {
+    const sql = loadMigrationSql();
+
+    expect(hasDdlMatcher(sql, /metric_date/i)).toBe(true);
+    expect(hasDdlMatcher(sql, /metric_key/i)).toBe(true);
+    expect(hasDdlMatcher(sql, /metric_value/i)).toBe(true);
+    expect(hasDdlMatcher(sql, /dimension_json/i)).toBe(true);
+    expect(hasDdlMatcher(sql, /requested_at/i)).toBe(true);
+    expect(hasDdlMatcher(sql, /disabled_at/i)).toBe(true);
+    expect(hasDdlMatcher(sql, /hard_deleted_at/i)).toBe(true);
+    expect(hasDdlMatcher(sql, /last_error/i)).toBe(true);
+  });
 });
