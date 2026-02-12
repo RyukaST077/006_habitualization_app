@@ -1,6 +1,7 @@
 import type { FullConfig } from '@playwright/test';
 
 const PROD_ENV_NAMES = new Set(['prod', 'production']);
+const ALLOWED_SUPABASE_ENVS = new Set(['dev', 'stg']);
 const REQUIRED_ENV_KEYS = ['SUPABASE_ENV', 'SUPABASE_URL', 'SUPABASE_ANON_KEY'] as const;
 
 function normalize(value: string): string {
@@ -22,10 +23,17 @@ function collectMissingKeys(): string[] {
 function assertNotProduction(): void {
   const supabaseEnv = process.env.SUPABASE_ENV?.trim() ?? '';
   const supabaseUrl = process.env.SUPABASE_URL?.trim() ?? '';
+  const normalizedEnv = normalize(supabaseEnv);
 
-  if (PROD_ENV_NAMES.has(normalize(supabaseEnv))) {
+  if (PROD_ENV_NAMES.has(normalizedEnv)) {
     throw new Error(
       `[E2E-GUARD] Production environment is forbidden for smoke tests. SUPABASE_ENV=${supabaseEnv}`,
+    );
+  }
+
+  if (!ALLOWED_SUPABASE_ENVS.has(normalizedEnv)) {
+    throw new Error(
+      `[E2E-GUARD] SUPABASE_ENV must be dev or stg for smoke tests. SUPABASE_ENV=${supabaseEnv}`,
     );
   }
 
@@ -33,6 +41,13 @@ function assertNotProduction(): void {
   if (normalizedUrl.includes('prod') || normalizedUrl.includes('production')) {
     throw new Error(
       `[E2E-GUARD] Production-like URL is forbidden for smoke tests. SUPABASE_URL=${supabaseUrl}`,
+    );
+  }
+
+  // Policy: dev allows mock backend; stg requires live integration endpoint checks.
+  if (normalizedEnv === 'stg' && normalizedUrl.includes('localhost')) {
+    throw new Error(
+      `[E2E-GUARD] stg requires non-local URL for smoke tests. SUPABASE_URL=${supabaseUrl}`,
     );
   }
 }
