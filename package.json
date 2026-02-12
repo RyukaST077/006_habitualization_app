@@ -6,6 +6,7 @@
     "db:start": "supabase start",
     "db:stop": "supabase stop",
     "db:status": "sh -c 'if docker info >/dev/null 2>&1; then supabase status; else echo \"Docker daemon is not running; skipped supabase status.\"; fi'",
+    "db:seed": "sh -c 'if docker info >/dev/null 2>&1; then supabase seed --local; else echo \"Docker daemon is not running; skipped supabase seed.\"; fi'",
     "test": "vitest run --coverage",
     "test:watch": "vitest",
     "test:e2e": "playwright test --pass-with-no-tests",

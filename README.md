@@ -166,6 +166,31 @@ supabase db push
 3. `supabase db reset` で初期化から再適用し、再現性を確認する。
 4. `npm run db:status` で状態を確認し、問題なければ `supabase db push` を実行する。
 
+## Supabase seed運用
+
+### 実行コマンド
+
+```bash
+# seed.sql をローカルDBへ投入
+npm run db:seed
+```
+
+### 検証SQL（policy_settings）
+
+```sql
+select policy_type, current_version
+from public.policy_settings
+where policy_type in ('terms', 'privacy')
+order by policy_type;
+```
+
+- 期待値: `terms` と `privacy` の2件（いずれも `v1.0`）。
+
+### 固定テストデータ方針
+
+- RLS/監査の統合試験は固定ユーザー `USER-A` / `USER-B` と運用ロール `ROLE-002` を利用する。
+- 本PRでは `policy_settings` 初期値（terms/privacy v1.0）を `supabase/seed.sql` で投入する。
+
 ## 設計書への導線
 
 - 実装計画: `docs/implements_plan.md`
