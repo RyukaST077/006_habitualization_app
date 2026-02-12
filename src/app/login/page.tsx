@@ -3,6 +3,8 @@
 import { useState } from 'react';
 
 import { LOGIN_TO_CONSENT_TRANSITION } from '../../client/routing/transition-map';
+import { AppFooter } from '../../components/common/app-footer';
+import { AppHeader } from '../../components/common/app-header';
 import { ErrorDisplay } from '../../components/common/error-display';
 import type { CommonUiErrorDto } from '../../components/common/common-ui-types';
 
@@ -71,12 +73,14 @@ export default function LoginPage() {
 
   return (
     <main>
+      <AppHeader />
       <h1>SCR-001 ログイン</h1>
       <p>/login</p>
       <button type="button" onClick={handleGoogleLogin} disabled={isLoading}>
         {isLoading ? 'ログイン中...' : 'Googleでログイン'}
       </button>
       <ErrorDisplay error={error} />
+      <AppFooter />
     </main>
   );
 }

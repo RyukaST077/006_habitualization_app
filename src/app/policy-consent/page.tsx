@@ -5,6 +5,7 @@ import {
   POLICY_REJECT_TRANSITION,
 } from '../../client/routing/transition-map';
 import { AppFooter } from '../../components/common/app-footer';
+import { AppHeader } from '../../components/common/app-header';
 
 export default function PolicyConsentPage() {
   function handleAccept(): void {
@@ -17,6 +18,7 @@ export default function PolicyConsentPage() {
 
   return (
     <main>
+      <AppHeader />
       <h1>SCR-008 ポリシー同意</h1>
       <p>/policy-consent</p>
       <p>サービス利用ポリシーに同意して続行してください。</p>
