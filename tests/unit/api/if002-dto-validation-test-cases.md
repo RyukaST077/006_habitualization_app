@@ -14,7 +14,11 @@
 - Content-Type: application/json 必須（GET以外）。
 - X-Request-Id は任意だが、レスポンス trace_id を返却する。
 - `POST /api/habits`: `name`, `displayOrder` 必須。
+- `POST /api/habits`: `name` は 1..80 文字、`displayOrder` は 1..9999。
 - `PATCH /api/habits/{id}`: `id` がUUID形式、payload が空でないこと。
+- `PATCH /api/habits/{id}`: 本人所有習慣のみ更新可。非所有は `FORBIDDEN`。
+- `POST /api/habits/{id}/archive`: `status=archived` へ遷移し、状態競合は `DOMAIN_CONFLICT`。
+- `POST /api/habits/{id}/resume`: `status=active` へ遷移し、状態競合は `DOMAIN_CONFLICT`。
 - `POST /api/checkins`: `habitId`, `logDate`, `checkedInAt` 必須。
 - `PATCH /api/settings/profile`: `timezone`, `dayCutoffTime` 必須。
 - `POST /api/settings/withdrawal`: 冪等トークン/本人確認の入力契約を固定する。
@@ -37,4 +41,3 @@
 - `IF-002 route contract not implemented`
 - `Expected validation guard for required fields`
 - `Expected error response code FORBIDDEN/DOMAIN_CONFLICT/INTERNAL_ERROR`
-
