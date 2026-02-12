@@ -1,14 +1,5 @@
 import { describe, expect, it } from 'vitest';
-
-type ScreenId =
-  | 'SCR-001'
-  | 'SCR-002'
-  | 'SCR-003'
-  | 'SCR-004'
-  | 'SCR-005'
-  | 'SCR-006'
-  | 'SCR-007'
-  | 'SCR-008';
+import { resolveRoutePath, type ScreenId } from '../../../src/client/routing/route-paths';
 
 type FixedRouteCase = {
   screenId: Exclude<ScreenId, 'SCR-004'>;
@@ -42,11 +33,7 @@ const dynamicRouteCase: DynamicRouteCase = {
   traceability: ['SCR-004', 'FNC-004'],
 };
 
-function resolveRoutePath(_screenId: ScreenId, _params?: { habitId?: string }): string {
-  throw new Error('Route path resolver is not implemented yet');
-}
-
-describe('route path definitions (Red)', () => {
+describe('route path definitions', () => {
   it('[SCR-001..003,SCR-005..008] fixed routes are listed as observable assertions', () => {
     for (const routeCase of fixedRouteCases) {
       expect(routeCase.expectedPath).toMatch(/^\//);
@@ -74,7 +61,22 @@ describe('route path definitions (Red)', () => {
     expect(allTraceabilityTags).toContain('SCR-004');
   });
 
-  it('[RED][SCR-001] route resolver should resolve /login for SCR-001', () => {
+  it('[SCR-001] route resolver should resolve /login for SCR-001', () => {
     expect(resolveRoutePath('SCR-001')).toBe('/login');
+  });
+
+  it('[SCR-004] route resolver should resolve dynamic path for valid habitId', () => {
+    expect(resolveRoutePath('SCR-004', { habitId: dynamicRouteCase.validHabitId })).toBe(
+      '/habits/habit-001/edit',
+    );
+  });
+
+  it('[SCR-004] route resolver should reject missing or invalid habitId', () => {
+    expect(() => resolveRoutePath('SCR-004')).toThrow();
+    expect(() => resolveRoutePath('SCR-004', { habitId: undefined })).toThrow();
+
+    for (const habitId of dynamicRouteCase.invalidHabitIds) {
+      expect(() => resolveRoutePath('SCR-004', { habitId })).toThrow();
+    }
   });
 });
