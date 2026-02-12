@@ -186,3 +186,9 @@ export const T043_CONTRACT_TEST_GLOBS = [
   'tests/integration/api/checkins-business-date.contract.test.ts',
   'tests/integration/checkin/t043-green-summary.test.ts',
 ] as const;
+
+export const T044_CONTRACT_TEST_GLOBS = [
+  'tests/integration/checkin/business-date.service.contract.test.ts',
+  'tests/integration/api/checkins-business-date.contract.test.ts',
+  'tests/integration/checkin/t044-refactor-summary.test.ts',
+] as const;
