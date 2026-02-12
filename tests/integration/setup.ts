@@ -155,3 +155,9 @@ export const T037_CONTRACT_TEST_GLOBS = [
   'tests/integration/routing/policy-consent-usecase.contract.test.ts',
   'tests/integration/routing/t037-green-summary.test.ts',
 ] as const;
+
+export const T038_CONTRACT_TEST_GLOBS = [
+  'tests/integration/routing/policy-consent-api.contract.test.ts',
+  'tests/unit/routing/auth-screen-flow.test.ts',
+  'tests/integration/routing/t038-refactor-summary.test.ts',
+] as const;

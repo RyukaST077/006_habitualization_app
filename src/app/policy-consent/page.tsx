@@ -15,8 +15,8 @@ export default function PolicyConsentPage() {
   const [privacyVersion, setPrivacyVersion] = useState('v1.0');
   const [feedback, setFeedback] = useState<string>('');
 
-  useEffect(() => {
-    void (async () => {
+  async function reloadCurrentPolicies(): Promise<void> {
+    try {
       const response = await fetch('/api/policies/current', { method: 'GET' });
       if (!response.ok) {
         setFeedback('POLICY_UPDATE_FAILED');
@@ -29,7 +29,14 @@ export default function PolicyConsentPage() {
       };
       setTermsVersion(payload.terms?.policy_version ?? payload.terms?.currentVersion ?? 'v1.0');
       setPrivacyVersion(payload.privacy?.policy_version ?? payload.privacy?.currentVersion ?? 'v1.0');
-    })();
+      setFeedback('');
+    } catch {
+      setFeedback('POLICY_UPDATE_FAILED');
+    }
+  }
+
+  useEffect(() => {
+    void reloadCurrentPolicies();
   }, []);
 
   const consentsPayload = useMemo(
@@ -80,13 +87,21 @@ export default function PolicyConsentPage() {
       footer={<AppFooter />}
     >
       <p>サービス利用ポリシーに同意して続行してください。</p>
-      {feedback ? <p role="alert">{feedback}</p> : null}
+      {feedback ? (
+        <p role="alert">
+          {feedback}
+          {feedback === 'VERSION_CONFLICT' ? ' 最新版を再取得して再度同意してください。' : ''}
+        </p>
+      ) : null}
       <div>
         <button type="button" onClick={handleAccept}>
           同意して続行
         </button>
         <button type="button" onClick={handleReject}>
           同意しない
+        </button>
+        <button type="button" onClick={() => void reloadCurrentPolicies()}>
+          最新版を再取得
         </button>
       </div>
       <a href={POLICY_CONSENT_TRANSITION.href}>{POLICY_CONSENT_TRANSITION.label}</a>

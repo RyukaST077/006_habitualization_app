@@ -21,6 +21,9 @@ describe('auth screen flow ui contracts', () => {
     expect(policyPageContent).toContain('POLICY_REJECT_TRANSITION');
     expect(policyPageContent).toContain('同意して続行');
     expect(policyPageContent).toContain('同意しない');
+    expect(policyPageContent).toContain('VERSION_CONFLICT');
+    expect(policyPageContent).toContain('最新版を再取得');
+    expect(policyPageContent).toContain('reloadCurrentPolicies');
   });
 
   it('login/policy screens keep shared shell usage and observable SCR labels', () => {
