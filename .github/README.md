@@ -21,6 +21,13 @@
 - シークレットを平文でコミットしない。
 - `.env*` を含む機密情報ファイルは常に除外対象として扱う。
 
+### Dependabot PR レビュー観点
+
+- `.github/dependabot.yml` に従い、`npm` と `github-actions` の更新PRを週次で確認する。
+- セキュリティアラート由来のPRは最優先でレビューする。
+- CI（`lint` / `typecheck` / `test`）が全て成功していることを確認する。
+- 依存更新で破壊的変更が疑われる場合は、リリースノートと差分を確認してからマージする。
+
 ## CODEOWNERS 運用
 
 - 定義ファイル: `.github/CODEOWNERS`
