@@ -14,6 +14,10 @@ function mapHabitRecord(record: HabitRecord): Habit {
   };
 }
 
+function transitionConflictMessage(detail: string): string {
+  return `DOMAIN_CONFLICT:status_transition:${detail}`;
+}
+
 export class HabitRepository {
   constructor(private readonly client: SupabaseClient) {}
 
@@ -94,7 +98,7 @@ export class HabitRepository {
       .single();
 
     if (error) {
-      throw new Error(`HABIT_NOT_ACTIVE:${error.message}`);
+      throw new Error(transitionConflictMessage(error.message));
     }
 
     return mapHabitRecord(data as HabitRecord);
