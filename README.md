@@ -49,6 +49,20 @@ npm run test
 - ワークフロー内で `npm ci` 後に `npm run test` を実行する
 - テスト後に `coverage/v8/lcov.info` を成果物として参照する
 
+## ローカル再現手順（CI品質ゲート）
+
+PRやmainのCI失敗時は、以下をローカルで順に再現する。
+
+```bash
+npm run lint
+npm run typecheck
+npm run test
+npm run build
+```
+
+- `lint` / `typecheck` / `test` は PR必須チェックと同一。
+- `build` は main向けゲート（`lint/typecheck/test` を内部実行）。
+
 ## E2E実行手順（Playwright）
 
 ### 前提
@@ -116,6 +130,7 @@ npm run test:e2e:smoke
 - 変更確認: `git status`
 - 差分確認: `git diff`
 - テスト実行: `npm run test`
+- CI再現: `npm run lint && npm run typecheck && npm run test && npm run build`
 - タスク参照: `_tasks/T-003.md`
 
 ## 設計書への導線

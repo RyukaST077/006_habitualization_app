@@ -15,6 +15,17 @@
 - Job: `typecheck`
 - Job: `test`
 
+`main` への `push` では同 workflow 内で `build` を実行し、デプロイ前品質ゲートとして扱う。
+
+### 必須チェックとPRブロック条件の対応
+
+| 種別 | 対象 | ブロック条件 | 対応 |
+|------|------|--------------|------|
+| PR必須 | `lint` | 失敗/未実行 | `npm run lint` をローカル再実行し、lintエラーを解消 |
+| PR必須 | `typecheck` | 失敗/未実行 | `npm run typecheck` をローカル再実行し、型エラーを解消 |
+| PR必須 | `test` | 失敗/未実行 | `npm run test` をローカル再実行し、失敗テストを修正 |
+| main必須 | `build` | 失敗 | `npm run build` をローカル再現し、`lint/typecheck/test` を順に修正 |
+
 セキュリティ関連修正を含む PR でも同一の必須チェック（`lint/typecheck/test`）を適用する。
 
 ## 環境変数・シークレットのレビュー必須項目
@@ -34,10 +45,17 @@
 
 以下のいずれかに該当する場合は PRブロック とし、修正完了までマージ不可とする。
 
+- 必須 ステータスチェック（`lint/typecheck/test`）が未通過。
 - 環境変数 の変更理由と適用環境（Dev/Stg/Prod）が不明。
 - シークレット を平文でコミットしている、または秘密管理への移管手順がない。
 - Preview から Prod へ到達し得る設定変更がある。
-- 必須 ステータスチェック（`lint/typecheck/test`）が未通過。
+
+## 障害時の一次切り分け手順
+
+1. `lint` 失敗: `npm run lint` を再実行し、静的解析エラーを修正する。
+2. `typecheck` 失敗: `npm run typecheck` を再実行し、型定義と実装の不整合を修正する。
+3. `test` 失敗: `npm run test` を再実行し、失敗テストと依存設定を修正する。
+4. `build` 失敗: `npm run build` で再現し、ログ順に `lint/typecheck/test` を個別に切り分ける。
 
 ## 例外運用
 

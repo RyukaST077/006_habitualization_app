@@ -11,6 +11,21 @@
 - `service_role` はサーバコンテキスト限定で利用し、クライアント配布を禁止する。
 - 平文シークレットをリポジトリに保存しない（`.env.example` はダミー/空値のみ）。
 
+### CI利用時の責務分界（GitHub/Vercel/Supabase）
+
+| 基盤 | 主な責務 | 設定対象 | 禁止事項 |
+|------|----------|----------|----------|
+| GitHub | `lint/typecheck/test/build` 実行時の注入 | Repository/Environment Secrets | ワークフローファイルへの平文埋め込み |
+| Vercel | 実行環境（Preview/Prod）のアプリ用秘密値管理 | Project Environment Variables | CI用途の秘密値をVercelだけに置く運用 |
+| Supabase | DB/Edge側のサーバ秘密管理 | Supabase Secrets / Project設定 | クライアント配布可能な領域への特権鍵配置 |
+
+### CI設定フロー
+
+1. CIで必要な値を GitHub Secrets に設定する（必要最小限）。
+2. アプリ実行で必要な値は Vercel Environment Variables に設定する。
+3. Supabase 内部処理で必要な値は Supabase Secrets に設定する。
+4. 同一キーは基盤ごとに用途を明記し、ローテーション時に3基盤の反映完了を確認する。
+
 ## 3. アクセス制御
 - 運用者特権は最小人数に限定する。
 - 運用者アカウントは MFA 必須とする。
