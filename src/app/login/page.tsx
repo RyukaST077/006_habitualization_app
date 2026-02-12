@@ -3,6 +3,8 @@
 import { useState } from 'react';
 
 import { LOGIN_TO_CONSENT_TRANSITION } from '../../client/routing/transition-map';
+import { ErrorDisplay } from '../../components/common/error-display';
+import type { CommonUiErrorDto } from '../../components/common/common-ui-types';
 
 type AuthStartResponse = {
   auth_url?: string;
@@ -18,11 +20,11 @@ const ERROR_MESSAGES: Record<NonNullable<AuthStartResponse['errorCode']>, string
 
 export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [error, setError] = useState<CommonUiErrorDto | null>(null);
 
   async function handleGoogleLogin(): Promise<void> {
     setIsLoading(true);
-    setErrorMessage(null);
+    setError(null);
 
     try {
       const response = await fetch('/api/auth/google/start', {
@@ -36,16 +38,32 @@ export default function LoginPage() {
       const body = (await response.json()) as AuthStartResponse;
 
       if (!response.ok || !body.auth_url || !body.trace_id) {
-        const fallback = '認証開始に失敗しました。Googleでログインを再試行してください。';
-        const detailed = body.errorCode ? ERROR_MESSAGES[body.errorCode] : fallback;
-        const traceSuffix = body.trace_id ? ` (trace_id: ${body.trace_id})` : '';
-        setErrorMessage(`${detailed}${traceSuffix}`);
+        const errorCode = body.errorCode ?? 'AUTH_FAILED';
+        const statusByErrorCode: Record<NonNullable<AuthStartResponse['errorCode']>, 400 | 403 | 500> = {
+          INVALID_REDIRECT: 400,
+          AUTH_FAILED: 403,
+          AUTH_PROVIDER_ERROR: 500,
+        };
+        const status = statusByErrorCode[errorCode];
+
+        setError({
+          code: errorCode,
+          message: ERROR_MESSAGES[errorCode],
+          trace_id: body.trace_id,
+          requirement_id: 'SCR-COM-3.2',
+          status,
+        });
         return;
       }
 
       window.location.href = LOGIN_TO_CONSENT_TRANSITION.href;
     } catch {
-      setErrorMessage('通信エラーが発生しました。ネットワークを確認して再試行してください。');
+      setError({
+        code: 'NETWORK_ERROR',
+        message: '通信エラーが発生しました。ネットワークを確認して再試行してください。',
+        requirement_id: 'SCR-COM-3.2',
+        status: 500,
+      });
     } finally {
       setIsLoading(false);
     }
@@ -58,7 +76,7 @@ export default function LoginPage() {
       <button type="button" onClick={handleGoogleLogin} disabled={isLoading}>
         {isLoading ? 'ログイン中...' : 'Googleでログイン'}
       </button>
-      {errorMessage ? <p role="alert">{errorMessage}</p> : null}
+      <ErrorDisplay error={error} />
     </main>
   );
 }

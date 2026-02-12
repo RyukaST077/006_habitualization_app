@@ -1,7 +1,11 @@
 import { HOME_TRANSITION_LINKS } from '../../client/routing/transition-map';
 import { AppHeader } from '../../components/common/app-header';
+import { ErrorDisplay } from '../../components/common/error-display';
+import type { CommonUiErrorDto } from '../../components/common/common-ui-types';
 
 export default function HomePage() {
+  const error: CommonUiErrorDto | null = null;
+
   return (
     <main>
       <AppHeader />
@@ -17,6 +21,7 @@ export default function HomePage() {
           ))}
         </ul>
       </nav>
+      <ErrorDisplay error={error} />
     </main>
   );
 }
