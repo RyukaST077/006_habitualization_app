@@ -14,3 +14,14 @@ export function expectErrorShape(value: unknown, requiredPrefix?: string): void 
     expect(error.message).toContain(requiredPrefix);
   }
 }
+
+export function expectGuardRedirect(
+  actualPath: '/login' | '/policy-consent' | '/home',
+  expectedPath: '/login' | '/policy-consent' | '/home',
+): void {
+  expect(actualPath).toBe(expectedPath);
+}
+
+export function expectSessionDestroyed(actual: boolean, expected: boolean): void {
+  expect(actual).toBe(expected);
+}

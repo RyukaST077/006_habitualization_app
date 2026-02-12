@@ -67,7 +67,7 @@ export const AUTH_CONSENT_GUARD_CASES: GuardTransitionCase[] = [
     expectedPath: '/login',
     requiresSessionDestroy: true,
     actor: ROUTING_ACTORS.AUTHENTICATED_WITHOUT_CONSENT,
-    traceability: ['TC-ST-FR-004-004', 'SCR-008', 'SCR-001', 'FNC-002'],
+    traceability: ['TC-ST-FR-004-004', 'SCR-008', 'SCR-001', 'FNC-002', 'POLICY_CONSENT_REJECT'],
   },
   {
     caseId: 'TC-IT-FR-002-001-CONSENTED-HOME',
@@ -77,5 +77,14 @@ export const AUTH_CONSENT_GUARD_CASES: GuardTransitionCase[] = [
     requiresSessionDestroy: false,
     actor: ROUTING_ACTORS.AUTHENTICATED_WITH_CONSENT,
     traceability: ['TC-IT-FR-002-001', 'SCR-001', 'SCR-002', 'FNC-001', 'FNC-002'],
+  },
+  {
+    caseId: 'TC-IT-FR-002-001-CONSENTED-POLICY-CONSENT',
+    fromScr: 'SCR-008',
+    requestedPath: '/policy-consent',
+    expectedPath: '/home',
+    requiresSessionDestroy: false,
+    actor: ROUTING_ACTORS.AUTHENTICATED_WITH_CONSENT,
+    traceability: ['TC-IT-FR-002-001', 'SCR-008', 'SCR-002', 'FNC-002'],
   },
 ];
