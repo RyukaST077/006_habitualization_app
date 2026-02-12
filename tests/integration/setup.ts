@@ -121,3 +121,7 @@ export const AGGREGATION_WITHDRAWAL_ALERT_DDL_TEST_GLOBS = [
 export const REPOSITORY_CONTRACT_TEST_GLOBS = [
   'tests/integration/repositories/*.test.ts',
 ] as const;
+
+export const IF002_CONTRACT_TEST_GLOBS = [
+  'tests/integration/api/*.test.ts',
+] as const;
