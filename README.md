@@ -204,6 +204,8 @@ order by policy_type;
 
 - RLS/監査の統合試験は固定ユーザー `USER-A` / `USER-B` と運用ロール `ROLE-002` を利用する。
 - 本PRでは `policy_settings` 初期値（terms/privacy v1.0）を `supabase/seed.sql` で投入する。
+- テスト用fixtureは `USER_A` / `USER_B` / `OPS_1` の固定キーで管理し、実行ごとに再現可能なデータを使用する。
+- テストデータはダミーデータのみを使用し、実在個人情報や本番データを投入しない。
 
 ## DBセットアップ・検証フロー（T-018/T-020/T-022 前提）
 
