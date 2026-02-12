@@ -1,28 +1,25 @@
 import { randomUUID } from 'node:crypto';
 
+import { createAuthFailureResult, type AuthFailureResult } from './auth-flow-result';
+
 export type CompleteGoogleLoginSuccess = {
   status: 200;
   callback: true;
   redirectTo: '/home';
   trace_id: string;
+  auditEvent: 'LOGIN_SUCCESS';
 };
 
-export type CompleteGoogleLoginFailure = {
-  status: 401 | 500;
-  errorCode: 'AUTH_FAILED' | 'AUTH_PROVIDER_ERROR';
-  callback: true;
-  trace_id: string;
-};
+type CallbackFailureCode = 'AUTH_FAILED' | 'AUTH_PROVIDER_ERROR';
+export type CompleteGoogleLoginFailure = AuthFailureResult<CallbackFailureCode> & { callback: true };
 
 export type CompleteGoogleLoginResult = CompleteGoogleLoginSuccess | CompleteGoogleLoginFailure;
 
 export function completeGoogleLogin(failWith?: 'AUTH_FAILED' | 'AUTH_PROVIDER_ERROR'): CompleteGoogleLoginResult {
   if (failWith) {
     return {
-      status: failWith === 'AUTH_FAILED' ? 401 : 500,
-      errorCode: failWith,
+      ...createAuthFailureResult(failWith),
       callback: true,
-      trace_id: randomUUID(),
     };
   }
 
@@ -31,5 +28,6 @@ export function completeGoogleLogin(failWith?: 'AUTH_FAILED' | 'AUTH_PROVIDER_ER
     callback: true,
     redirectTo: '/home',
     trace_id: randomUUID(),
+    auditEvent: 'LOGIN_SUCCESS',
   };
 }

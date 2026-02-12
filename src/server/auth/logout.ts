@@ -5,6 +5,7 @@ export type LogoutResult = {
   logout: true;
   redirectTo: '/login';
   trace_id: string;
+  auditEvent: 'LOGOUT_SUCCESS';
 };
 
 export function logout(): LogoutResult {
@@ -13,5 +14,6 @@ export function logout(): LogoutResult {
     logout: true,
     redirectTo: '/login',
     trace_id: randomUUID(),
+    auditEvent: 'LOGOUT_SUCCESS',
   };
 }

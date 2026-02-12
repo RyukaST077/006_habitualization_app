@@ -1,7 +1,13 @@
 import { randomUUID } from 'node:crypto';
 
-export type AuthStartErrorCode = 'INVALID_REDIRECT' | 'AUTH_FAILED' | 'AUTH_PROVIDER_ERROR';
-export type AuthAuditEvent = 'LOGIN_START' | 'LOGIN_SUCCESS' | 'LOGIN_FAILED';
+import {
+  createAuthFailureResult,
+  type AuthAuditEvent,
+  type AuthFailureCode,
+  type AuthFailureResult,
+} from './auth-flow-result';
+
+export type AuthStartErrorCode = AuthFailureCode;
 
 export type StartGoogleLoginSuccess = {
   status: 200;
@@ -12,11 +18,11 @@ export type StartGoogleLoginSuccess = {
 };
 
 export type StartGoogleLoginFailure = {
-  status: 400 | 401 | 500;
-  errorCode: AuthStartErrorCode;
-  trace_id: string;
+  status: AuthFailureResult<AuthStartErrorCode>['status'];
+  errorCode: AuthFailureResult<AuthStartErrorCode>['errorCode'];
+  trace_id: AuthFailureResult<AuthStartErrorCode>['trace_id'];
   sessionCreated: false;
-  auditEvent: 'LOGIN_FAILED';
+  auditEvent: AuthFailureResult<AuthStartErrorCode>['auditEvent'];
 };
 
 export type StartGoogleLoginResult = StartGoogleLoginSuccess | StartGoogleLoginFailure;
@@ -32,16 +38,6 @@ function createAuthUrl(redirectTo: '/home'): string {
   return `https://auth.example.local/google/start?${query.toString()}`;
 }
 
-function mapFailureStatus(
-  errorCode: Exclude<AuthStartErrorCode, 'INVALID_REDIRECT'>,
-): 401 | 500 {
-  if (errorCode === 'AUTH_FAILED') {
-    return 401;
-  }
-
-  return 500;
-}
-
 export function startGoogleLogin(
   redirectTo: string,
   options: StartGoogleLoginOptions = {},
@@ -50,21 +46,15 @@ export function startGoogleLogin(
 
   if (redirectTo !== '/home') {
     return {
-      status: 400,
-      errorCode: 'INVALID_REDIRECT',
-      trace_id: traceId,
+      ...createAuthFailureResult('INVALID_REDIRECT', traceId),
       sessionCreated: false,
-      auditEvent: 'LOGIN_FAILED',
     };
   }
 
   if (options.failWith) {
     return {
-      status: mapFailureStatus(options.failWith),
-      errorCode: options.failWith,
-      trace_id: traceId,
+      ...createAuthFailureResult(options.failWith, traceId),
       sessionCreated: false,
-      auditEvent: 'LOGIN_FAILED',
     };
   }
 
