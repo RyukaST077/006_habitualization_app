@@ -110,6 +110,47 @@ alter table habit_logs
   add constraint fk_habit_logs_habit
   foreign key (habit_id) references habits (id);
 
+alter table policy_settings
+  add constraint chk_policy_settings_type
+  check (policy_type in ('terms', 'privacy'));
+
+create index idx_policy_settings_updated on policy_settings (updated_at desc);
+
+alter table policy_consents
+  add constraint chk_policy_consents_type
+  check (policy_type in ('terms', 'privacy'));
+
+alter table policy_consents
+  add constraint uq_policy_consents_user_type_ver
+  unique (user_id, policy_type, policy_version);
+
+alter table policy_consents
+  add constraint fk_policy_consents_user
+  foreign key (user_id) references profiles (user_id);
+
+alter table policy_consents
+  add constraint fk_policy_consents_type
+  foreign key (policy_type) references policy_settings (policy_type);
+
+create index idx_policy_consents_user_type_time
+  on policy_consents (user_id, policy_type, consented_at desc);
+
+alter table audit_logs
+  add constraint chk_audit_logs_result
+  check (result in ('success', 'failure'));
+
+alter table audit_logs
+  add constraint chk_audit_logs_required
+  check (
+    char_length(action) > 0
+    and char_length(target_type) > 0
+    and char_length(target_id) > 0
+  );
+
+create index idx_audit_logs_occurred on audit_logs (occurred_at desc);
+create index idx_audit_logs_actor on audit_logs (actor_user_id, occurred_at desc);
+create index idx_audit_logs_action_result on audit_logs (action, result, occurred_at desc);
+
 create index idx_habit_logs_user_date on habit_logs (user_id, log_date desc);
 create index idx_habit_logs_habit_date on habit_logs (habit_id, log_date desc);
 
@@ -167,9 +208,11 @@ execute function fn_set_updated_at();
 alter table profiles enable row level security;
 alter table habits enable row level security;
 alter table habit_logs enable row level security;
+alter table policy_consents enable row level security;
 
 create policy p_profiles_user_scope on profiles for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy p_habits_user_scope on habits for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy p_habit_logs_user_scope on habit_logs for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy p_policy_consents_user_scope on policy_consents for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 commit;
