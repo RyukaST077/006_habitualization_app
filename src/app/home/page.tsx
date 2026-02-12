@@ -5,6 +5,7 @@ export default function HomePage() {
     <main>
       <h1>SCR-002 ホーム</h1>
       <p>/home</p>
+      <p>同意済みユーザーの到達先画面です。</p>
       <nav aria-label="SCR-002 normal transitions">
         <ul>
           {HOME_TRANSITION_LINKS.map((link) => (

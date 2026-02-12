@@ -50,6 +50,13 @@ export function resolveNormalTransitionPath(
   return resolveRoutePath(transition.to, params);
 }
 
+export const LOGIN_TO_CONSENT_TRANSITION: TransitionLink = {
+  from: 'SCR-001',
+  to: 'SCR-008',
+  label: 'Googleでログイン',
+  href: resolveRoutePath('SCR-008'),
+};
+
 export const HOME_TRANSITION_LINKS: TransitionLink[] = [
   {
     from: 'SCR-002',
@@ -92,4 +99,11 @@ export const POLICY_CONSENT_TRANSITION: TransitionLink = {
   to: 'SCR-002',
   label: 'SCR-002 ホームへ',
   href: resolveNormalTransitionPath({ from: 'SCR-008', to: 'SCR-002' }),
+};
+
+export const POLICY_REJECT_TRANSITION: TransitionLink = {
+  from: 'SCR-008',
+  to: 'SCR-001',
+  label: 'SCR-001 ログインへ戻る',
+  href: resolveRoutePath('SCR-001'),
 };
