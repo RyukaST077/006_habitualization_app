@@ -131,3 +131,9 @@ export const FNC013_CONTRACT_TEST_GLOBS = [
   'tests/integration/security/fnc013-authorization-policy.contract.test.ts',
   'tests/integration/security/fnc013-red-summary.test.ts',
 ] as const;
+
+export const T030_CONTRACT_TEST_GLOBS = [
+  'tests/integration/security/common-error.contract.test.ts',
+  'tests/integration/security/audit-assertions.contract.test.ts',
+  'tests/integration/security/t030-red-summary.test.ts',
+] as const;
