@@ -83,7 +83,7 @@ export const HOME_TRANSITION_LINKS: TransitionLink[] = [
   {
     from: 'SCR-002',
     to: 'SCR-006',
-    label: 'SCR-006 分析へ',
+    label: 'SCR-006 分析へ（任意機能/モック）',
     href: resolveNormalTransitionPath({ from: 'SCR-002', to: 'SCR-006' }),
   },
   {

@@ -305,6 +305,9 @@ describe('route transition matrix', () => {
       '/analytics',
       '/settings',
     ]);
+    expect(HOME_TRANSITION_LINKS.find((link) => link.to === 'SCR-006')?.label).toContain(
+      '任意機能/モック',
+    );
   });
 
   it('policy consent page includes SCR-008 -> SCR-002 normal transition link', () => {
