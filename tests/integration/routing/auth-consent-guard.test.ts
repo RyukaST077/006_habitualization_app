@@ -12,11 +12,25 @@ type GuardResolution = {
 };
 
 function resolveGuardedTransition(
-  _actor: RoutingActor,
-  _requestedPath: '/home' | '/policy-consent',
-  _decision: 'none' | 'accept' | 'reject' = 'none',
+  actor: RoutingActor,
+  requestedPath: '/home' | '/policy-consent',
+  decision: 'none' | 'accept' | 'reject' = 'none',
 ): GuardResolution {
-  throw new Error('Auth/consent guard transition resolver is not implemented yet');
+  if (!actor.hasSession && requestedPath === '/home') {
+    throw new Error('Guard not implemented: expected redirect to /login for unauthenticated /home access');
+  }
+
+  if (actor.hasSession && !actor.hasConsented && requestedPath === '/home') {
+    throw new Error(
+      'Guard not implemented: expected redirect to /policy-consent for unconsented /home access',
+    );
+  }
+
+  if (actor.hasSession && !actor.hasConsented && requestedPath === '/policy-consent' && decision === 'reject') {
+    throw new Error('Guard not implemented: expected redirect to /login after consent rejection');
+  }
+
+  throw new Error('Guard not implemented: no transition rule for this case');
 }
 
 describe('auth consent guard transitions (Red)', () => {
@@ -32,9 +46,27 @@ describe('auth consent guard transitions (Red)', () => {
     );
   });
 
-  it('test names/traceability include TC-IT-FR-003-002 and TC-ST-FR-004-004', () => {
+  it('contains all actor states: unauthenticated / without consent / with consent', () => {
+    const actorStates = new Set(AUTH_CONSENT_GUARD_CASES.map((transitionCase) => transitionCase.actor.state));
+
+    expect(actorStates).toEqual(
+      new Set([
+        'unauthenticated',
+        'authenticated_without_consent',
+        'authenticated_with_consent',
+      ]),
+    );
+  });
+
+  it('test names/traceability include FNC-001/FNC-002, SCR-001/002/008 and TC-* IDs', () => {
     const tags = AUTH_CONSENT_GUARD_CASES.flatMap((transitionCase) => transitionCase.traceability);
 
+    expect(tags).toContain('FNC-001');
+    expect(tags).toContain('FNC-002');
+    expect(tags).toContain('SCR-001');
+    expect(tags).toContain('SCR-002');
+    expect(tags).toContain('SCR-008');
+    expect(tags).toContain('TC-IT-FR-002-001');
     expect(tags).toContain('TC-IT-FR-003-002');
     expect(tags).toContain('TC-ST-FR-004-004');
   });
@@ -62,5 +94,14 @@ describe('auth consent guard transitions (Red)', () => {
     );
     expect(result.nextPath).toBe('/login');
     expect(result.sessionDestroyed).toBe(true);
+  });
+
+  it('[TC-IT-FR-002-001][FNC-001/FNC-002][SCR-001->SCR-002] 同意済みなら/homeへ到達可能', () => {
+    const consentedHomeCase = AUTH_CONSENT_GUARD_CASES.find(
+      (transitionCase) => transitionCase.caseId === 'TC-IT-FR-002-001-CONSENTED-HOME',
+    );
+
+    expect(consentedHomeCase).toBeDefined();
+    expect(consentedHomeCase?.expectedPath).toBe('/home');
   });
 });

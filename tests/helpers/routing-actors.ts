@@ -67,6 +67,15 @@ export const AUTH_CONSENT_GUARD_CASES: GuardTransitionCase[] = [
     expectedPath: '/login',
     requiresSessionDestroy: true,
     actor: ROUTING_ACTORS.AUTHENTICATED_WITHOUT_CONSENT,
-    traceability: ['TC-ST-FR-004-004', 'SCR-008', 'SCR-001', 'FNC-003'],
+    traceability: ['TC-ST-FR-004-004', 'SCR-008', 'SCR-001', 'FNC-002'],
+  },
+  {
+    caseId: 'TC-IT-FR-002-001-CONSENTED-HOME',
+    fromScr: 'SCR-002',
+    requestedPath: '/home',
+    expectedPath: '/home',
+    requiresSessionDestroy: false,
+    actor: ROUTING_ACTORS.AUTHENTICATED_WITH_CONSENT,
+    traceability: ['TC-IT-FR-002-001', 'SCR-001', 'SCR-002', 'FNC-001', 'FNC-002'],
   },
 ];
