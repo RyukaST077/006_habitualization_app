@@ -22,6 +22,15 @@ export type Profile = {
 
 export type HabitStatus = 'active' | 'archived';
 
+export type HabitRecord = {
+  id: string;
+  user_id: string;
+  name: string;
+  display_order: number;
+  status: HabitStatus;
+  archived_at: string | null;
+};
+
 export interface CurrentPolicy {
   policyType: 'terms' | 'privacy';
   currentVersion: string;
@@ -29,4 +38,3 @@ export interface CurrentPolicy {
 }
 
 export type DeletionJobStatus = 'queued' | 'in_progress' | 'completed' | 'failed';
-
