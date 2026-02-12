@@ -30,9 +30,11 @@ export type SetHabitStatusInput = {
   status: HabitStatus;
 };
 
+export type HabitTransitionInput = Omit<SetHabitStatusInput, 'status'>;
+
 export type HabitServicePort = {
   createHabit(input: CreateHabitInput): Promise<Habit>;
   updateHabit(input: UpdateHabitInput): Promise<Habit>;
-  archiveHabit(input: Omit<SetHabitStatusInput, 'status'>): Promise<Habit>;
-  resumeHabit(input: Omit<SetHabitStatusInput, 'status'>): Promise<Habit>;
+  archiveHabit(input: HabitTransitionInput): Promise<Habit>;
+  resumeHabit(input: HabitTransitionInput): Promise<Habit>;
 };

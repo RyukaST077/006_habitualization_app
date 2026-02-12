@@ -15,14 +15,21 @@ export class HabitDomainError extends Error {
   }
 }
 
-export function invalidHabitInput(message: string): HabitDomainError {
-  return new HabitDomainError('INVALID_HABIT_INPUT', message);
+function createHabitDomainError(
+  code: HabitDomainErrorCode,
+  message: string,
+): HabitDomainError {
+  return new HabitDomainError(code, message);
 }
 
-export function forbiddenHabitAction(message: string): HabitDomainError {
-  return new HabitDomainError('FORBIDDEN', message);
+export function invalidHabitInput(message = 'INVALID_HABIT_INPUT'): HabitDomainError {
+  return createHabitDomainError('INVALID_HABIT_INPUT', message);
 }
 
-export function domainConflict(message: string): HabitDomainError {
-  return new HabitDomainError('DOMAIN_CONFLICT', message);
+export function forbiddenHabitAction(message = 'FORBIDDEN'): HabitDomainError {
+  return createHabitDomainError('FORBIDDEN', message);
+}
+
+export function domainConflict(message = 'DOMAIN_CONFLICT'): HabitDomainError {
+  return createHabitDomainError('DOMAIN_CONFLICT', message);
 }

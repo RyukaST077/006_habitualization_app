@@ -4,6 +4,8 @@ import { forbiddenHabitAction, invalidHabitInput } from './HabitErrors';
 import type {
   CreateHabitInput,
   Habit,
+  HabitStatus,
+  HabitTransitionInput,
   UpdateHabitInput,
   UpdateHabitPayload,
 } from './HabitTypes';
@@ -94,40 +96,39 @@ export class HabitService {
   }
 
   async archiveHabit(input: { userId: string; habitId: string }): Promise<Habit> {
+    return this.transitionHabitStatus(input, 'archived', 'HABIT_ARCHIVE', 'archive');
+  }
+
+  async resumeHabit(input: { userId: string; habitId: string }): Promise<Habit> {
+    return this.transitionHabitStatus(input, 'active', 'HABIT_RESUME', 'resume');
+  }
+
+  private async transitionHabitStatus(
+    input: HabitTransitionInput,
+    status: HabitStatus,
+    auditAction: 'HABIT_ARCHIVE' | 'HABIT_RESUME',
+    traceSuffix: 'archive' | 'resume',
+  ): Promise<Habit> {
     this.authz.assertSelf(input.userId, input.userId);
-    const habit = await this.repository.setHabitStatus(input.userId, input.habitId, 'archived');
+    const habit = await this.repository.setHabitStatus(input.userId, input.habitId, status);
     if (habit.userId !== input.userId) {
-      throw forbiddenHabitAction('FORBIDDEN');
+      throw forbiddenHabitAction();
     }
 
+    const detail = this.buildHabitStatusAuditDetail(habit);
     this.auditLogger.log({
       audit: true,
-      action: 'HABIT_ARCHIVE',
+      action: auditAction,
       result: 'success',
-      trace_id: `habit-${habit.id}-archive`,
+      trace_id: `habit-${habit.id}-${traceSuffix}`,
       actorId: input.userId,
-      detail: { habitId: habit.id, status: habit.status },
+      detail,
     });
 
     return habit;
   }
 
-  async resumeHabit(input: { userId: string; habitId: string }): Promise<Habit> {
-    this.authz.assertSelf(input.userId, input.userId);
-    const habit = await this.repository.setHabitStatus(input.userId, input.habitId, 'active');
-    if (habit.userId !== input.userId) {
-      throw forbiddenHabitAction('FORBIDDEN');
-    }
-
-    this.auditLogger.log({
-      audit: true,
-      action: 'HABIT_RESUME',
-      result: 'success',
-      trace_id: `habit-${habit.id}-resume`,
-      actorId: input.userId,
-      detail: { habitId: habit.id, status: habit.status },
-    });
-
-    return habit;
+  private buildHabitStatusAuditDetail(habit: Habit): { habitId: string; status: HabitStatus } {
+    return { habitId: habit.id, status: habit.status };
   }
 }
