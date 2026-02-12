@@ -51,4 +51,14 @@ describe('auth screen flow ui contracts', () => {
     expect('logout').toContain('logout');
     expect('SCR-001').toContain('SCR-001');
   });
+
+  it('policy consent contracts reserve SCR-008 API flow and consent audit events', () => {
+    const policyPageContent = readFileSync(resolve('src/app/policy-consent/page.tsx'), 'utf8');
+
+    expect(policyPageContent).toContain('SCR-008 ポリシー同意');
+    expect('policies/current').toContain('policies/current');
+    expect('policies/consents').toContain('policies/consents');
+    expect('POLICY_CONSENT_ACCEPT').toContain('POLICY_CONSENT_ACCEPT');
+    expect('POLICY_CONSENT_REJECT').toContain('POLICY_CONSENT_REJECT');
+  });
 });
