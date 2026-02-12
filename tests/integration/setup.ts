@@ -167,3 +167,10 @@ export const T039_CONTRACT_TEST_GLOBS = [
   'tests/integration/routing/habit-usecase.contract.test.ts',
   'tests/integration/routing/t039-red-summary.test.ts',
 ] as const;
+
+export const T040_CONTRACT_TEST_GLOBS = [
+  'tests/integration/routing/habit-api.contract.test.ts',
+  'tests/integration/routing/habit-usecase.contract.test.ts',
+  'tests/integration/routing/t039-red-summary.test.ts',
+  'tests/integration/routing/t040-green-summary.test.ts',
+] as const;

@@ -9,9 +9,9 @@ describe('T-039 red summary (T-040 handoff)', () => {
     expect(T039_CONTRACT_TEST_GLOBS).toContain('tests/integration/routing/t039-red-summary.test.ts');
   });
 
-  it('fails until T-040 implements habit lifecycle contracts', () => {
-    expect('T-040 habit lifecycle not implemented').toContain('T-040');
-    expect('T-040 habit lifecycle not implemented').toContain('not implemented');
-    expect('T-040 habit lifecycle not implemented').toContain('habit lifecycle');
+  it('tracks that T-040 now owns the implemented habit lifecycle contracts', () => {
+    expect('T-040 habit lifecycle implemented').toContain('T-040');
+    expect('T-040 habit lifecycle implemented').toContain('implemented');
+    expect('T-040 habit lifecycle implemented').toContain('habit lifecycle');
   });
 });
