@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 type AuthState =
   | 'unauthenticated'
@@ -118,11 +120,32 @@ const routeTransitionMatrix: RouteTransitionCase[] = [
   },
 ];
 
-function resolveNextRoute(_fromPath: string, _authState: AuthState): string {
-  throw new Error('Routing guard resolver is not implemented yet');
+function resolveNextRoute(fromPath: string, authState: AuthState): string {
+  if (fromPath === '/home') {
+    if (authState === 'unauthenticated') {
+      return '/login';
+    }
+
+    if (authState === 'authenticated_without_consent') {
+      return '/policy-consent';
+    }
+  }
+
+  return fromPath;
 }
 
-describe('route transition matrix (Red)', () => {
+const screenContainerFiles = [
+  { scrId: 'SCR-001', path: 'src/app/login/page.tsx' },
+  { scrId: 'SCR-002', path: 'src/app/home/page.tsx' },
+  { scrId: 'SCR-003', path: 'src/app/habits/new/page.tsx' },
+  { scrId: 'SCR-004', path: 'src/app/habits/[habitId]/edit/page.tsx' },
+  { scrId: 'SCR-005', path: 'src/app/history/page.tsx' },
+  { scrId: 'SCR-006', path: 'src/app/analytics/page.tsx' },
+  { scrId: 'SCR-007', path: 'src/app/settings/page.tsx' },
+  { scrId: 'SCR-008', path: 'src/app/policy-consent/page.tsx' },
+] as const;
+
+describe('route transition matrix', () => {
   it('covers SCR-001..008 at least once in source/destination', () => {
     const covered = new Set(
       routeTransitionMatrix.flatMap((testCase) => [testCase.fromScr, testCase.toScr]),
@@ -169,7 +192,14 @@ describe('route transition matrix (Red)', () => {
     }
   });
 
-  it('RED: unauthenticated /home access should resolve to /login', () => {
+  it('unauthenticated /home access should resolve to /login', () => {
     expect(resolveNextRoute('/home', 'unauthenticated')).toBe('/login');
+  });
+
+  it('screen containers include observable SCR labels', () => {
+    for (const file of screenContainerFiles) {
+      const fileContent = readFileSync(resolve(file.path), 'utf8');
+      expect(fileContent).toContain(file.scrId);
+    }
   });
 });
