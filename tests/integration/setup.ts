@@ -137,3 +137,9 @@ export const T030_CONTRACT_TEST_GLOBS = [
   'tests/integration/security/audit-assertions.contract.test.ts',
   'tests/integration/security/t030-red-summary.test.ts',
 ] as const;
+
+export const T033_CONTRACT_TEST_GLOBS = [
+  'tests/integration/routing/auth-callback-logout.contract.test.ts',
+  'tests/integration/routing/auth-usecase.contract.test.ts',
+  'tests/integration/routing/t033-red-summary.test.ts',
+] as const;
