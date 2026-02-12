@@ -28,6 +28,13 @@
 - CI（`lint` / `typecheck` / `test`）が全て成功していることを確認する。
 - 依存更新で破壊的変更が疑われる場合は、リリースノートと差分を確認してからマージする。
 
+### Secret scan 失敗時対応
+
+- workflow: `.github/workflows/secret-scan.yml`（`pull_request` / `push`）を必須確認対象とする。
+- `secret-scan` ジョブが失敗したPRはマージしない（修正完了までPRブロック）。
+- 誤検知の可能性がある場合は、検知箇所の根拠を確認してから最小限の除外設定を検討する。
+- 漏えいの可能性がある場合は、キー無効化と再発行（ローテーション）を先に実施してから修正PRを更新する。
+
 ## CODEOWNERS 運用
 
 - 定義ファイル: `.github/CODEOWNERS`
