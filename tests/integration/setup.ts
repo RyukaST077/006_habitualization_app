@@ -107,3 +107,7 @@ export function loadPolicyAuditMigrationSql(): string {
 export function loadAggregationWithdrawalAlertMigrationSql(): string {
   return loadMigrationSql();
 }
+
+export function loadAggregationWithdrawalAlertIntegrationMigrationSql(): string {
+  return loadMigrationSql();
+}
