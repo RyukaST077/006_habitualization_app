@@ -174,3 +174,8 @@ export const T040_CONTRACT_TEST_GLOBS = [
   'tests/integration/routing/t039-red-summary.test.ts',
   'tests/integration/routing/t040-green-summary.test.ts',
 ] as const;
+
+export const T042_CONTRACT_TEST_GLOBS = [
+  'tests/integration/checkin/business-date.service.contract.test.ts',
+  'tests/integration/checkin/t042-red-summary.test.ts',
+] as const;
