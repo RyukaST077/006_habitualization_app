@@ -1,6 +1,7 @@
 import {
   POLICY_UPDATE_FAILED,
   VERSION_CONFLICT,
+  normalizePolicyConsentConflict,
   type PolicyConsentItem,
 } from '../../../../../server/policies/policy-consent-contract';
 import { registerPolicyConsents } from '../../../../../server/policies/register-policy-consents';
@@ -66,12 +67,11 @@ export async function POST(request: Request): Promise<Response> {
       ...result,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (message.includes('POLICY_VERSION_CONFLICT')) {
+    const conflict = normalizePolicyConsentConflict(error);
+    if (conflict) {
       return Response.json({ errorCode: VERSION_CONFLICT }, { status: 409 });
     }
 
     return Response.json({ errorCode: POLICY_UPDATE_FAILED }, { status: 500 });
   }
 }
-

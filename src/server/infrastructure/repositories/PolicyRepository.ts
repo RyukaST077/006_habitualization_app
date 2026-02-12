@@ -8,6 +8,28 @@ type ConsentRecord = {
   consentedAt: string;
 };
 
+type PolicyConflictAuditMetadata = {
+  metadata: {
+    old_version: string;
+    new_version: string;
+    policy_type: 'terms' | 'privacy' | 'unknown';
+  };
+};
+
+function buildPolicyConflictAuditMetadata(
+  policyType: 'terms' | 'privacy' | 'unknown',
+  oldVersion: string,
+  newVersion: string,
+): PolicyConflictAuditMetadata {
+  return {
+    metadata: {
+      old_version: oldVersion,
+      new_version: newVersion,
+      policy_type: policyType,
+    },
+  };
+}
+
 export class PolicyRepository {
   constructor(private readonly client: SupabaseClient) {}
 
@@ -59,7 +81,11 @@ export class PolicyRepository {
       .upsert(payload, { onConflict: 'user_id,policy_type,consented_version' });
 
     if (error) {
-      throw new Error(`POLICY_VERSION_CONFLICT:${error.message}`);
+      const primaryConsent = consents[0];
+      const metadata = primaryConsent
+        ? buildPolicyConflictAuditMetadata(primaryConsent.policyType, 'unknown', primaryConsent.consentedVersion)
+        : buildPolicyConflictAuditMetadata('unknown', 'unknown', 'unknown');
+      throw new Error(`POLICY_VERSION_CONFLICT:${error.message}:${JSON.stringify(metadata)}`);
     }
   }
 
@@ -84,4 +110,3 @@ export class PolicyRepository {
     }
   }
 }
-

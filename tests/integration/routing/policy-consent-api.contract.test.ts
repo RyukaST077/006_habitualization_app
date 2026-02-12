@@ -23,6 +23,8 @@ describe('policy consent api contract (Red)', () => {
     const source = readFileSync(policyConsentsPath, 'utf8');
     expect(source).toContain('policies/consents');
     expect(source).toContain('policy_consents');
+    expect(source).toContain('normalizePolicyConsentConflict');
+    expect(source).toContain('status: 409');
     expect(source).toContain('VERSION_CONFLICT');
     expect(source).toContain('POLICY_UPDATE_FAILED');
   });
