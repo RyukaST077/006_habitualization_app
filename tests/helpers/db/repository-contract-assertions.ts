@@ -31,3 +31,8 @@ export function expectErrorContract(sourceCode: string, errors: string[]): void 
   }
 }
 
+export function expectSourceKeywords(sourceCode: string, keywords: string[]): void {
+  for (const keyword of keywords) {
+    expect(sourceCode, `Expected keyword in source: ${keyword}`).toContain(keyword);
+  }
+}
