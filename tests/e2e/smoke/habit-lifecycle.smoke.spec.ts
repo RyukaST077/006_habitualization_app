@@ -11,7 +11,7 @@ const skeletonReason =
 // - SCR-002
 // - IF-001 (session established before protected actions)
 test.describe('smoke: habit lifecycle', () => {
-  test('TC-AUTO-SMK-002 create -> edit -> archive habit', async ({ page }) => {
+  test('TC-AUTO-SMK-002 FR-007/008/009: active -> archived -> active lifecycle', async ({ page }) => {
     test.skip(true, skeletonReason);
 
     const policy = resolveAuthBackendPolicy();
@@ -20,8 +20,11 @@ test.describe('smoke: habit lifecycle', () => {
     // TODO(screen): SCR-002 で習慣一覧/作成UIを表示する。
     await page.goto('/habits');
 
-    // TODO(api): 習慣作成・更新・アーカイブAPIの成功/失敗を観測する。
-    // TODO(db): habit テーブルの作成/更新/論理削除状態を確認する。
+    // TODO(api): archive API 実行後に status=archived を観測する。
+    // TODO(api): resume API 実行後に status=active を観測する。
+    // TODO(api): 他ユーザーの状態遷移は FORBIDDEN(403) を返すことを観測する。
+    // TODO(api): 不正遷移は DOMAIN_CONFLICT(409) を返すことを観測する。
+    // TODO(db): status / archived_at が遷移に応じて更新されることを確認する。
     // TODO(audit): 習慣作成・更新・削除イベントの監査ログを確認する。
     // TODO(authz): セッション未確立時は作成操作を拒否すること。
     void policy;
