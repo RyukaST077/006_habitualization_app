@@ -1,13 +1,19 @@
-import type { PolicyRepository } from '../infrastructure/repositories/PolicyRepository';
 import type { PolicyConsentEvaluation } from './policy-consent-contract';
 import { POLICY_CONSENT_ACCEPT } from './policy-consent-contract';
+
+export type PolicyConsentRepository = {
+  getCurrentPolicies: () => Promise<Array<{ policyType: 'terms' | 'privacy'; currentVersion: string; effectiveFrom: string }>>;
+  findUserLatestConsents: (
+    userId: string,
+  ) => Promise<Array<{ policyType: 'terms' | 'privacy'; consentedVersion: string; consentedAt: string }>>;
+};
 
 export type EvaluatePolicyConsentInput = {
   userId: string;
 };
 
 export async function evaluatePolicyConsent(
-  repository: PolicyRepository,
+  repository: PolicyConsentRepository,
   input: EvaluatePolicyConsentInput,
 ): Promise<PolicyConsentEvaluation> {
   const [policy_settings, policy_consents] = await Promise.all([

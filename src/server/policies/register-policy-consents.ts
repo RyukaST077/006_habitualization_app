@@ -1,12 +1,22 @@
 import { randomUUID } from 'node:crypto';
 
-import type { PolicyRepository } from '../infrastructure/repositories/PolicyRepository';
 import {
   POLICY_CONSENT_ACCEPT,
   POLICY_CONSENT_REJECT,
   type PolicyConsentActionResult,
   type PolicyConsentItem,
 } from './policy-consent-contract';
+
+export type PolicyConsentWriterRepository = {
+  insertConsents: (
+    userId: string,
+    consents: Array<{
+      policyType: 'terms' | 'privacy';
+      consentedVersion: string;
+      consentedAt: string;
+    }>,
+  ) => Promise<void>;
+};
 
 export type RegisterPolicyConsentsInput = {
   userId: string;
@@ -15,7 +25,7 @@ export type RegisterPolicyConsentsInput = {
 };
 
 export async function registerPolicyConsents(
-  repository: PolicyRepository,
+  repository: PolicyConsentWriterRepository,
   input: RegisterPolicyConsentsInput,
 ): Promise<PolicyConsentActionResult> {
   const traceId = randomUUID();
@@ -49,4 +59,3 @@ export async function registerPolicyConsents(
     ...(policy_version ? {} : {}),
   };
 }
-
