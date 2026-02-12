@@ -63,6 +63,27 @@ npm run build
 - `lint` / `typecheck` / `test` は PR必須チェックと同一。
 - `build` は main向けゲート（`lint/typecheck/test` を内部実行）。
 
+## Pull Request テンプレ記入手順（IDトレース）
+
+PR作成時は `.github/pull_request_template.md` を使用し、次の順で記入する。
+
+1. タスクID（`T-xxx`）を記入する。
+2. 対象ID（`FNC/SCR/IF/TBL`）を記入する。
+3. 要件ID（`FR/NFR/CON/AC`）とテストID（`TC/TS`）を記入する。
+4. テスト証跡リンク（CI結果、テストログ、必要な画面キャプチャ）を記入する。
+5. セキュリティ確認（入力検証/認可/シークレット）を記入する。
+
+最小記入例:
+
+- `タスクID: T-009`
+- `対象ID: FNC-001, SCR-002, IF-002, TBL-003`
+- `要件ID: FR-010, AC-010`
+- `テストID: TC-021`
+- `テスト証跡: https://github.com/<org>/<repo>/actions/runs/<run_id>`
+- `セキュリティ確認: 入力検証=変更なし / 認可=変更なし / シークレット=追加なし`
+
+未記載がある場合は CI の `pr-body-traceability` で失敗し、PRはマージ不可となる。
+
 ## セキュリティヘッダ確認手順（PR-003）
 
 ### 自動確認
