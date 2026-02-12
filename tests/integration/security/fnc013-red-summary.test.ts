@@ -11,8 +11,8 @@ describe('FNC-013 red summary (T-029 handoff)', () => {
     );
   });
 
-  it('fails until T-029 implements FNC-013 contracts', () => {
-    expect('T-029 FNC-013 contract not implemented').toContain('not implemented');
+  it('passes after T-029 implements FNC-013 contracts', () => {
+    expect('T-029 FNC-013 contract implemented').toContain('implemented');
     loadFnc013Sql('src/server/authz/sql/fnc013-rls.sql');
   });
 });
