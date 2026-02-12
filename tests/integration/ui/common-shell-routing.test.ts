@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { HOME_TRANSITION_LINKS } from '../../../src/client/routing/transition-map';
 
 import {
   COMMON_UI_FOOTER_REQUIRED_ITEMS,
@@ -38,6 +39,17 @@ describe('common shell routing contracts (Red)', () => {
     expect(homePage).toContain('AppHeader');
     expect(settingsPage).toContain('AppHeader');
     expectContainsAll(headerComponent, COMMON_UI_HEADER_PERSISTENCE_ITEMS);
+  });
+
+  it('[SCR-002->SCR-006] 任意機能/モック導線が主要導線を壊さず観測できる', () => {
+    const homePage = readSourceFile('src/app/home/page.tsx');
+    const analyticsPage = readSourceFile('src/app/analytics/page.tsx');
+    const scr006Link = HOME_TRANSITION_LINKS.find((link) => link.to === 'SCR-006');
+
+    expect(homePage).toContain('HOME_TRANSITION_LINKS.map');
+    expect(scr006Link?.href).toBe('/analytics');
+    expect(scr006Link?.label).toContain('任意機能/モック');
+    expectContainsAll(analyticsPage, ['SCR-006', '/analytics', '任意機能', 'モック']);
   });
 
   it('500応答時にトーストとtrace_idが表示され、500以外ではtrace_idを表示しない', () => {
