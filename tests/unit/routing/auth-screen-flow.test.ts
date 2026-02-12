@@ -23,6 +23,16 @@ describe('auth screen flow ui contracts', () => {
     expect(policyPageContent).toContain('同意しない');
   });
 
+  it('login/policy screens keep shared shell usage and observable SCR labels', () => {
+    const loginPageContent = readFileSync(resolve('src/app/login/page.tsx'), 'utf8');
+    const policyPageContent = readFileSync(resolve('src/app/policy-consent/page.tsx'), 'utf8');
+
+    expect(loginPageContent).toContain('AppScreenShell');
+    expect(loginPageContent).toContain('SCR-001 ログイン');
+    expect(policyPageContent).toContain('AppScreenShell');
+    expect(policyPageContent).toContain('SCR-008 ポリシー同意');
+  });
+
   it('transition map defines login->consent and consent reject->login links', () => {
     const transitionMapContent = readFileSync(resolve('src/client/routing/transition-map.ts'), 'utf8');
 

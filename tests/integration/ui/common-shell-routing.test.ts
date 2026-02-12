@@ -54,6 +54,18 @@ describe('common shell routing contracts (Red)', () => {
     expectContainsAll(headerComponent, COMMON_UI_HEADER_PERSISTENCE_ITEMS);
   });
 
+  it('[SCR-001/002/007/008] 主要画面が共通シェルを利用し続ける', () => {
+    const loginPage = sources[paths.LOGIN_PAGE];
+    const homePage = sources[paths.HOME_PAGE];
+    const settingsPage = sources[paths.SETTINGS_PAGE];
+    const policyPage = sources[paths.POLICY_PAGE];
+
+    expect(loginPage).toContain('AppScreenShell');
+    expect(homePage).toContain('AppScreenShell');
+    expect(settingsPage).toContain('AppScreenShell');
+    expect(policyPage).toContain('AppScreenShell');
+  });
+
   it('[SCR-002->SCR-006] 任意機能/モック導線が主要導線を壊さず観測できる', () => {
     const homePage = sources[paths.HOME_PAGE];
     const analyticsPage = sources[paths.ANALYTICS_PAGE];
