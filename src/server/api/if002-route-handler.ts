@@ -5,16 +5,21 @@ export async function handleIf002<T>(handler: () => Promise<T>): Promise<Respons
     const response = await handler();
     return response as Response;
   } catch (error) {
-    if (error instanceof Error && error.message === 'VALIDATION_ERROR') {
+    if (error instanceof Error && error.message.startsWith('FORBIDDEN')) {
+      return forbidden();
+    }
+    if (error instanceof Error && error.message.startsWith('VALIDATION_ERROR')) {
       return validationError();
     }
-    if (error instanceof Error && error.message === 'DOMAIN_CONFLICT') {
+    if (error instanceof Error && error.message.startsWith('INVALID_HABIT_INPUT')) {
+      return validationError();
+    }
+    if (error instanceof Error && error.message.startsWith('DOMAIN_CONFLICT')) {
       return domainConflict();
     }
-    if (error instanceof Error && error.message === 'INTERNAL_ERROR') {
+    if (error instanceof Error && error.message.startsWith('INTERNAL_ERROR')) {
       return internalError();
     }
-
-    return forbidden();
+    return internalError();
   }
 }
