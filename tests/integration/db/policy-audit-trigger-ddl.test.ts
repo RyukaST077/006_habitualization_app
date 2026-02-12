@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
+import { expectPolicyAuditMetadataFields } from '../../helpers/db/policy-audit-assertions';
 import { hasDdlMatcher } from '../../helpers/db/schema-introspection';
 import { loadMigrationSql } from '../../helpers/db/migration-runner';
 
@@ -16,9 +17,6 @@ describe('policy/audit trigger DDL (Red)', () => {
     const sql = loadMigrationSql();
 
     expect(hasDdlMatcher(sql, /policy_settings/i)).toBe(true);
-    expect(hasDdlMatcher(sql, /metadata_json/i)).toBe(true);
-    expect(hasDdlMatcher(sql, /old_version/i)).toBe(true);
-    expect(hasDdlMatcher(sql, /new_version/i)).toBe(true);
-    expect(hasDdlMatcher(sql, /policy_type/i)).toBe(true);
+    expectPolicyAuditMetadataFields(sql);
   });
 });

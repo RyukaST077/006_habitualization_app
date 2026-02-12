@@ -99,3 +99,7 @@ export function loadCoreMigrationSql(): string {
 export function loadIntegrationMigrationSql(): string {
   return loadMigrationSql();
 }
+
+export function loadPolicyAuditMigrationSql(): string {
+  return loadMigrationSql();
+}
