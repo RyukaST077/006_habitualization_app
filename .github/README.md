@@ -7,8 +7,13 @@
 - 変更は原則PR経由でレビューする。
 - タスクは `_tasks/T-001.md` のPR単位で進める。
 - 品質ゲート workflow: `.github/workflows/ci.yml`
-  - 発火契機: `pull_request`（opened/synchronize/reopened/ready_for_review）
-  - 実行ジョブ: `lint` / `typecheck` / `test`
+  - 発火契機:
+    - `pull_request`（opened/synchronize/reopened/ready_for_review）
+    - `push`（main）
+  - 実行ジョブ:
+    - PR: `lint` / `typecheck` / `test`
+    - main: `lint` / `typecheck` / `test` / `build`
+  - 依存関係: `build` は `needs: [lint, typecheck, test]` で前段ジョブ成功後に実行
   - 運用: 失敗ジョブがある場合はPRをマージしない。ローカルで同名 `npm run` を再実行して修正する。
 
 ## セキュリティ運用

@@ -32,6 +32,13 @@
 - [ ] テスト失敗時はエラーメッセージ（Missing required env / Production forbidden）に従って設定を修正した。
 - [ ] カバレッジ成果物 `coverage/v8/lcov.info` が生成されることを確認した。
 
+## 6.1 CI buildゲート検証（main向け）
+- [ ] `.github/workflows/ci.yml` に `push.branches: [main]` が定義されている。
+- [ ] `build` ジョブに `if: github.event_name == 'push' && github.ref == 'refs/heads/main'` が設定されている。
+- [ ] `build` ジョブに `needs: [lint, typecheck, test]` が設定され、前段ジョブ成功時のみ実行される。
+- [ ] `build` 実行は `npm ci` と `npm run build` のみで完結し、平文Secretsをworkflowに埋め込んでいない。
+- [ ] `npm run build` の失敗時は `build` ジョブが失敗し、workflow全体が失敗ステータスになる。
+
 ## 8. E2Eスモーク実行前チェック（READMEと同一）
 ### E2E前提条件（共通）
 - [ ] 依存関係をインストールする（`npm install`）。
