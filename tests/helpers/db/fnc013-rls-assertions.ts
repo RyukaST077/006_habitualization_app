@@ -1,10 +1,7 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { loadSourceFile } from '../source-cache';
 
 export function loadFnc013Sql(relativePath: string): string {
-  const absolutePath = resolve(relativePath);
-  expect(existsSync(absolutePath), `FNC-013 RLS contract not implemented: ${relativePath}`).toBe(true);
-  return readFileSync(absolutePath, 'utf8');
+  return loadSourceFile(relativePath, 'FNC-013 RLS contract not implemented');
 }
 
 export function expectRlsKeywords(sql: string): void {
@@ -12,4 +9,3 @@ export function expectRlsKeywords(sql: string): void {
   expect(sql).toContain('auth.uid() = user_id');
   expect(sql).toContain('FORBIDDEN');
 }
-

@@ -1,10 +1,7 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { loadSourceFile } from './source-cache';
 
 export function loadCommonErrorSource(relativePath: string): string {
-  const absolutePath = resolve(relativePath);
-  expect(existsSync(absolutePath), `AppError contract not implemented: ${relativePath}`).toBe(true);
-  return readFileSync(absolutePath, 'utf8');
+  return loadSourceFile(relativePath, 'AppError contract not implemented');
 }
 
 export function expectErrorKeywords(source: string): void {

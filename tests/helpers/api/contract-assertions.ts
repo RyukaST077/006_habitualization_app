@@ -1,12 +1,7 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { loadSourceFile } from '../source-cache';
 
 export function requireApiRoute(relativePath: string): string {
-  const absolutePath = resolve(relativePath);
-
-  expect(existsSync(absolutePath), `IF-002 route contract not implemented: ${relativePath}`).toBe(true);
-
-  return readFileSync(absolutePath, 'utf8');
+  return loadSourceFile(relativePath, 'IF-002 route contract not implemented');
 }
 
 export function expectValidationKeywords(sourceCode: string, keywords: string[]): void {
