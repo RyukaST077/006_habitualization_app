@@ -1,43 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-type AuthStartResult = {
-  status: 200 | 400 | 401 | 500;
-  errorCode?: 'INVALID_REDIRECT' | 'AUTH_FAILED' | 'AUTH_PROVIDER_ERROR';
-  sessionCreated: boolean;
-  auditEvent: 'LOGIN_START' | 'LOGIN_SUCCESS' | 'LOGIN_FAILED';
-};
+import { startGoogleLogin } from '../../../src/server/auth/start-google-login';
 
-type RedirectValidationCase = {
-  caseId: string;
-  redirectTo: string;
-  expectedStatus: 400;
-  expectedErrorCode: 'INVALID_REDIRECT';
-  expectedSessionCreated: false;
-  expectedAuditEvent: 'LOGIN_FAILED';
-  traceability: string[];
-};
-
-const INVALID_REDIRECT_CASES: RedirectValidationCase[] = [
-  {
-    caseId: 'TC-IT-FR-001-002-INVALID-ABSOLUTE-URL',
-    redirectTo: 'https://evil.example.com/callback',
-    expectedStatus: 400,
-    expectedErrorCode: 'INVALID_REDIRECT',
-    expectedSessionCreated: false,
-    expectedAuditEvent: 'LOGIN_FAILED',
-    traceability: ['TC-IT-FR-001-002', 'FNC-001', 'SCR-001', 'IF-001'],
-  },
-];
-
-function startGoogleLogin(_redirectTo: string): AuthStartResult {
-  throw new Error(
-    'Auth start is not implemented: expected 400 INVALID_REDIRECT and sessionCreated=false',
-  );
-}
-
-describe('auth start redirect validation (Red)', () => {
+describe('auth start redirect validation (Green)', () => {
   it('traceability includes TC-IT-FR-001-002 / FNC-001 / SCR-001 / IF-001', () => {
-    const tags = INVALID_REDIRECT_CASES.flatMap((testCase) => testCase.traceability);
+    const tags = ['TC-IT-FR-001-002', 'FNC-001', 'SCR-001', 'IF-001'];
 
     expect(tags).toContain('TC-IT-FR-001-002');
     expect(tags).toContain('FNC-001');
@@ -46,11 +13,53 @@ describe('auth start redirect validation (Red)', () => {
   });
 
   it('[TC-IT-FR-001-002][FNC-001][SCR-001][IF-001] redirectTo不正値は400 INVALID_REDIRECTかつセッション未作成', () => {
-    const result = startGoogleLogin(INVALID_REDIRECT_CASES[0].redirectTo);
+    const result = startGoogleLogin('https://evil.example.com/callback', {
+      traceId: 'trace-invalid-redirect',
+    });
 
     expect(result.status).toBe(400);
     expect(result.errorCode).toBe('INVALID_REDIRECT');
     expect(result.sessionCreated).toBe(false);
     expect(result.auditEvent).toBe('LOGIN_FAILED');
+    expect(result.trace_id).toBe('trace-invalid-redirect');
+  });
+
+  it('[TC-IT-FR-001-001][FNC-001][SCR-001][IF-001] 正常系はauth_urlとtrace_idを返す', () => {
+    const result = startGoogleLogin('/home', {
+      traceId: 'trace-success',
+      oauthUrlFactory: () => 'https://auth.example.local/google/start?redirectTo=%2Fhome',
+    });
+
+    expect(result.status).toBe(200);
+    expect(result.auth_url).toContain('https://auth.example.local/google/start');
+    expect(result.sessionCreated).toBe(true);
+    expect(result.auditEvent).toBe('LOGIN_START');
+    expect(result.trace_id).toBe('trace-success');
+  });
+
+  it('[TC-IT-FR-001-003][FNC-001][IF-001] 認証失敗時は401 AUTH_FAILEDを返す', () => {
+    const result = startGoogleLogin('/home', {
+      traceId: 'trace-auth-failed',
+      failWith: 'AUTH_FAILED',
+    });
+
+    expect(result.status).toBe(401);
+    expect(result.errorCode).toBe('AUTH_FAILED');
+    expect(result.sessionCreated).toBe(false);
+    expect(result.auditEvent).toBe('LOGIN_FAILED');
+    expect(result.trace_id).toBe('trace-auth-failed');
+  });
+
+  it('[TC-IT-FR-001-004][FNC-001][IF-001] プロバイダ障害時は500 AUTH_PROVIDER_ERRORを返す', () => {
+    const result = startGoogleLogin('/home', {
+      traceId: 'trace-provider-error',
+      failWith: 'AUTH_PROVIDER_ERROR',
+    });
+
+    expect(result.status).toBe(500);
+    expect(result.errorCode).toBe('AUTH_PROVIDER_ERROR');
+    expect(result.sessionCreated).toBe(false);
+    expect(result.auditEvent).toBe('LOGIN_FAILED');
+    expect(result.trace_id).toBe('trace-provider-error');
   });
 });
