@@ -50,6 +50,15 @@ export function resolveNormalTransitionPath(
   return resolveRoutePath(transition.to, params);
 }
 
+function createNormalTransitionLink(transition: NormalTransition, label: string): TransitionLink {
+  return {
+    from: transition.from,
+    to: transition.to,
+    label,
+    href: resolveNormalTransitionPath(transition),
+  };
+}
+
 export const LOGIN_TO_CONSENT_TRANSITION: TransitionLink = {
   from: 'SCR-001',
   to: 'SCR-008',
@@ -57,49 +66,44 @@ export const LOGIN_TO_CONSENT_TRANSITION: TransitionLink = {
   href: resolveRoutePath('SCR-008'),
 };
 
-export const HOME_TRANSITION_LINKS: TransitionLink[] = [
+const HOME_NORMAL_TRANSITIONS: Array<{
+  transition: Extract<NormalTransition, { from: 'SCR-002' }>;
+  label: string;
+}> = [
   {
-    from: 'SCR-002',
-    to: 'SCR-003',
+    transition: { from: 'SCR-002', to: 'SCR-003' },
     label: 'SCR-003 習慣作成へ',
-    href: resolveNormalTransitionPath({ from: 'SCR-002', to: 'SCR-003' }),
   },
   {
-    from: 'SCR-002',
-    to: 'SCR-004',
-    label: 'SCR-004 習慣編集へ',
-    href: resolveNormalTransitionPath({
+    transition: {
       from: 'SCR-002',
       to: 'SCR-004',
       params: { habitId: DEFAULT_EDIT_HABIT_ID },
-    }),
+    },
+    label: 'SCR-004 習慣編集へ',
   },
   {
-    from: 'SCR-002',
-    to: 'SCR-005',
+    transition: { from: 'SCR-002', to: 'SCR-005' },
     label: 'SCR-005 履歴へ',
-    href: resolveNormalTransitionPath({ from: 'SCR-002', to: 'SCR-005' }),
   },
   {
-    from: 'SCR-002',
-    to: 'SCR-006',
+    transition: { from: 'SCR-002', to: 'SCR-006' },
     label: 'SCR-006 分析へ（任意機能/モック）',
-    href: resolveNormalTransitionPath({ from: 'SCR-002', to: 'SCR-006' }),
   },
   {
-    from: 'SCR-002',
-    to: 'SCR-007',
+    transition: { from: 'SCR-002', to: 'SCR-007' },
     label: 'SCR-007 設定へ',
-    href: resolveNormalTransitionPath({ from: 'SCR-002', to: 'SCR-007' }),
   },
 ];
 
-export const POLICY_CONSENT_TRANSITION: TransitionLink = {
-  from: 'SCR-008',
-  to: 'SCR-002',
-  label: 'SCR-002 ホームへ',
-  href: resolveNormalTransitionPath({ from: 'SCR-008', to: 'SCR-002' }),
-};
+export const HOME_TRANSITION_LINKS: TransitionLink[] = HOME_NORMAL_TRANSITIONS.map(({ transition, label }) =>
+  createNormalTransitionLink(transition, label),
+);
+
+export const POLICY_CONSENT_TRANSITION = createNormalTransitionLink(
+  { from: 'SCR-008', to: 'SCR-002' },
+  'SCR-002 ホームへ',
+);
 
 export const POLICY_REJECT_TRANSITION: TransitionLink = {
   from: 'SCR-008',

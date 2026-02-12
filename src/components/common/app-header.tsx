@@ -1,7 +1,9 @@
+const COMMON_HEADER_ARIA_LABEL = '共通ヘッダー';
+
 export function AppHeader() {
   return (
     <header>
-      <nav aria-label="共通ヘッダー">
+      <nav aria-label={COMMON_HEADER_ARIA_LABEL}>
         <ul>
           <li>
             <a href="/home">ロゴ</a>

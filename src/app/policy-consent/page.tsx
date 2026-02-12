@@ -6,6 +6,7 @@ import {
 } from '../../client/routing/transition-map';
 import { AppFooter } from '../../components/common/app-footer';
 import { AppHeader } from '../../components/common/app-header';
+import { AppScreenShell } from '../../components/common/app-screen-shell';
 
 export default function PolicyConsentPage() {
   function handleAccept(): void {
@@ -17,10 +18,12 @@ export default function PolicyConsentPage() {
   }
 
   return (
-    <main>
-      <AppHeader />
-      <h1>SCR-008 ポリシー同意</h1>
-      <p>/policy-consent</p>
+    <AppScreenShell
+      title="SCR-008 ポリシー同意"
+      path="/policy-consent"
+      header={<AppHeader />}
+      footer={<AppFooter />}
+    >
       <p>サービス利用ポリシーに同意して続行してください。</p>
       <div>
         <button type="button" onClick={handleAccept}>
@@ -32,7 +35,6 @@ export default function PolicyConsentPage() {
       </div>
       <a href={POLICY_CONSENT_TRANSITION.href}>{POLICY_CONSENT_TRANSITION.label}</a>
       <a href={POLICY_REJECT_TRANSITION.href}>{POLICY_REJECT_TRANSITION.label}</a>
-      <AppFooter />
-    </main>
+    </AppScreenShell>
   );
 }
