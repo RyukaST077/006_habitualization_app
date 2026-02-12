@@ -1,6 +1,25 @@
 import { resolveLogDate } from '../../domain/time/BusinessDateService';
-import { HabitRepository, UserRepository } from '../../infrastructure/repositories';
 import type { CheckinResult } from './CheckinTypes';
+
+type Profile = {
+  timezone: string;
+  dayCutoffTime: string;
+  accountStatus: 'active' | 'disabled' | 'deleted';
+};
+
+export interface CheckinUserRepositoryPort {
+  findProfile(userId: string): Promise<Profile | null>;
+  incrementDailyActivity(delta: {
+    userId: string;
+    logDate: string;
+    loginDelta: number;
+    checkinDelta: number;
+  }): Promise<void>;
+}
+
+export interface CheckinHabitRepositoryPort {
+  upsertCheckin(userId: string, habitId: string, logDate: string, checkedInAt: string): Promise<void>;
+}
 
 function normalizeCutoffTime(value: string): string {
   if (/^\d{2}:\d{2}$/.test(value)) {
@@ -26,8 +45,8 @@ function asDomainError(error: unknown): Error {
 
 export class CheckinService {
   constructor(
-    private readonly userRepository: UserRepository,
-    private readonly habitRepository: HabitRepository,
+    private readonly userRepository: CheckinUserRepositoryPort,
+    private readonly habitRepository: CheckinHabitRepositoryPort,
   ) {}
 
   async registerCheckin(userId: string, habitId: string, nowUtc: Date): Promise<CheckinResult> {

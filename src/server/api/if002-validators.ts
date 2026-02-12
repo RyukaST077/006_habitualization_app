@@ -72,6 +72,21 @@ export function validateHabitDto(payload: JsonObject): { name: string; displayOr
   return { name, displayOrder };
 }
 
+export function validateCheckinPayload(payload: JsonObject): { habitId: string } {
+  requireKeys(payload, ['habitId']);
+  const raw = payload.habitId;
+  if (typeof raw !== 'string' && typeof raw !== 'number') {
+    throw new Error('VALIDATION_ERROR');
+  }
+
+  const habitId = String(raw).trim();
+  if (habitId.length === 0) {
+    throw new Error('VALIDATION_ERROR');
+  }
+
+  return { habitId };
+}
+
 export function parseAuthUserId(request: Request): string {
   assertAuthHeader(request);
   const authHeader = request.headers.get('Authorization') ?? '';
