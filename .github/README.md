@@ -35,6 +35,15 @@
 - 誤検知の可能性がある場合は、検知箇所の根拠を確認してから最小限の除外設定を検討する。
 - 漏えいの可能性がある場合は、キー無効化と再発行（ローテーション）を先に実施してから修正PRを更新する。
 
+### 週次セキュリティ運用確認（OPS-W-002）
+
+- Dependabot設定確認: `test -f .github/dependabot.yml`
+- 依存更新対象確認: `rg "package-ecosystem" .github/dependabot.yml`
+- Secret scan workflow確認: `test -f .github/workflows/secret-scan.yml`
+- Secret scanトリガー確認: `rg "pull_request|push" .github/workflows/secret-scan.yml`
+- CSP/必須ヘッダ定義確認: `rg "Content-Security-Policy|X-Content-Type-Options|Referrer-Policy|X-Frame-Options|frame-ancestors" middleware.ts`
+- ヘッダ自動検証: `npm run test -- tests/security/headers.spec.ts`
+
 ## CODEOWNERS 運用
 
 - 定義ファイル: `.github/CODEOWNERS`

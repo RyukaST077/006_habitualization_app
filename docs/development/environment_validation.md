@@ -15,10 +15,25 @@
 - [ ] GitHub/Vercel/Supabase それぞれの保管値が最新ローテーション状態で一致している。
 - [ ] ローテーション記録（実施日、担当者、影響範囲、復旧確認）を残している。
 
+## 3.1 週次セキュリティ運用チェック（OPS-W-002）
+- [ ] `test -f .github/dependabot.yml` を実行し、Dependabot設定ファイルの存在を確認した。
+- [ ] `rg "package-ecosystem" .github/dependabot.yml` を実行し、`npm` と `github-actions` の対象定義を確認した。
+- [ ] `test -f .github/workflows/secret-scan.yml` を実行し、secret scan workflowの存在を確認した。
+- [ ] `rg "pull_request|push" .github/workflows/secret-scan.yml` を実行し、PR/pushトリガーを確認した。
+- [ ] `rg "Content-Security-Policy|X-Content-Type-Options|Referrer-Policy|X-Frame-Options|frame-ancestors" middleware.ts` を実行し、必須ヘッダを確認した。
+- [ ] `npm run test -- tests/security/headers.spec.ts` を実行し、CSP/セキュリティヘッダ検証テストの成功を確認した。
+
 ## 4. 漏えい時チェック（インシデント対応）
 - [ ] 漏えい 疑い発生時の 初動 として、対象キーを即時無効化した。
 - [ ] 代替キーを発行し、GitHub/Vercel/Supabase へ再設定した。
 - [ ] 影響範囲を調査し、監査ログと再発防止策を記録した。
+
+### 4.1 secret-scan失敗時の復旧フロー
+- [ ] `secret-scan` の検知内容を確認し、誤検知か漏えい疑いかを分類した。
+- [ ] 漏えい疑いがある場合は、対象キーを即時無効化した。
+- [ ] 新規キーを発行し、GitHub/Vercel/Supabaseの順で再設定した。
+- [ ] 失効前キーへの依存がないことを確認し、監査ログへ作業記録を残した。
+- [ ] 修正コミット後に `secret-scan` の再実行成功を確認してからPRブロックを解除した。
 
 ## 5. PRレビュー時チェック
 - [ ] 環境変数の追加/変更があるPRは、接続先の環境区分（Dev/Stg/Prod）を明示している。
@@ -59,6 +74,10 @@
 - [ ] `[E2E-GUARD] Missing required environment variables` の場合は欠落キーを設定して再実行する。
 - [ ] `[E2E-GUARD] Production environment is forbidden for smoke tests` の場合は `SUPABASE_ENV` を非本番値へ修正する。
 - [ ] `[E2E-GUARD] Production-like URL is forbidden for smoke tests` の場合は `SUPABASE_URL` を検証環境向けへ修正する。
+
+## 8.1 CSP/セキュリティヘッダ検証（手動/自動）
+- [ ] 自動: `npm run test -- tests/security/headers.spec.ts` が成功する。
+- [ ] 手動: `curl -I http://127.0.0.1:3000 | rg "Content-Security-Policy|X-Content-Type-Options|Referrer-Policy|X-Frame-Options"` で必須ヘッダが確認できる。
 
 ## 7. テスト関連Secretsの取り扱い
 - [ ] テスト手順書・README・PR説明へSecrets平文を記載していない。
