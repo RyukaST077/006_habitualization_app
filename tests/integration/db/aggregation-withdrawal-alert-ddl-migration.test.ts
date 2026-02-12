@@ -4,7 +4,7 @@ import { expectAggregationWithdrawalAlertTable } from '../../helpers/db/aggregat
 import { hasDdlMatcher } from '../../helpers/db/schema-introspection';
 import { loadMigrationSql } from '../../helpers/db/migration-runner';
 
-describe('aggregation/withdrawal/alert DDL migration contract (Red)', () => {
+describe('aggregation/withdrawal/alert DDL migration contract', () => {
   test('[migration] aggregation/withdrawal/alert tables are applied in init migration', () => {
     const sql = loadMigrationSql();
 
@@ -14,7 +14,7 @@ describe('aggregation/withdrawal/alert DDL migration contract (Red)', () => {
     expectAggregationWithdrawalAlertTable(sql, 'monitoring_alert_events');
   });
 
-  test('[migration] placeholder is removed after aggregation/withdrawal/alert DDL implementation', () => {
+  test('[migration] no placeholder remains after aggregation/withdrawal/alert DDL implementation', () => {
     const sql = loadMigrationSql();
 
     expect(hasDdlMatcher(sql, /placeholder:\s+no\s+schema\s+changes/i)).toBe(false);
