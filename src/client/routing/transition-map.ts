@@ -1,3 +1,9 @@
+import {
+  resolveAuthConsentGuard,
+  type AuthConsentGuardActor,
+  type ConsentDecision,
+  type GuardedPath,
+} from './auth-consent-guard';
 import { resolveRoutePath, type ResolveRouteParams, type ScreenId } from './route-paths';
 
 export type NormalTransition =
@@ -17,7 +23,21 @@ export type TransitionLink = {
 
 const DEFAULT_EDIT_HABIT_ID = 'abc123';
 
+export type GuardedTransition = {
+  actor: AuthConsentGuardActor;
+  requestedPath: GuardedPath;
+  decision?: ConsentDecision;
+};
+
 // Auth/consent guard behavior is implemented in T-013.
+export function resolveGuardedTransitionPath(transition: GuardedTransition): string {
+  return resolveAuthConsentGuard(
+    transition.actor,
+    transition.requestedPath,
+    transition.decision,
+  ).nextPath;
+}
+
 export function resolveNormalTransitionPath(
   transition: NormalTransition,
   params?: ResolveRouteParams,

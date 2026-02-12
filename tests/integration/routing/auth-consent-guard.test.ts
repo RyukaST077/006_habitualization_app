@@ -6,15 +6,14 @@ import {
   type RoutingActor,
 } from '../../helpers/routing-actors';
 import {
-  expectGuardFailureReason,
   expectGuardRedirect,
   expectSessionDestroyed,
 } from '../../helpers/assertions';
-
-type GuardResolution = {
-  nextPath: '/login' | '/policy-consent' | '/home';
-  sessionDestroyed: boolean;
-};
+import {
+  resolveAuthConsentGuard,
+  type ConsentDecision,
+  type GuardResolution,
+} from '../../../src/client/routing/auth-consent-guard';
 
 type GuardFailureHint = {
   state: RoutingActor['state'];
@@ -25,29 +24,9 @@ type GuardFailureHint = {
 function resolveGuardedTransition(
   actor: RoutingActor,
   requestedPath: '/home' | '/policy-consent',
-  decision: 'none' | 'accept' | 'reject' = 'none',
+  decision: ConsentDecision = 'none',
 ): GuardResolution {
-  if (!actor.hasSession && requestedPath === '/home') {
-    throw new Error('Guard not implemented: expected redirect to /login for unauthenticated /home access');
-  }
-
-  if (actor.hasSession && !actor.hasConsented && requestedPath === '/home') {
-    throw new Error(
-      'Guard not implemented: expected redirect to /policy-consent for unconsented /home access',
-    );
-  }
-
-  if (actor.hasSession && !actor.hasConsented && requestedPath === '/policy-consent' && decision === 'reject') {
-    throw new Error('Guard not implemented: expected redirect to /login after consent rejection');
-  }
-
-  if (actor.hasSession && actor.hasConsented && requestedPath === '/policy-consent') {
-    throw new Error(
-      'Guard not implemented: expected redirect to /home when consented user reaches /policy-consent',
-    );
-  }
-
-  throw new Error('Guard not implemented: no transition rule for this case');
+  return resolveAuthConsentGuard(actor, requestedPath, decision);
 }
 
 function expectResolvedGuard(result: GuardResolution, expectedPath: GuardResolution['nextPath'], sessionDestroyed: boolean): void {
@@ -55,7 +34,7 @@ function expectResolvedGuard(result: GuardResolution, expectedPath: GuardResolut
   expectSessionDestroyed(result.sessionDestroyed, sessionDestroyed);
 }
 
-describe('auth consent guard transitions (Red)', () => {
+describe('auth consent guard transitions (Green)', () => {
   it('defines observable guard expectations: unauthenticated/unconsented cannot reach /home', () => {
     const deniedHomeActors = AUTH_CONSENT_GUARD_CASES.filter(
       (transitionCase) =>
@@ -94,7 +73,7 @@ describe('auth consent guard transitions (Red)', () => {
     expect(tags).toContain('POLICY_CONSENT_REJECT');
   });
 
-  it('keeps reusable guard failure reason hints for expected redirects', () => {
+  it('keeps reusable guard expectation hints for redirects', () => {
     const failureHints: GuardFailureHint[] = [
       { state: 'unauthenticated', requestedPath: '/home', expectedRedirect: '/login' },
       {
@@ -115,10 +94,16 @@ describe('auth consent guard transitions (Red)', () => {
     ];
 
     for (const hint of failureHints) {
-      expectGuardFailureReason(
-        `Guard not implemented: expected redirect to ${hint.expectedRedirect}`,
-        hint.expectedRedirect,
-      );
+      const actor = AUTH_CONSENT_GUARD_CASES.find((testCase) => testCase.actor.state === hint.state)?.actor;
+      expect(actor).toBeDefined();
+
+      const decision: ConsentDecision =
+        hint.state === 'authenticated_without_consent' && hint.requestedPath === '/policy-consent'
+          ? 'reject'
+          : 'none';
+
+      const result = resolveGuardedTransition(actor as RoutingActor, hint.requestedPath, decision);
+      expectGuardRedirect(result.nextPath, hint.expectedRedirect);
     }
   });
 
