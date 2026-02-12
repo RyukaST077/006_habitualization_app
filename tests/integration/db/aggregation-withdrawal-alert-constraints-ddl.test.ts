@@ -13,7 +13,7 @@ import {
 } from '../../helpers/db/schema-introspection';
 import { loadMigrationSql } from '../../helpers/db/migration-runner';
 
-describe('aggregation/withdrawal/alert constraints/index DDL (Red)', () => {
+describe('aggregation/withdrawal/alert constraints/index DDL', () => {
   test('[TBL-004][user_daily_activity] expected check/unique/index and RLS definitions exist', () => {
     const sql = loadMigrationSql();
 
@@ -41,6 +41,7 @@ describe('aggregation/withdrawal/alert constraints/index DDL (Red)', () => {
     expectAggregationWithdrawalAlertConstraint(sql, 'chk_account_deletion_jobs_status');
     expectAggregationWithdrawalAlertConstraint(sql, 'uq_account_deletion_jobs_user');
     expectAggregationWithdrawalAlertIndex(sql, 'idx_account_deletion_jobs_status_due');
+    expect(hasDdlMatcher(sql, /trg_account_deletion_jobs_updated_at/i)).toBe(true);
     expectAccountDeletionLifecycleTokens(sql);
   });
 

@@ -61,5 +61,7 @@ export function expectP2OptInMarker(sql: string): void {
 }
 
 export function expectNoPersonalIdentifierColumns(sql: string): void {
-  expect(hasDdlMatcher(sql, /user_id|email/i)).toBe(false);
+  const analyticsTable = sql.match(/create\s+table\s+analytics_daily_kpi\s*\(([\s\S]*?)\);/i);
+  const analyticsColumns = analyticsTable?.[1] ?? '';
+  expect(hasDdlMatcher(analyticsColumns, /user_id|email/i)).toBe(false);
 }

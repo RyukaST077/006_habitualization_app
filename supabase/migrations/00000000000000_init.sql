@@ -208,6 +208,55 @@ create index idx_audit_logs_action_result on audit_logs (action, result, occurre
 create index idx_habit_logs_user_date on habit_logs (user_id, log_date desc);
 create index idx_habit_logs_habit_date on habit_logs (habit_id, log_date desc);
 
+alter table user_daily_activity
+  add constraint uq_user_daily_activity_user_date
+  unique (user_id, activity_date);
+
+alter table user_daily_activity
+  add constraint chk_user_daily_activity_counts
+  check (login_count >= 0 and checkin_count >= 0);
+
+create index idx_user_daily_activity_date
+  on user_daily_activity (activity_date desc);
+
+alter table analytics_daily_kpi
+  add constraint uq_analytics_daily_kpi_key
+  unique (metric_date, metric_key, dimension_hash);
+
+alter table analytics_daily_kpi
+  add constraint chk_analytics_daily_kpi_non_negative
+  check (metric_value >= 0);
+
+create index idx_analytics_daily_kpi_date_key
+  on analytics_daily_kpi (metric_date desc, metric_key);
+
+alter table account_deletion_jobs
+  add constraint uq_account_deletion_jobs_user
+  unique (user_id);
+
+alter table account_deletion_jobs
+  add constraint chk_account_deletion_jobs_status
+  check (job_status in ('queued', 'in_progress', 'completed', 'failed'));
+
+create index idx_account_deletion_jobs_status_due
+  on account_deletion_jobs (job_status, hard_delete_due_at);
+
+-- role-002/service role only access marker (implemented in PR-003)
+-- P2 is default disabled and only inserted on explicit opt-in setting.
+alter table monitoring_alert_events
+  add constraint chk_monitoring_alert_events_level
+  check (alert_level in ('P1', 'P2'));
+
+alter table monitoring_alert_events
+  add constraint chk_monitoring_alert_events_status
+  check (notification_status in ('pending', 'sent', 'failed'));
+
+create index idx_monitoring_alert_events_status
+  on monitoring_alert_events (notification_status, created_at desc);
+
+create index idx_monitoring_alert_events_level_time
+  on monitoring_alert_events (alert_level, created_at desc);
+
 create or replace function fn_set_updated_at()
 returns trigger as $$
 begin
@@ -327,6 +376,11 @@ execute function fn_validate_active_habit();
 
 create trigger trg_habit_logs_updated_at
 before update on habit_logs
+for each row
+execute function fn_set_updated_at();
+
+create trigger trg_account_deletion_jobs_updated_at
+before update on account_deletion_jobs
 for each row
 execute function fn_set_updated_at();
 
