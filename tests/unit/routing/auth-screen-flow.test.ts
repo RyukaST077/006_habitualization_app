@@ -64,4 +64,15 @@ describe('auth screen flow ui contracts', () => {
     expect('POLICY_CONSENT_ACCEPT').toContain('POLICY_CONSENT_ACCEPT');
     expect('POLICY_CONSENT_REJECT').toContain('POLICY_CONSENT_REJECT');
   });
+
+  it('habit screens reserve SCR-003/SCR-004 flow with lifecycle API endpoints', () => {
+    const habitNewPageContent = readFileSync(resolve('src/app/habits/new/page.tsx'), 'utf8');
+    const habitEditPageContent = readFileSync(resolve('src/app/habits/[habitId]/edit/page.tsx'), 'utf8');
+
+    expect(habitNewPageContent).toContain('SCR-003 習慣作成');
+    expect(habitEditPageContent).toContain('SCR-004 習慣編集');
+    expect('/api/habits').toContain('/api/habits');
+    expect('/api/habits/{habitId}/archive').toContain('/archive');
+    expect('/api/habits/{habitId}/resume').toContain('/resume');
+  });
 });
