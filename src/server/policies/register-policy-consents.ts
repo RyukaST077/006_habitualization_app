@@ -1,8 +1,11 @@
 import { randomUUID } from 'node:crypto';
 
 import {
+  CONSENT_ALREADY_EXISTS,
   POLICY_CONSENT_ACCEPT,
   POLICY_CONSENT_REJECT,
+  VERSION_CONFLICT,
+  normalizePolicyConsentConflict,
   type PolicyConsentActionResult,
   type PolicyConsentItem,
 } from './policy-consent-contract';
@@ -41,14 +44,32 @@ export async function registerPolicyConsents(
 
   const policy_version = input.consents[0]?.policy_version ?? '';
 
-  await repository.insertConsents(
-    input.userId,
-    input.consents.map((consent) => ({
-      policyType: consent.policy_type,
-      consentedVersion: consent.policy_version,
-      consentedAt: new Date().toISOString(),
-    })),
-  );
+  try {
+    await repository.insertConsents(
+      input.userId,
+      input.consents.map((consent) => ({
+        policyType: consent.policy_type,
+        consentedVersion: consent.policy_version,
+        consentedAt: new Date().toISOString(),
+      })),
+    );
+  } catch (error) {
+    const conflict = normalizePolicyConsentConflict(error);
+    if (conflict === CONSENT_ALREADY_EXISTS) {
+      return {
+        accepted: true,
+        redirectTo: '/home',
+        auditEvent: POLICY_CONSENT_ACCEPT,
+        trace_id: traceId,
+      };
+    }
+
+    if (conflict === VERSION_CONFLICT) {
+      throw new Error(VERSION_CONFLICT);
+    }
+
+    throw error;
+  }
 
   return {
     accepted: true,

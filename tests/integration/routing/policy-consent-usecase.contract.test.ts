@@ -23,5 +23,19 @@ describe('policy consent usecase contract (Red)', () => {
     expect(source).toContain('POLICY_CONSENT_ACCEPT');
     expect(source).toContain('POLICY_CONSENT_REJECT');
     expect(source).toContain('policy_version');
+    expect(source).toContain('VERSION_CONFLICT');
+    expect(source).toContain('CONSENT_ALREADY_EXISTS');
+  });
+
+  it('defines conflict normalization contract for IF-004 and M-002 terms', () => {
+    const contractPath = resolve('src/server/policies/policy-consent-contract.ts');
+
+    expect(existsSync(contractPath), 'policy consent contract not implemented').toBe(true);
+
+    const source = readFileSync(contractPath, 'utf8');
+    expect(source).toContain('VERSION_CONFLICT');
+    expect(source).toContain('POLICY_VERSION_MISMATCH');
+    expect(source).toContain('CONSENT_ALREADY_EXISTS');
+    expect(source).toContain('normalizePolicyConsentConflict');
   });
 });
