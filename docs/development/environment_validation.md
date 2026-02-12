@@ -79,6 +79,18 @@
 - [ ] 自動: `npm run test -- tests/security/headers.spec.ts` が成功する。
 - [ ] 手動: `curl -I http://127.0.0.1:3000 | rg "Content-Security-Policy|X-Content-Type-Options|Referrer-Policy|X-Frame-Options"` で必須ヘッダが確認できる。
 
+## 11. テストデータ（fixture）更新時の確認フロー
+### 11.1 unit/integration/e2e の順で検証
+- [ ] Unit: `npm run test -- tests/unit/sample.test.ts` を実行し、固定fixture（`USER-A` / `USER-B` / `OPS-1`）の再現性を確認する。
+- [ ] Integration: `npm run test -- tests/integration/supabase-connectivity.test.ts` を実行し、環境変数と接続先の整合性を確認する。
+- [ ] E2E: `npm run test:e2e:smoke` を実行し、`SUPABASE_ENV` のガード（`dev`/`stg`）が有効であることを確認する。
+- [ ] ロール確認: `ROLE-002` は匿名KPI確認および監査用途の運用ユーザーとして扱い、一般ユーザーと混在させない。
+
+### 11.2 失敗時の切り分け
+- [ ] env不足: `[E2E-GUARD] Missing required environment variables` が出た場合、`SUPABASE_ENV` / `SUPABASE_URL` / `SUPABASE_ANON_KEY` を設定して再実行する。
+- [ ] fixture不整合: `USER-A` / `USER-B` / `OPS-1` のキー名・role・timezone・locale を `tests/helpers/fixtures.ts` と `tests/e2e/fixtures/users.ts` で突合する。
+- [ ] ロール不一致: `ROLE-002` が一般ユーザー導線に混入していないか、監査用途の画面/ケースに限定されているかを確認する。
+
 ## 7. テスト関連Secretsの取り扱い
 - [ ] テスト手順書・README・PR説明へSecrets平文を記載していない。
 - [ ] CI設定には秘密管理機能（Repository/Environment Secrets）を使用している。

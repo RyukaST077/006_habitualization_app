@@ -131,6 +131,20 @@ npm run test:e2e:smoke
 5. 接続エラーの場合:
    - `SUPABASE_URL` が検証環境向けであることとネットワーク到達性を確認する
 
+### テストデータ更新時の確認コマンド
+
+```bash
+# Unit/Integration の固定fixture確認
+npm run test -- tests/unit/sample.test.ts
+npm run test -- tests/integration/supabase-connectivity.test.ts
+
+# 全体回帰
+npm run test
+
+# E2Eスモーク（本番接続ガード有効）
+npm run test:e2e:smoke
+```
+
 ### Secrets運用の注意
 
 - `SUPABASE_ANON_KEY` を含む機密値をREADME・Issue・PRコメントへ平文で貼り付けない
