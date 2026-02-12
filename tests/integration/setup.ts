@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { createFixtureUsers, type FixtureUsers } from '../helpers/fixtures';
 
 type IntegrationEnv = {
   supabaseUrl: string;
@@ -61,6 +62,10 @@ export function createIntegrationClient(env: NodeJS.ProcessEnv = process.env): S
   return createClient(parsed.supabaseUrl, parsed.supabaseAnonKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+}
+
+export function initializeIntegrationFixtures(): FixtureUsers {
+  return createFixtureUsers();
 }
 
 export async function probeSupabaseConnection(env: NodeJS.ProcessEnv = process.env): Promise<void> {
