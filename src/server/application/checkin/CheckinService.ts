@@ -34,6 +34,11 @@ export interface CheckinHabitRepositoryPort {
   ): Promise<{ idempotent: boolean }>;
 }
 
+type CheckinContext = {
+  logDate: string;
+  idempotent: boolean;
+};
+
 function normalizeCutoffTime(value: string): string {
   if (/^\d{2}:\d{2}$/.test(value)) {
     return value;
@@ -42,6 +47,19 @@ function normalizeCutoffTime(value: string): string {
     return value.slice(0, 5);
   }
   throw validationError('VALIDATION_ERROR:dayCutoffTime');
+}
+
+function mapInfrastructureError(error: Error): Error {
+  if (error.message.startsWith('INVALID_TIMEZONE') || error.message.startsWith('INVALID_CUTOFF_TIME')) {
+    return validationError('VALIDATION_ERROR:profile_settings');
+  }
+  if (error.message.startsWith('FORBIDDEN')) {
+    return forbiddenError(error.message);
+  }
+  if (error.message.startsWith('CHECKIN_CONFLICT')) {
+    return domainConflictError('DOMAIN_CONFLICT:checkin');
+  }
+  return internalError('INTERNAL_ERROR:checkin');
 }
 
 function asDomainError(error: unknown): Error {
@@ -53,17 +71,19 @@ function asDomainError(error: unknown): Error {
   }
 
   if (error instanceof Error) {
-    if (error.message.startsWith('INVALID_TIMEZONE') || error.message.startsWith('INVALID_CUTOFF_TIME')) {
-      return validationError('VALIDATION_ERROR:profile_settings');
-    }
-    if (error.message.startsWith('FORBIDDEN')) {
-      return forbiddenError(error.message);
-    }
-    if (error.message.startsWith('CHECKIN_CONFLICT')) {
-      return domainConflictError('DOMAIN_CONFLICT:checkin');
-    }
+    return mapInfrastructureError(error);
   }
   return internalError('INTERNAL_ERROR:checkin');
+}
+
+function assertAccessibleHabit(habitStatus: 'active' | 'archived' | null): void {
+  if (!habitStatus) {
+    // FR-025 / RLS boundary: owner scope by user_id. Reject with FORBIDDEN and keep DB_UNCHANGED.
+    throw forbiddenError('FORBIDDEN:habit_owner_mismatch:DB_UNCHANGED:user_id:RLS:FR-025');
+  }
+  if (habitStatus === 'archived') {
+    throw habitArchivedError('HABIT_ARCHIVED:DOMAIN_CONFLICT:archived');
+  }
 }
 
 export class CheckinService {
@@ -83,37 +103,45 @@ export class CheckinService {
     }
 
     try {
-      const cutoff = normalizeCutoffTime(profile.dayCutoffTime);
-      const logDate = resolveLogDate(nowUtc, profile.timezone, cutoff);
-      const habitStatus = await this.habitRepository.findOwnedHabitStatus(userId, habitId);
-      if (!habitStatus) {
-        // FR-025 / RLS boundary: owner scope by user_id. Reject with FORBIDDEN and keep DB_UNCHANGED.
-        throw forbiddenError('FORBIDDEN:habit_owner_mismatch:DB_UNCHANGED:user_id:RLS:FR-025');
-      }
-      if (habitStatus === 'archived') {
-        throw habitArchivedError('HABIT_ARCHIVED:DOMAIN_CONFLICT:archived');
-      }
-
-      const upsertResult = await this.habitRepository.upsertCheckin(
-        userId,
-        habitId,
-        logDate,
-        nowUtc.toISOString(),
+      const logDate = resolveLogDate(
+        nowUtc,
+        profile.timezone,
+        normalizeCutoffTime(profile.dayCutoffTime),
       );
-      const idempotent = upsertResult.idempotent === true;
+      const habitStatus = await this.habitRepository.findOwnedHabitStatus(userId, habitId);
+      assertAccessibleHabit(habitStatus);
+      const context = await this.persistCheckinAndBuildContext(userId, habitId, logDate, nowUtc);
       await this.userRepository.incrementDailyActivity({
         userId,
-        logDate,
+        logDate: context.logDate,
         loginDelta: 0,
-        checkinDelta: idempotent ? 0 : 1,
+        checkinDelta: context.idempotent ? 0 : 1,
       });
 
       return {
-        logDate,
-        idempotent,
+        logDate: context.logDate,
+        idempotent: context.idempotent,
       };
     } catch (error) {
       throw asDomainError(error);
     }
+  }
+
+  private async persistCheckinAndBuildContext(
+    userId: string,
+    habitId: string,
+    logDate: string,
+    nowUtc: Date,
+  ): Promise<CheckinContext> {
+    const upsertResult = await this.habitRepository.upsertCheckin(
+      userId,
+      habitId,
+      logDate,
+      nowUtc.toISOString(),
+    );
+    return {
+      logDate,
+      idempotent: upsertResult.idempotent === true,
+    };
   }
 }
