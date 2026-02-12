@@ -10,9 +10,10 @@
 
 `main` へマージする PR には、次のチェック通過を必須とする。
 
-- `lint`
-- `typecheck`
-- `test`
+- Workflow: `PR Quality Gate`（`.github/workflows/ci.yml`）
+- Job: `lint`
+- Job: `typecheck`
+- Job: `test`
 
 セキュリティ関連修正を含む PR でも同一の必須チェック（`lint/typecheck/test`）を適用する。
 
