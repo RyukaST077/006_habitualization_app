@@ -127,4 +127,12 @@ before update on habit_logs
 for each row
 execute function fn_set_updated_at();
 
+alter table profiles enable row level security;
+alter table habits enable row level security;
+alter table habit_logs enable row level security;
+
+create policy p_profiles_user_scope on profiles for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy p_habits_user_scope on habits for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy p_habit_logs_user_scope on habit_logs for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
 commit;
