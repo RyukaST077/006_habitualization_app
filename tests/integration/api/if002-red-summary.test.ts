@@ -8,9 +8,8 @@ describe('IF-002 red summary (T-027 handoff)', () => {
     expect(IF002_CONTRACT_TEST_GLOBS).toEqual(['tests/integration/api/*.test.ts']);
   });
 
-  it('fails until T-027 implements IF-002 routes', () => {
-    expect('T-027 IF-002 route contract not implemented').toContain('not implemented');
+  it('passes after T-027 implements IF-002 routes', () => {
+    expect('T-027 IF-002 routes implemented').toContain('implemented');
     requireApiRoute('src/app/api/home/habits/route.ts');
   });
 });
-
