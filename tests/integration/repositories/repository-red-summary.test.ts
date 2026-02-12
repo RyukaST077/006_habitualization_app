@@ -8,9 +8,8 @@ describe('repository contract red summary (T-025 handoff)', () => {
     expect(REPOSITORY_CONTRACT_TEST_GLOBS).toEqual(['tests/integration/repositories/*.test.ts']);
   });
 
-  it('fails until T-025 implements repository contracts', () => {
-    expect('T-025 Repository contract not implemented').toContain('not implemented');
+  it('loads repository index after T-025 implementation', () => {
+    expect('T-025 Repository contracts implemented').toContain('implemented');
     loadRepositorySource('src/server/infrastructure/repositories/index.ts');
   });
 });
-
