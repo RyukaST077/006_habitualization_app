@@ -9,8 +9,8 @@ describe('T-030 red summary (T-031 handoff)', () => {
     expect(T030_CONTRACT_TEST_GLOBS).toContain('tests/integration/security/audit-assertions.contract.test.ts');
   });
 
-  it('fails until T-031 implements AppError and audit logger', () => {
-    expect('T-031 AppError contract not implemented').toContain('not implemented');
+  it('passes after T-031 implements AppError and audit logger', () => {
+    expect('T-031 AppError contract implemented').toContain('implemented');
     loadCommonErrorSource('src/server/common/errors/AppError.ts');
   });
 });
