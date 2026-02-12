@@ -210,3 +210,9 @@ export const T047_CONTRACT_TEST_GLOBS = [
   'tests/integration/api/checkins-authorization.contract.test.ts',
   'tests/integration/checkin/t047-refactor-summary.test.ts',
 ] as const;
+
+export const T048_CONTRACT_TEST_GLOBS = [
+  'tests/integration/api/checkins-cancel.contract.test.ts',
+  'tests/integration/api/checkins-cancel-authorization.contract.test.ts',
+  'tests/integration/checkin/t048-red-summary.test.ts',
+] as const;
