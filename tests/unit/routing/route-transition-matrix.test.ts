@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import {
+  HOME_TRANSITION_LINKS,
+  POLICY_CONSENT_TRANSITION,
+  resolveNormalTransitionPath,
+} from '../../../src/client/routing/transition-map';
 
 type AuthState =
   | 'unauthenticated'
@@ -120,20 +125,6 @@ const routeTransitionMatrix: RouteTransitionCase[] = [
   },
 ];
 
-function resolveNextRoute(fromPath: string, authState: AuthState): string {
-  if (fromPath === '/home') {
-    if (authState === 'unauthenticated') {
-      return '/login';
-    }
-
-    if (authState === 'authenticated_without_consent') {
-      return '/policy-consent';
-    }
-  }
-
-  return fromPath;
-}
-
 const screenContainerFiles = [
   { scrId: 'SCR-001', path: 'src/app/login/page.tsx' },
   { scrId: 'SCR-002', path: 'src/app/home/page.tsx' },
@@ -144,6 +135,13 @@ const screenContainerFiles = [
   { scrId: 'SCR-007', path: 'src/app/settings/page.tsx' },
   { scrId: 'SCR-008', path: 'src/app/policy-consent/page.tsx' },
 ] as const;
+
+const normalTransitionCases = routeTransitionMatrix.filter(
+  (testCase) =>
+    (testCase.fromScr === 'SCR-002' &&
+      ['SCR-003', 'SCR-004', 'SCR-005', 'SCR-006', 'SCR-007'].includes(testCase.toScr)) ||
+    (testCase.fromScr === 'SCR-008' && testCase.toScr === 'SCR-002'),
+);
 
 describe('route transition matrix', () => {
   it('covers SCR-001..008 at least once in source/destination', () => {
@@ -192,8 +190,93 @@ describe('route transition matrix', () => {
     }
   });
 
-  it('unauthenticated /home access should resolve to /login', () => {
-    expect(resolveNextRoute('/home', 'unauthenticated')).toBe('/login');
+  it('resolves normal transitions by transition-map (without guard logic)', () => {
+    expect(
+      resolveNormalTransitionPath({
+        from: 'SCR-002',
+        to: 'SCR-003',
+      }),
+    ).toBe('/habits/new');
+    expect(
+      resolveNormalTransitionPath({
+        from: 'SCR-002',
+        to: 'SCR-004',
+        params: { habitId: 'abc123' },
+      }),
+    ).toBe('/habits/abc123/edit');
+    expect(
+      resolveNormalTransitionPath({
+        from: 'SCR-002',
+        to: 'SCR-005',
+      }),
+    ).toBe('/history');
+    expect(
+      resolveNormalTransitionPath({
+        from: 'SCR-002',
+        to: 'SCR-006',
+      }),
+    ).toBe('/analytics');
+    expect(
+      resolveNormalTransitionPath({
+        from: 'SCR-002',
+        to: 'SCR-007',
+      }),
+    ).toBe('/settings');
+    expect(
+      resolveNormalTransitionPath({
+        from: 'SCR-008',
+        to: 'SCR-002',
+      }),
+    ).toBe('/home');
+  });
+
+  it('keeps matrix expected paths for normal transitions', () => {
+    for (const testCase of normalTransitionCases) {
+      if (testCase.fromScr === 'SCR-002' && testCase.toScr === 'SCR-004') {
+        expect(
+          resolveNormalTransitionPath({
+            from: 'SCR-002',
+            to: 'SCR-004',
+            params: { habitId: 'abc123' },
+          }),
+        ).toBe(testCase.expectedPath);
+        continue;
+      }
+
+      if (testCase.fromScr === 'SCR-002' && testCase.toScr === 'SCR-003') {
+        expect(resolveNormalTransitionPath({ from: 'SCR-002', to: 'SCR-003' })).toBe(
+          testCase.expectedPath,
+        );
+        continue;
+      }
+
+      if (testCase.fromScr === 'SCR-002' && testCase.toScr === 'SCR-005') {
+        expect(resolveNormalTransitionPath({ from: 'SCR-002', to: 'SCR-005' })).toBe(
+          testCase.expectedPath,
+        );
+        continue;
+      }
+
+      if (testCase.fromScr === 'SCR-002' && testCase.toScr === 'SCR-006') {
+        expect(resolveNormalTransitionPath({ from: 'SCR-002', to: 'SCR-006' })).toBe(
+          testCase.expectedPath,
+        );
+        continue;
+      }
+
+      if (testCase.fromScr === 'SCR-002' && testCase.toScr === 'SCR-007') {
+        expect(resolveNormalTransitionPath({ from: 'SCR-002', to: 'SCR-007' })).toBe(
+          testCase.expectedPath,
+        );
+        continue;
+      }
+
+      if (testCase.fromScr === 'SCR-008' && testCase.toScr === 'SCR-002') {
+        expect(resolveNormalTransitionPath({ from: 'SCR-008', to: 'SCR-002' })).toBe(
+          testCase.expectedPath,
+        );
+      }
+    }
   });
 
   it('screen containers include observable SCR labels', () => {
@@ -201,5 +284,38 @@ describe('route transition matrix', () => {
       const fileContent = readFileSync(resolve(file.path), 'utf8');
       expect(fileContent).toContain(file.scrId);
     }
+  });
+
+  it('home page shows observable links for SCR-003/004/005/006/007', () => {
+    const homePageContent = readFileSync(resolve('src/app/home/page.tsx'), 'utf8');
+    expect(homePageContent).toContain('HOME_TRANSITION_LINKS.map');
+    expect(homePageContent).toContain('<a href={link.href}>{link.label}</a>');
+
+    expect(HOME_TRANSITION_LINKS.map((link) => link.to)).toEqual([
+      'SCR-003',
+      'SCR-004',
+      'SCR-005',
+      'SCR-006',
+      'SCR-007',
+    ]);
+    expect(HOME_TRANSITION_LINKS.map((link) => link.href)).toEqual([
+      '/habits/new',
+      '/habits/abc123/edit',
+      '/history',
+      '/analytics',
+      '/settings',
+    ]);
+  });
+
+  it('policy consent page includes SCR-008 -> SCR-002 normal transition link', () => {
+    const policyConsentPageContent = readFileSync(resolve('src/app/policy-consent/page.tsx'), 'utf8');
+    expect(policyConsentPageContent).toContain('POLICY_CONSENT_TRANSITION');
+    expect(POLICY_CONSENT_TRANSITION.href).toBe('/home');
+    expect(POLICY_CONSENT_TRANSITION.label).toContain('SCR-002');
+  });
+
+  it('keeps guard responsibility separated for T-013', () => {
+    const transitionMapContent = readFileSync(resolve('src/client/routing/transition-map.ts'), 'utf8');
+    expect(transitionMapContent).toContain('T-013');
   });
 });
