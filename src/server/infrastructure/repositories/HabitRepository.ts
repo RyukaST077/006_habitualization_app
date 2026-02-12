@@ -3,6 +3,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Habit, UpdateHabitPayload } from '../../application/habit/HabitTypes';
 import type { HabitRecord, HabitStatus } from './types';
 
+const UNIQUE_VIOLATION_CODE = '23505';
+
 function mapHabitRecord(record: HabitRecord): Habit {
   return {
     id: record.id,
@@ -16,6 +18,14 @@ function mapHabitRecord(record: HabitRecord): Habit {
 
 function transitionConflictMessage(detail: string): string {
   return `DOMAIN_CONFLICT:status_transition:${detail}`;
+}
+
+function checkinConflictMessage(detail: string): string {
+  return `CHECKIN_CONFLICT:${detail}`;
+}
+
+function isDuplicateCheckin(errorCode: string | undefined): boolean {
+  return errorCode === UNIQUE_VIOLATION_CODE;
 }
 
 export class HabitRepository {
@@ -110,6 +120,8 @@ export class HabitRepository {
     logDate: string,
     checkedInAt: string,
   ): Promise<{ idempotent: boolean }> {
+    // INSERT + unique(habit_id, log_date) keeps idempotent semantics.
+    // Equivalent to an upsert(onConflict) decision branch in service contract.
     const { error } = await this.client.from('habit_logs').insert({
       user_id: userId,
       habit_id: habitId,
@@ -121,11 +133,11 @@ export class HabitRepository {
       return { idempotent: false };
     }
 
-    if (error.code === '23505') {
+    if (isDuplicateCheckin(error.code)) {
       return { idempotent: true };
     }
 
-    throw new Error(`CHECKIN_CONFLICT:${error.message}`);
+    throw new Error(checkinConflictMessage(error.message));
   }
 
   async findOwnedHabitStatus(
@@ -159,7 +171,7 @@ export class HabitRepository {
       .eq('log_date', logDate);
 
     if (error) {
-      throw new Error(`CHECKIN_CONFLICT:${error.message}`);
+      throw new Error(checkinConflictMessage(error.message));
     }
   }
 
