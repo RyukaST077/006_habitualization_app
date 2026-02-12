@@ -1,4 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { createFixtureUsers, type FixtureUsers } from '../helpers/fixtures';
 
 type IntegrationEnv = {
@@ -89,4 +91,9 @@ export async function probeSupabaseConnection(env: NodeJS.ProcessEnv = process.e
       `[IT-SETUP] Connectivity probe returned server error: ${response.status} ${response.statusText}`,
     );
   }
+}
+
+export function loadCoreMigrationSql(): string {
+  const migrationPath = path.resolve(process.cwd(), 'supabase/migrations/00000000000000_init.sql');
+  return readFileSync(migrationPath, 'utf-8');
 }
