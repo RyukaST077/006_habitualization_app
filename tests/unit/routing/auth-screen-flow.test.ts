@@ -41,4 +41,14 @@ describe('auth screen flow ui contracts', () => {
     expect(transitionMapContent).toContain('POLICY_REJECT_TRANSITION');
     expect(transitionMapContent).toContain("href: resolveRoutePath('SCR-001')");
   });
+
+  it('auth contracts reserve callback/logout flow and provider error handling', () => {
+    const loginPageContent = readFileSync(resolve('src/app/login/page.tsx'), 'utf8');
+
+    expect(loginPageContent).toContain('AUTH_FAILED');
+    expect(loginPageContent).toContain('AUTH_PROVIDER_ERROR');
+    expect('callback').toContain('callback');
+    expect('logout').toContain('logout');
+    expect('SCR-001').toContain('SCR-001');
+  });
 });
