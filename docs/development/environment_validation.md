@@ -61,3 +61,11 @@
 - [ ] テスト手順書・README・PR説明へSecrets平文を記載していない。
 - [ ] CI設定には秘密管理機能（Repository/Environment Secrets）を使用している。
 - [ ] ログ共有時はURL・キー等の機密値をマスクしている。
+
+## 9. DB migration検証（Supabase）
+- [ ] `npm run db:start` でローカルDBを起動できる。
+- [ ] `npm run db:status` で状態確認できる（未起動時は原因メッセージを確認する）。
+- [ ] `supabase/migrations/00000000000000_init.sql` が存在する。
+- [ ] DDL変更時に `supabase db diff -f <name>` で migration を生成している。
+- [ ] `supabase db reset` で migration 再適用と seed 初期化を検証している。
+- [ ] 反映前に `supabase db push` の対象差分を確認している。

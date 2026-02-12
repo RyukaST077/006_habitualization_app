@@ -133,6 +133,39 @@ npm run test:e2e:smoke
 - CI再現: `npm run lint && npm run typecheck && npm run test && npm run build`
 - タスク参照: `_tasks/T-003.md`
 
+## Supabase DB migration運用
+
+### 命名規則
+
+- migration ファイル名は `YYYYMMDDHHMMSS_<description>.sql` を使用する。
+- 初期雛形は `supabase/migrations/00000000000000_init.sql` を基点とする。
+
+### 作成・確認・適用コマンド
+
+```bash
+# ローカルDB起動
+npm run db:start
+
+# 状態確認（未起動時はスキップメッセージを表示）
+npm run db:status
+
+# 差分確認（ローカルDBとmigrationとの差分）
+supabase db diff -f <name>
+
+# migrationの再適用検証（seedも含む）
+supabase db reset
+
+# 変更をリモートへ反映
+supabase db push
+```
+
+### 運用フロー
+
+1. `npm run db:start` でローカルDBを起動する。
+2. DDL 変更後に `supabase db diff -f <name>` で migration を生成する。
+3. `supabase db reset` で初期化から再適用し、再現性を確認する。
+4. `npm run db:status` で状態を確認し、問題なければ `supabase db push` を実行する。
+
 ## 設計書への導線
 
 - 実装計画: `docs/implements_plan.md`
