@@ -1,16 +1,23 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-import type { HabitStatus } from './types';
+import type { Habit, UpdateHabitPayload } from '../../application/habit/HabitTypes';
+import type { HabitRecord, HabitStatus } from './types';
 
-type HabitUpdatePayload = {
-  name?: string;
-  displayOrder?: number;
-};
+function mapHabitRecord(record: HabitRecord): Habit {
+  return {
+    id: record.id,
+    userId: record.user_id,
+    name: record.name,
+    displayOrder: record.display_order,
+    status: record.status,
+    archivedAt: record.archived_at,
+  };
+}
 
 export class HabitRepository {
   constructor(private readonly client: SupabaseClient) {}
 
-  async listHabits(userId: string, status?: HabitStatus): Promise<unknown[]> {
+  async listHabits(userId: string, status?: HabitStatus): Promise<Habit[]> {
     let query = this.client.from('habits').select('*').eq('user_id', userId);
     if (status) {
       query = query.eq('status', status);
@@ -21,13 +28,19 @@ export class HabitRepository {
       throw new Error(`HABIT_NOT_FOUND:${error.message}`);
     }
 
-    return data ?? [];
+    return ((data as HabitRecord[] | null) ?? []).map(mapHabitRecord);
   }
 
-  async createHabit(userId: string, name: string, displayOrder: number): Promise<unknown> {
+  async createHabit(userId: string, name: string, displayOrder: number): Promise<Habit> {
     const { data, error } = await this.client
       .from('habits')
-      .insert({ user_id: userId, name, display_order: displayOrder, status: 'active' })
+      .insert({
+        user_id: userId,
+        name,
+        display_order: displayOrder,
+        status: 'active',
+        archived_at: null,
+      })
       .select('*')
       .single();
 
@@ -35,34 +48,56 @@ export class HabitRepository {
       throw new Error(`HABIT_NOT_FOUND:${error.message}`);
     }
 
-    return data;
+    return mapHabitRecord(data as HabitRecord);
   }
 
-  async updateHabit(userId: string, habitId: string, payload: HabitUpdatePayload): Promise<void> {
-    const { error } = await this.client
+  async updateHabit(userId: string, habitId: string, payload: UpdateHabitPayload): Promise<Habit> {
+    if (payload.name !== undefined && payload.name.trim().length === 0) {
+      throw new Error('INVALID_HABIT_INPUT:name');
+    }
+    if (payload.displayOrder !== undefined && payload.displayOrder < 1) {
+      throw new Error('INVALID_HABIT_INPUT:displayOrder');
+    }
+
+    const { data, error } = await this.client
       .from('habits')
       .update({
         name: payload.name,
         display_order: payload.displayOrder,
       })
       .eq('id', habitId)
-      .eq('user_id', userId);
+      .eq('user_id', userId)
+      .select('*')
+      .single();
 
     if (error) {
+      // Owner-scope query (`eq('user_id', userId)`) is the repository boundary for FORBIDDEN.
       throw new Error(`HABIT_NOT_FOUND:${error.message}`);
     }
+
+    return mapHabitRecord(data as HabitRecord);
   }
 
-  async setHabitStatus(userId: string, habitId: string, status: HabitStatus): Promise<void> {
-    const { error } = await this.client
+  async setHabitStatus(userId: string, habitId: string, status: HabitStatus): Promise<Habit> {
+    if (status !== 'active' && status !== 'archived') {
+      throw new Error('INVALID_HABIT_INPUT:status');
+    }
+
+    const archivedAt = status === 'archived' ? new Date().toISOString() : null;
+
+    const { data, error } = await this.client
       .from('habits')
-      .update({ status })
+      .update({ status, archived_at: archivedAt })
       .eq('id', habitId)
-      .eq('user_id', userId);
+      .eq('user_id', userId)
+      .select('*')
+      .single();
 
     if (error) {
       throw new Error(`HABIT_NOT_ACTIVE:${error.message}`);
     }
+
+    return mapHabitRecord(data as HabitRecord);
   }
 
   async upsertCheckin(
@@ -120,4 +155,3 @@ export class HabitRepository {
     return data ?? [];
   }
 }
-
