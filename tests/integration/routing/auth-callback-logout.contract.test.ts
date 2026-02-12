@@ -11,6 +11,8 @@ describe('auth callback/logout api contract (Red)', () => {
     expect(source).toContain('callback');
     expect(source).toContain('AUTH_FAILED');
     expect(source).toContain('AUTH_PROVIDER_ERROR');
+    expect(source).toContain('auditEvent');
+    expect(source).toContain('toAuthErrorResponse');
   });
 
   it('defines auth logout route', () => {
@@ -19,5 +21,8 @@ describe('auth callback/logout api contract (Red)', () => {
 
     const source = readFileSync(logoutPath, 'utf8');
     expect(source).toContain('logout');
+    expect(source).toContain('trace_id');
+    expect(source).toContain('auditEvent');
+    expect(source).toContain('toAuthJsonResponse');
   });
 });

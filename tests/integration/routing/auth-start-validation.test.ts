@@ -62,4 +62,17 @@ describe('auth start redirect validation (Green)', () => {
     expect(result.auditEvent).toBe('LOGIN_FAILED');
     expect(result.trace_id).toBe('trace-provider-error');
   });
+
+  it('[T-035][FNC-001][IF-001] 失敗時は共通のauditEventとtrace_idを維持する', () => {
+    const invalidRedirect = startGoogleLogin('invalid', { traceId: 'trace-invalid' });
+    const authFailed = startGoogleLogin('/home', { traceId: 'trace-failed', failWith: 'AUTH_FAILED' });
+    const providerError = startGoogleLogin('/home', { traceId: 'trace-provider', failWith: 'AUTH_PROVIDER_ERROR' });
+
+    expect(invalidRedirect.auditEvent).toBe('LOGIN_FAILED');
+    expect(authFailed.auditEvent).toBe('LOGIN_FAILED');
+    expect(providerError.auditEvent).toBe('LOGIN_FAILED');
+    expect(invalidRedirect.trace_id).toBe('trace-invalid');
+    expect(authFailed.trace_id).toBe('trace-failed');
+    expect(providerError.trace_id).toBe('trace-provider');
+  });
 });
