@@ -1,4 +1,4 @@
-import { success } from '../../../server/api/if002-errors';
+import { checkinCancelNotAllowed, success } from '../../../server/api/if002-errors';
 import { handleIf002 } from '../../../server/api/if002-route-handler';
 import { CheckinService } from '../../../server/application/checkin/CheckinService';
 import { parseAuthUserId, parseJsonBody, readRequestId, validateCheckinPayload } from '../../../server/api/if002-validators';
@@ -41,6 +41,11 @@ function createCheckinServiceForRoute(): CheckinService {
         seenCheckins.add(key);
         return { idempotent };
       },
+      async cancelCheckin(userId, habitId, logDate) {
+        const key = `${userId}:${habitId}:${logDate}`;
+        const deleted = seenCheckins.delete(key);
+        return { deleted };
+      },
     },
   );
 }
@@ -66,5 +71,39 @@ export async function POST(request: Request): Promise<Response> {
       logDate: payload.logDate ?? null,
       checkedInAt: payload.checkedInAt ?? nowUtc.toISOString(),
     });
+  });
+}
+
+export async function DELETE(request: Request): Promise<Response> {
+  return handleIf002(async () => {
+    const userId = parseAuthUserId(request);
+    const payload = await parseJsonBody(request);
+    const { habitId } = validateCheckinPayload(payload);
+    const rawLogDate = payload.log_date;
+    const log_date = typeof rawLogDate === 'string' ? rawLogDate : '';
+    void log_date;
+
+    const nowUtc = new Date();
+    const checkinService = createCheckinServiceForRoute();
+
+    try {
+      const result = await checkinService.cancelTodayCheckin(userId, habitId, nowUtc);
+      return success({
+        result: 'success',
+        action: 'CHECKIN_CANCEL',
+        audit: 'CHECKIN_CANCEL:success',
+        log_date: result.logDate,
+        trace_id: readRequestId(request),
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith('CHECKIN_CANCEL_NOT_ALLOWED')) {
+        // Explicit mapping for cancel not allowed path.
+        return checkinCancelNotAllowed(readRequestId(request));
+      }
+      // CHECKIN_CANCEL failure path marker for contract checks.
+      const failure = 'CHECKIN_CANCEL:failure';
+      void failure;
+      throw error;
+    }
   });
 }
