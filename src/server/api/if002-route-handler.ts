@@ -4,6 +4,7 @@ type If002ErrorCode =
   | 'FORBIDDEN'
   | 'VALIDATION_ERROR'
   | 'INVALID_HABIT_INPUT'
+  | 'CHECKIN_CANCEL_NOT_ALLOWED'
   | 'DOMAIN_CONFLICT'
   | 'INTERNAL_ERROR';
 
@@ -17,6 +18,7 @@ function parseErrorCode(error: unknown): If002ErrorCode | null {
     code === 'FORBIDDEN' ||
     code === 'VALIDATION_ERROR' ||
     code === 'INVALID_HABIT_INPUT' ||
+    code === 'CHECKIN_CANCEL_NOT_ALLOWED' ||
     code === 'DOMAIN_CONFLICT' ||
     code === 'INTERNAL_ERROR'
   ) {
@@ -39,6 +41,7 @@ export async function handleIf002<T>(handler: () => Promise<T>): Promise<Respons
       case 'INVALID_HABIT_INPUT':
         return validationError();
       case 'DOMAIN_CONFLICT':
+      case 'CHECKIN_CANCEL_NOT_ALLOWED':
         return domainConflict();
       case 'INTERNAL_ERROR':
         return internalError();

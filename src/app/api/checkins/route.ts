@@ -1,7 +1,13 @@
 import { checkinCancelNotAllowed, success } from '../../../server/api/if002-errors';
 import { handleIf002 } from '../../../server/api/if002-route-handler';
 import { CheckinService } from '../../../server/application/checkin/CheckinService';
-import { parseAuthUserId, parseJsonBody, readRequestId, validateCheckinPayload } from '../../../server/api/if002-validators';
+import {
+  parseAuthUserId,
+  parseJsonBody,
+  readRequestId,
+  validateCancelCheckinPayload,
+  validateCheckinPayload,
+} from '../../../server/api/if002-validators';
 
 // IF-002 route: /api/checkins
 // M-004 integration: resolveLogDate(nowUtc, timezone, dayCutoffTime) is delegated to CheckinService.
@@ -77,11 +83,8 @@ export async function POST(request: Request): Promise<Response> {
 export async function DELETE(request: Request): Promise<Response> {
   return handleIf002(async () => {
     const userId = parseAuthUserId(request);
-    const payload = await parseJsonBody(request);
-    const { habitId } = validateCheckinPayload(payload);
-    const rawLogDate = payload.log_date;
-    const log_date = typeof rawLogDate === 'string' ? rawLogDate : '';
-    void log_date;
+    const payload = await parseJsonBody(request); // IF-002: DELETE /api/checkins/{habitId} + log_date.
+    const { habitId, logDate } = validateCancelCheckinPayload(payload);
 
     const nowUtc = new Date();
     const checkinService = createCheckinServiceForRoute();
@@ -92,7 +95,7 @@ export async function DELETE(request: Request): Promise<Response> {
         result: 'success',
         action: 'CHECKIN_CANCEL',
         audit: 'CHECKIN_CANCEL:success',
-        log_date: result.logDate,
+        log_date: logDate ?? result.logDate,
         trace_id: readRequestId(request),
       });
     } catch (error) {

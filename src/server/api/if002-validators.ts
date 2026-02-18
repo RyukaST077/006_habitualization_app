@@ -87,6 +87,26 @@ export function validateCheckinPayload(payload: JsonObject): { habitId: string }
   return { habitId };
 }
 
+function asLogDate(value: JsonValue | undefined): string {
+  if (typeof value !== 'string') {
+    throw new Error('VALIDATION_ERROR');
+  }
+  const normalized = value.trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+    throw new Error('VALIDATION_ERROR');
+  }
+  return normalized;
+}
+
+export function validateCancelCheckinPayload(
+  payload: JsonObject,
+): { habitId: string; logDate: string } {
+  requireKeys(payload, ['habitId', 'log_date']);
+  const { habitId } = validateCheckinPayload(payload);
+  const logDate = asLogDate(payload.log_date);
+  return { habitId, logDate };
+}
+
 export function parseAuthUserId(request: Request): string {
   assertAuthHeader(request);
   const authHeader = request.headers.get('Authorization') ?? '';
