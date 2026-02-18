@@ -8,20 +8,26 @@ type If002ErrorCode =
   | 'DOMAIN_CONFLICT'
   | 'INTERNAL_ERROR';
 
+const IF002_ERROR_CODES: ReadonlySet<If002ErrorCode> = new Set([
+  'FORBIDDEN',
+  'VALIDATION_ERROR',
+  'INVALID_HABIT_INPUT',
+  'CHECKIN_CANCEL_NOT_ALLOWED',
+  'DOMAIN_CONFLICT',
+  'INTERNAL_ERROR',
+]);
+
+function isIf002ErrorCode(code: string): code is If002ErrorCode {
+  return IF002_ERROR_CODES.has(code as If002ErrorCode);
+}
+
 function parseErrorCode(error: unknown): If002ErrorCode | null {
   if (!(error instanceof Error)) {
     return null;
   }
 
   const [code] = error.message.split(':');
-  if (
-    code === 'FORBIDDEN' ||
-    code === 'VALIDATION_ERROR' ||
-    code === 'INVALID_HABIT_INPUT' ||
-    code === 'CHECKIN_CANCEL_NOT_ALLOWED' ||
-    code === 'DOMAIN_CONFLICT' ||
-    code === 'INTERNAL_ERROR'
-  ) {
+  if (isIf002ErrorCode(code)) {
     return code;
   }
 

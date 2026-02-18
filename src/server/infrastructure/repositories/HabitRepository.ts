@@ -169,19 +169,18 @@ export class HabitRepository {
   ): Promise<{ deleted: boolean }> {
     // Owner-scope/RLS boundary:
     // `user_id + habit_id + log_date` deletes only caller-owned same-day record.
-    const { data, error } = await this.client
+    const { count, error } = await this.client
       .from('habit_logs')
-      .delete()
+      .delete({ count: 'exact' })
       .eq('user_id', userId)
       .eq('habit_id', habitId)
-      .eq('log_date', logDate)
-      .select('id');
+      .eq('log_date', logDate);
 
     if (error) {
       throw new Error(checkinConflictMessage(error.message));
     }
 
-    if (!data || data.length === 0) {
+    if (!count) {
       // Not deletable (out-of-day/missing) => DB_UNCHANGED for service contract.
       throw new Error('CHECKIN_CANCEL_NOT_ALLOWED:DB_UNCHANGED');
     }

@@ -1,4 +1,4 @@
-import { checkinCancelNotAllowed, success } from '../../../server/api/if002-errors';
+import { success } from '../../../server/api/if002-errors';
 import { handleIf002 } from '../../../server/api/if002-route-handler';
 import { CheckinService } from '../../../server/application/checkin/CheckinService';
 import {
@@ -87,26 +87,16 @@ export async function DELETE(request: Request): Promise<Response> {
     const { habitId, logDate } = validateCancelCheckinPayload(payload);
 
     const nowUtc = new Date();
+    const traceId = readRequestId(request);
     const checkinService = createCheckinServiceForRoute();
-
-    try {
-      const result = await checkinService.cancelTodayCheckin(userId, habitId, nowUtc);
-      return success({
-        result: 'success',
-        action: 'CHECKIN_CANCEL',
-        audit: 'CHECKIN_CANCEL:success',
-        log_date: logDate ?? result.logDate,
-        trace_id: readRequestId(request),
-      });
-    } catch (error) {
-      if (error instanceof Error && error.message.startsWith('CHECKIN_CANCEL_NOT_ALLOWED')) {
-        // Explicit mapping for cancel not allowed path.
-        return checkinCancelNotAllowed(readRequestId(request));
-      }
-      // CHECKIN_CANCEL failure path marker for contract checks.
-      const failure = 'CHECKIN_CANCEL:failure';
-      void failure;
-      throw error;
-    }
+    const result = await checkinService.cancelTodayCheckin(userId, habitId, nowUtc);
+    // CHECKIN_CANCEL_NOT_ALLOWED is mapped by handleIf002 -> DOMAIN_CONFLICT.
+    return success({
+      result: 'success',
+      action: 'CHECKIN_CANCEL',
+      audit: 'CHECKIN_CANCEL:success',
+      log_date: logDate ?? result.logDate,
+      trace_id: traceId,
+    });
   });
 }
