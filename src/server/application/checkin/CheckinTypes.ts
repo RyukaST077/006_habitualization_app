@@ -3,6 +3,13 @@ export type CheckinResult = {
   idempotent: boolean;
 };
 
+export const CHECKIN_AUDIT_ACTION = {
+  CANCEL: 'CHECKIN_CANCEL',
+} as const;
+
+export type CheckinAuditAction =
+  (typeof CHECKIN_AUDIT_ACTION)[keyof typeof CHECKIN_AUDIT_ACTION];
+
 export type CancelTodayCheckinInput = {
   userId: string;
   habitId: string;
@@ -12,5 +19,5 @@ export type CancelTodayCheckinInput = {
 export type CancelCheckinResult = {
   logDate: string;
   canceled: boolean;
-  auditAction: 'CHECKIN_CANCEL';
+  auditAction: CheckinAuditAction;
 };

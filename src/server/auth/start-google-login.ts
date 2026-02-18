@@ -2,7 +2,6 @@ import { randomUUID } from 'node:crypto';
 
 import {
   createAuthFailureResult,
-  type AuthAuditEvent,
   type AuthFailureCode,
   type AuthFailureResult,
 } from './auth-flow-result';

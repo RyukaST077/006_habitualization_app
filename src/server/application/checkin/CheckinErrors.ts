@@ -16,33 +16,37 @@ export class CheckinDomainError extends Error {
   }
 }
 
-function createCheckinError(
+function createDomainError(
   code: CheckinErrorCode,
   message: string,
 ): CheckinDomainError {
   return new CheckinDomainError(code, message);
 }
 
+export function isCheckinDomainError(error: unknown): error is CheckinDomainError {
+  return error instanceof Error && error.name === 'CheckinDomainError';
+}
+
 export function validationError(message: string): CheckinDomainError {
-  return createCheckinError('VALIDATION_ERROR', message);
+  return createDomainError('VALIDATION_ERROR', message);
 }
 
 export function forbiddenError(message: string): CheckinDomainError {
-  return createCheckinError('FORBIDDEN', message);
+  return createDomainError('FORBIDDEN', message);
 }
 
 export function domainConflictError(message: string): CheckinDomainError {
-  return createCheckinError('DOMAIN_CONFLICT', message);
+  return createDomainError('DOMAIN_CONFLICT', message);
 }
 
 export function checkinCancelNotAllowedError(message: string): CheckinDomainError {
-  return createCheckinError('CHECKIN_CANCEL_NOT_ALLOWED', message);
+  return createDomainError('CHECKIN_CANCEL_NOT_ALLOWED', message);
 }
 
 export function internalError(message: string): CheckinDomainError {
-  return createCheckinError('INTERNAL_ERROR', message);
+  return createDomainError('INTERNAL_ERROR', message);
 }
 
 export function habitArchivedError(message: string): CheckinDomainError {
-  return createCheckinError('HABIT_ARCHIVED', message);
+  return createDomainError('HABIT_ARCHIVED', message);
 }
