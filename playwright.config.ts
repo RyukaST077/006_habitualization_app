@@ -20,6 +20,12 @@ export default defineConfig({
   },
   projects: [
     {
+      name: 'chromium',
+      use: {
+        ...devices['Desktop Chrome'],
+      },
+    },
+    {
       name: 'chrome-latest',
       use: {
         ...devices['Desktop Chrome'],

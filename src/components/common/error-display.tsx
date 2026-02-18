@@ -11,6 +11,7 @@ export function ErrorDisplay({ error }: ErrorDisplayProps) {
 
   const safeMessage = getSafeErrorMessage(error);
   const showTraceId = shouldDisplayTraceId(error);
+  const isCancelNotAllowed = error.code === 'CHECKIN_CANCEL_NOT_ALLOWED';
 
   if (error.status === 400) {
     return (
@@ -34,7 +35,11 @@ export function ErrorDisplay({ error }: ErrorDisplayProps) {
     return (
       <div data-display="toast">
         <p>409</p>
-        <p>{safeMessage}</p>
+        <p>
+          {isCancelNotAllowed
+            ? '当日外の取消はできません。今日の達成のみ取消できます。'
+            : safeMessage}
+        </p>
         <a href="/home">再開</a>
       </div>
     );

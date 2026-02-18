@@ -7,7 +7,11 @@ import { ErrorDisplay } from '../../components/common/error-display';
 import type { CommonUiErrorDto } from '../../components/common/common-ui-types';
 
 export default function HomePage() {
-  const error: CommonUiErrorDto | null = null;
+  const error: CommonUiErrorDto | null = {
+    code: 'CHECKIN_CANCEL_NOT_ALLOWED',
+    message: '当日外の取消はできません。今日の達成のみ取消できます。',
+    status: 409,
+  };
 
   return (
     <AppScreenShell
@@ -20,6 +24,15 @@ export default function HomePage() {
       <section aria-label="checkin state">
         <h2>checkin status</h2>
         <p>同日 duplicate checkin は idempotent=true として already checked in を表示します。</p>
+      </section>
+      <section aria-label="cancel checkin">
+        <h2>チェックイン取消</h2>
+        <p>当日達成のみ取消できます。APIは DELETE /api/checkins へ log_date を送信します。</p>
+        <button type="button">取消（当日）</button>
+        <button type="button" disabled>
+          取消（当日外は不可）
+        </button>
+        <p>監査: CHECKIN_CANCEL success / failure</p>
       </section>
       <section aria-label="archived resume">
         <h2>archived habit guidance</h2>
