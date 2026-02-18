@@ -1,6 +1,11 @@
 import { randomUUID } from 'node:crypto';
 
-type ErrorCode = 'FORBIDDEN' | 'DOMAIN_CONFLICT' | 'INTERNAL_ERROR' | 'VALIDATION_ERROR';
+type ErrorCode =
+  | 'FORBIDDEN'
+  | 'DOMAIN_CONFLICT'
+  | 'CHECKIN_CANCEL_NOT_ALLOWED'
+  | 'INTERNAL_ERROR'
+  | 'VALIDATION_ERROR';
 
 type ErrorBody = {
   result: 'error';
@@ -26,6 +31,10 @@ export function domainConflict(traceId?: string): Response {
   return errorResponse(409, 'DOMAIN_CONFLICT', traceId);
 }
 
+export function checkinCancelNotAllowed(traceId?: string): Response {
+  return errorResponse(409, 'CHECKIN_CANCEL_NOT_ALLOWED', traceId);
+}
+
 export function internalError(traceId?: string): Response {
   return errorResponse(500, 'INTERNAL_ERROR', traceId);
 }
@@ -41,4 +50,3 @@ export function success(payload: Record<string, unknown> = {}): Response {
     ...payload,
   });
 }
-

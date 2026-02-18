@@ -1,5 +1,5 @@
-import { completeGoogleLogin } from '../../../../../../server/auth/complete-google-login';
-import { toAuthErrorResponse, toAuthJsonResponse } from '../../../../../../server/auth/auth-route-response';
+import { completeGoogleLogin } from '../../../../../server/auth/complete-google-login';
+import { toAuthErrorResponse, toAuthJsonResponse } from '../../../../../server/auth/auth-route-response';
 
 const AUTH_CALLBACK_ERROR_ALIASES = {
   AUTH_FAILED: 'AUTH_FAILED',

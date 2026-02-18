@@ -38,3 +38,19 @@ export interface CurrentPolicy {
 }
 
 export type DeletionJobStatus = 'queued' | 'in_progress' | 'completed' | 'failed';
+
+export type CancelTodayCheckinCommand = {
+  userId: string;
+  habitId: string;
+  logDate: string;
+};
+
+export type CancelTodayCheckinRepositoryResult = {
+  deleted: boolean;
+};
+
+export interface CheckinCancellationRepository {
+  cancelTodayCheckin(
+    command: CancelTodayCheckinCommand,
+  ): Promise<CancelTodayCheckinRepositoryResult>;
+}

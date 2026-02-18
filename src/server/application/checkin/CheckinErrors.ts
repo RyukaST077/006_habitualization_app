@@ -2,13 +2,14 @@ export type CheckinErrorCode =
   | 'VALIDATION_ERROR'
   | 'FORBIDDEN'
   | 'DOMAIN_CONFLICT'
+  | 'CHECKIN_CANCEL_NOT_ALLOWED'
   | 'INTERNAL_ERROR'
   | 'HABIT_ARCHIVED';
 
 export class CheckinDomainError extends Error {
   constructor(
     public readonly code: CheckinErrorCode,
-    message = code,
+    message: string = code,
   ) {
     super(message);
     this.name = 'CheckinDomainError';
@@ -32,6 +33,10 @@ export function forbiddenError(message: string): CheckinDomainError {
 
 export function domainConflictError(message: string): CheckinDomainError {
   return createCheckinError('DOMAIN_CONFLICT', message);
+}
+
+export function checkinCancelNotAllowedError(message: string): CheckinDomainError {
+  return createCheckinError('CHECKIN_CANCEL_NOT_ALLOWED', message);
 }
 
 export function internalError(message: string): CheckinDomainError {
