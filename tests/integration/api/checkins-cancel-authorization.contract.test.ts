@@ -4,6 +4,7 @@ import { requireApiRoute } from '../../helpers/api/contract-assertions';
 
 describe('FNC-007 checkins cancel authorization contract (T-048 Red)', () => {
   it('expects FORBIDDEN(403) when user A tries user B cancel request', () => {
+    // Trace: TC-IT-FR-014-003 / FR-025 / IF-002
     const routeSource = requireApiRoute('src/app/api/checkins/route.ts');
     const errorSource = requireApiRoute('src/server/api/if002-errors.ts');
     expect(routeSource).toContain('/api/checkins');
@@ -14,6 +15,7 @@ describe('FNC-007 checkins cancel authorization contract (T-048 Red)', () => {
   });
 
   it('documents FR-025 RLS owner boundary for cancel path', () => {
+    // Trace: TC-IT-FR-014-003 / FR-025 / RLS / TBL-003
     const serviceSource = requireApiRoute('src/server/application/checkin/CheckinService.ts');
     expect(serviceSource).toContain('FR-025');
     expect(serviceSource).toContain('RLS');
@@ -22,6 +24,7 @@ describe('FNC-007 checkins cancel authorization contract (T-048 Red)', () => {
   });
 
   it('expects CHECKIN_CANCEL audit keywords for success and failure paths', () => {
+    // Trace: TC-ST-FR-014-004 / audit success-failure markers
     const routeSource = requireApiRoute('src/app/api/checkins/route.ts');
     expect(routeSource).toContain('CHECKIN_CANCEL');
     expect(routeSource).toContain('success');

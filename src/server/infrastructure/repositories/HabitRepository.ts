@@ -188,6 +188,16 @@ export class HabitRepository {
     return { deleted: true };
   }
 
+  // Legacy contract name kept for M-102 repository tests.
+  // HABIT_NOT_ACTIVE is enforced by service layer before repository mutation.
+  async deleteCheckin(
+    userId: string,
+    habitId: string,
+    logDate: string,
+  ): Promise<{ deleted: boolean }> {
+    return this.cancelTodayCheckin(userId, habitId, logDate);
+  }
+
   async findLogsByDateRange(
     userId: string,
     fromDate: string,

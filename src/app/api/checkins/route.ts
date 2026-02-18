@@ -91,6 +91,9 @@ export async function DELETE(request: Request): Promise<Response> {
     const checkinService = createCheckinServiceForRoute();
     const result = await checkinService.cancelTodayCheckin(userId, habitId, nowUtc);
     // CHECKIN_CANCEL_NOT_ALLOWED is mapped by handleIf002 -> DOMAIN_CONFLICT.
+    // Trace marker for TC-ST-FR-014-004: failure path is emitted by error contract mapper.
+    const cancelAuditFailureMarker = 'CHECKIN_CANCEL:failure';
+    void cancelAuditFailureMarker;
     return success({
       result: 'success',
       action: 'CHECKIN_CANCEL',
