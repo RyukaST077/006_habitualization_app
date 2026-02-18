@@ -162,17 +162,31 @@ export class HabitRepository {
     return data.status as HabitStatus;
   }
 
-  async deleteCheckin(userId: string, habitId: string, logDate: string): Promise<void> {
-    const { error } = await this.client
+  async cancelTodayCheckin(
+    userId: string,
+    habitId: string,
+    logDate: string,
+  ): Promise<{ deleted: boolean }> {
+    // Owner-scope/RLS boundary:
+    // `user_id + habit_id + log_date` deletes only caller-owned same-day record.
+    const { data, error } = await this.client
       .from('habit_logs')
       .delete()
       .eq('user_id', userId)
       .eq('habit_id', habitId)
-      .eq('log_date', logDate);
+      .eq('log_date', logDate)
+      .select('id');
 
     if (error) {
       throw new Error(checkinConflictMessage(error.message));
     }
+
+    if (!data || data.length === 0) {
+      // Not deletable (out-of-day/missing) => DB_UNCHANGED for service contract.
+      throw new Error('CHECKIN_CANCEL_NOT_ALLOWED:DB_UNCHANGED');
+    }
+
+    return { deleted: true };
   }
 
   async findLogsByDateRange(

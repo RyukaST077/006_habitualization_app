@@ -33,7 +33,7 @@ export interface CheckinHabitRepositoryPort {
     logDate: string,
     checkedInAt: string,
   ): Promise<{ idempotent: boolean }>;
-  cancelCheckin(
+  cancelTodayCheckin(
     userId: string,
     habitId: string,
     logDate: string,
@@ -155,7 +155,7 @@ export class CheckinService {
       const habitStatus = await this.habitRepository.findOwnedHabitStatus(userId, habitId);
       assertAccessibleHabit(habitStatus);
 
-      const cancelResult = await this.habitRepository.cancelCheckin(userId, habitId, logDate);
+      const cancelResult = await this.habitRepository.cancelTodayCheckin(userId, habitId, logDate);
       if (!cancelResult.deleted) {
         // BRL-010: only same-day cancel is allowed. Out-of-day requests are rejected.
         throw checkinCancelNotAllowedError(

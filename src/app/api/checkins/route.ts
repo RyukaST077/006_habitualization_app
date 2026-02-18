@@ -41,7 +41,7 @@ function createCheckinServiceForRoute(): CheckinService {
         seenCheckins.add(key);
         return { idempotent };
       },
-      async cancelCheckin(userId, habitId, logDate) {
+      async cancelTodayCheckin(userId, habitId, logDate) {
         const key = `${userId}:${habitId}:${logDate}`;
         const deleted = seenCheckins.delete(key);
         return { deleted };

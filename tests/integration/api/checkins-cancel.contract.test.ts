@@ -21,7 +21,11 @@ describe('FNC-007 checkins cancel contract (T-048 Red)', () => {
 
   it('expects DB unchanged marker for rejected cancel request', () => {
     const serviceSource = requireApiRoute('src/server/application/checkin/CheckinService.ts');
+    const repositorySource = requireApiRoute('src/server/infrastructure/repositories/HabitRepository.ts');
     expect(serviceSource).toContain('DB_UNCHANGED');
     expect(serviceSource).toContain('cancelTodayCheckin');
+    expect(repositorySource).toContain('habit_logs');
+    expect(repositorySource).toContain('log_date');
+    expect(repositorySource).toContain('cancelTodayCheckin');
   });
 });
