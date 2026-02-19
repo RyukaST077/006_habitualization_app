@@ -15,6 +15,7 @@
 - Job: `lint`
 - Job: `typecheck`
 - Job: `test`
+- Workflow: `secret-scan`（`.github/workflows/secret-scan.yml`）
 
 `main` への `push` では同 workflow 内で `build` を実行し、デプロイ前品質ゲートとして扱う。
 
@@ -32,6 +33,7 @@
 | PR必須 | `lint` | 失敗/未実行 | `npm run lint` をローカル再実行し、lintエラーを解消 |
 | PR必須 | `typecheck` | 失敗/未実行 | `npm run typecheck` をローカル再実行し、型エラーを解消 |
 | PR必須 | `test` | 失敗/未実行 | `npm run test` をローカル再実行し、失敗テストを修正 |
+| PR必須 | `secret-scan` | 失敗/未実行 | シークレット混入の誤検知/漏えい疑いを切り分け、漏えい時はキー無効化・再発行後に再実行 |
 | main必須 | `build` | 失敗 | `npm run build` をローカル再現し、`lint/typecheck/test` を順に修正 |
 
 セキュリティ関連修正を含む PR でも同一の必須チェック（`lint/typecheck/test`）を適用する。
@@ -96,6 +98,7 @@ PR本文に次のセキュリティ確認欄を設け、該当有無を記載す
 - シークレット変更PRで、90日ローテーションまたは漏えい時即時無効化フローの更新有無が不明。
 - Preview から Prod へ到達し得る設定変更がある。
 - `PR Quality Gate` workflow の `pr-body-traceability/lint/typecheck/test` のいずれかが未通過。
+- `secret-scan` workflow が未通過（失敗/未実行）である。
 - CODEOWNERS 対象パスの変更で、該当オーナー承認が未完了。
 
 ## レビュー差し戻し観点（IDトレース運用）
@@ -110,6 +113,7 @@ PR本文に次のセキュリティ確認欄を設け、該当有無を記載す
 2. `typecheck` 失敗: `npm run typecheck` を再実行し、型定義と実装の不整合を修正する。
 3. `test` 失敗: `npm run test` を再実行し、失敗テストと依存設定を修正する。
 4. `build` 失敗: `npm run build` で再現し、ログ順に `lint/typecheck/test` を個別に切り分ける。
+5. `secret-scan` 失敗: 検知内容を確認し、漏えい疑いがあればキーを即時無効化・再発行し、修正後に再実行する。
 
 ## 例外運用
 

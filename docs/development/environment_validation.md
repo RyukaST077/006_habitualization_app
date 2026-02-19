@@ -31,6 +31,11 @@
 - [ ] GitHub/Vercel/Supabase それぞれの保管値が最新ローテーション状態で一致している。
 - [ ] ローテーション記録（実施日、担当者、影響範囲、復旧確認）を残している。
 
+### 3.2 CI `secret-scan` 検証（PR-003）
+- [ ] `secret-scan` workflow が `pull_request` と `push` をトリガーに実行されることを確認した。
+- [ ] PR のステータスチェックで `secret-scan` が `success` 以外の場合、マージをブロックする運用を確認した。
+- [ ] 検知時は `4.1 secret-scan失敗時の復旧フロー` に従って再実行し、成功までマージしないことを確認した。
+
 ## 3.1 週次セキュリティ運用チェック（OPS-W-002）
 - [ ] `test -f .github/dependabot.yml` を実行し、Dependabot設定ファイルの存在を確認した。
 - [ ] `rg "package-ecosystem" .github/dependabot.yml` を実行し、`npm` と `github-actions` の対象定義を確認した。
