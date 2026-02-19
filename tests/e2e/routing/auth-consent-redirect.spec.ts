@@ -45,4 +45,46 @@ test.describe("T-011 PR-002 auth/consent redirect tests", () => {
       expect(resolvedPath).toBe(scenario.expectedPath);
     });
   });
+
+  test("TC-IT-FR-003-002: 未同意ユーザーは /home 到達時に /policy-consent へ強制遷移する", async () => {
+    const scenario = ROUTING_SCENARIOS[3];
+
+    await test.step(`[${scenario.caseId ?? scenario.id}] ${scenario.traceIds.join("/")}`, async () => {
+      const resolvedPath = resolveAuthConsentRedirect(
+        scenario.startPath,
+        scenario.authState,
+        scenario.consentState
+      );
+
+      expect(resolvedPath).toBe(scenario.expectedPath);
+    });
+  });
+
+  test("TC-IT-FR-003-003: 旧版同意（outdated consent）は再同意のため /policy-consent へ誘導する", async () => {
+    const scenario = ROUTING_SCENARIOS[4];
+
+    await test.step(`[${scenario.caseId ?? scenario.id}] ${scenario.traceIds.join("/")}`, async () => {
+      const resolvedPath = resolveAuthConsentRedirect(
+        scenario.startPath,
+        scenario.authState,
+        scenario.consentState
+      );
+
+      expect(resolvedPath).toBe(scenario.expectedPath);
+    });
+  });
+
+  test("TC-ST-FR-004-004: 同意拒否時はセッション破棄相当として /login へ戻す", async () => {
+    const scenario = ROUTING_SCENARIOS[5];
+
+    await test.step(`[${scenario.caseId ?? scenario.id}] ${scenario.traceIds.join("/")}`, async () => {
+      const resolvedPath = resolveAuthConsentRedirect(
+        scenario.startPath,
+        scenario.authState,
+        scenario.consentState
+      );
+
+      expect(resolvedPath).toBe(scenario.expectedPath);
+    });
+  });
 });

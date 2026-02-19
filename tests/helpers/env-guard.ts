@@ -4,6 +4,11 @@ type SupabaseTestEnv = {
   supabaseAnonKey: string;
 };
 
+export type AuthGuardTestEnv = {
+  authState: "unauthenticated" | "authenticated";
+  expectedApiStatus: 401 | 403;
+};
+
 const PROD_ENV_VALUES = new Set(["prod", "production"]);
 const PROD_URL_KEYWORDS = ["prod", "production"];
 
@@ -39,4 +44,11 @@ export function validateSupabaseTestEnv(
   }
 
   return env;
+}
+
+export function createUnauthenticatedGuardEnv(): AuthGuardTestEnv {
+  return {
+    authState: "unauthenticated",
+    expectedApiStatus: 401,
+  };
 }

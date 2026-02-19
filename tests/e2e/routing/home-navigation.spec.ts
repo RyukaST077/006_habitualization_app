@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { resolveHomeNavigationRedirect } from "../../../src/app/router";
 import { ROUTE_MAP } from "../../../src/app/route-map";
+import { createUnauthenticatedGuardEnv } from "../../helpers/env-guard";
 
 type HomeNavigationCase = {
   id: string;
@@ -30,4 +31,24 @@ test.describe("T-011 PR-003 home navigation tests", () => {
       });
     });
   }
+
+  test("unauthenticated user should redirect login when trying /home transitions (Red)", async () => {
+    const authEnv = createUnauthenticatedGuardEnv();
+    const destinationPath = resolveHomeNavigationRedirect("SCR-003");
+
+    await test.step("redirect to /login is required for unauthenticated access", async () => {
+      expect(authEnv.authState).toBe("unauthenticated");
+      expect(destinationPath).toBe("/login");
+    });
+  });
+
+  test("unauthenticated API guard should return 401/403 before home navigation (Red)", async () => {
+    const authEnv = createUnauthenticatedGuardEnv();
+
+    await test.step("401 or 403 should be returned for protected resource access", async () => {
+      const actualApiStatus = 302;
+      expect([401, 403]).toContain(authEnv.expectedApiStatus);
+      expect(actualApiStatus).toBe(authEnv.expectedApiStatus);
+    });
+  });
 });

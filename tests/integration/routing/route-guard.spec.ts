@@ -39,6 +39,9 @@ const GUARD_CASES: readonly GuardCase[] = [
   },
 ];
 
+const UNAUTHENTICATED_TARGETS: readonly GuardTarget[] = ["/home", "/habits/new", "/history", "/analytics", "/settings"];
+const UNCONSENTED_TARGETS: readonly GuardTarget[] = ["/home", "/habits/new", "/history", "/analytics", "/settings"];
+
 describe("T-011 PR-004 route guard tests", () => {
   it("未認証・未同意の保護画面アクセスはログインへリダイレクト", () => {
     const guardCase = GUARD_CASES[0];
@@ -56,5 +59,37 @@ describe("T-011 PR-004 route guard tests", () => {
     const guardCase = GUARD_CASES[2];
     const redirect = resolveProtectedRouteGuard(guardCase.state, guardCase.target);
     expect(redirect, guardCase.traceIds.join("/")).toBe(guardCase.expectedRedirect);
+  });
+
+  it("unauthenticated ユーザーはすべての保護画面で FORBIDDEN 扱いとして /login へリダイレクト", () => {
+    for (const target of UNAUTHENTICATED_TARGETS) {
+      const redirect = resolveProtectedRouteGuard({ isAuthenticated: false, hasConsented: false }, target);
+      expect(redirect, `unauthenticated:${target}:FORBIDDEN`).toBe("/login");
+    }
+  });
+
+  it("consent 未完了ユーザーは /policy-consent へ強制遷移される", () => {
+    for (const target of UNCONSENTED_TARGETS) {
+      const redirect = resolveProtectedRouteGuard({ isAuthenticated: true, hasConsented: false }, target);
+      expect(redirect, `consent-required:${target}:FORBIDDEN`).toBe("/policy-consent");
+    }
+  });
+
+  it("unauthenticated API access should return 401 (Red)", () => {
+    const redirect = resolveProtectedRouteGuard(
+      { isAuthenticated: false, hasConsented: false },
+      "/home"
+    );
+    const apiStatus = redirect === "/login" ? 302 : 200;
+    expect(apiStatus, "redirect login is not equivalent to API 401").toBe(401);
+  });
+
+  it("authenticated but missing consent API access should return 403 (Red)", () => {
+    const redirect = resolveProtectedRouteGuard(
+      { isAuthenticated: true, hasConsented: false },
+      "/history"
+    );
+    const apiStatus = redirect === "/policy-consent" ? 302 : 200;
+    expect(apiStatus, "redirect policy-consent is not equivalent to API 403").toBe(403);
   });
 });

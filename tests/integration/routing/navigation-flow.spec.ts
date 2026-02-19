@@ -36,4 +36,12 @@ describe("T-011 PR-002 navigation flow tests", () => {
   it("SCR-002: ホーム起点で各機能画面へ遷移可能", () => {
     expect(NAVIGATION_FLOW["SCR-002"]).toEqual(expectedNavigationFlow["SCR-002"]);
   });
+
+  it("Red: 未同意ユーザーは SCR-001 から SCR-002 へ直接遷移できない", () => {
+    expect(NAVIGATION_FLOW["SCR-001"]).toEqual(["SCR-008"]);
+  });
+
+  it("Red: 旧版同意（outdated consent）は re-consent として SCR-008 を強制する", () => {
+    expect(NAVIGATION_FLOW["SCR-002"], "re-consent should force policy-consent").toContain("SCR-008");
+  });
 });
