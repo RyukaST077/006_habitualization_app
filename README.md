@@ -71,3 +71,18 @@ npm run test -- tests/unit/sample.test.ts
 成功条件:
 - コマンドの終了コードが `0` であること。
 - テスト実行後に `coverage/v8/lcov.info` が生成されること。
+
+最小Integrationテストの実行:
+
+```bash
+npm run test -- tests/integration/supabase-connectivity.test.ts
+```
+
+環境ガード確認（本番環境は禁止）:
+
+```bash
+SUPABASE_ENV=production npm run test -- tests/integration/supabase-connectivity.test.ts
+```
+
+期待結果:
+- `SUPABASE_ENV=production` の実行は `Production forbidden` を含んで失敗すること。

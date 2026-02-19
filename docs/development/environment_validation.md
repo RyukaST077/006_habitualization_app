@@ -101,6 +101,13 @@
 - [ ] 手動: `curl -I http://127.0.0.1:3000 | rg "Content-Security-Policy|X-Content-Type-Options|Referrer-Policy|X-Frame-Options"` で必須ヘッダが確認できる。
 
 ## 11. テストデータ（fixture）更新時の確認フロー
+### 11.0 PR-002（Unit/IT基盤）導入時の最小確認
+- [ ] `test -f tests/helpers/env-guard.ts` を実行し、環境ガード実装の存在を確認する。
+- [ ] `test -f tests/helpers/fixtures.ts` を実行し、固定fixture定義の存在を確認する。
+- [ ] `test -f tests/integration/supabase-connectivity.test.ts` を実行し、Integrationテスト雛形の存在を確認する。
+- [ ] `npm run test -- tests/integration/supabase-connectivity.test.ts` を実行し、非本番環境で成功することを確認する。
+- [ ] `SUPABASE_ENV=production npm run test -- tests/integration/supabase-connectivity.test.ts` を実行し、`Production forbidden` で失敗することを確認する。
+
 ### 11.1 unit/integration/e2e の順で検証
 - [ ] Unit: `npm run test -- tests/unit/sample.test.ts` を実行し、固定fixture（`USER-A` / `USER-B` / `OPS-1`）の再現性を確認する。
 - [ ] Integration: `npm run test -- tests/integration/supabase-connectivity.test.ts` を実行し、環境変数と接続先の整合性を確認する。
