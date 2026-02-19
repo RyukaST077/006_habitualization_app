@@ -18,6 +18,12 @@
 
 `main` への `push` では同 workflow 内で `build` を実行し、デプロイ前品質ゲートとして扱う。
 
+## CODEOWNERS に基づくレビュー要件
+
+- `.github/CODEOWNERS` に定義されたパスへの変更は、該当オーナーのレビューを必須とする。
+- 最低1名の CODEOWNERS 承認が得られるまで `main` へのマージを行わない。
+- `docs/` と `.github/` の変更は運用ポリシー変更として扱い、CODEOWNERS 承認を必須とする。
+
 ### 必須チェックとPRブロック条件の対応
 
 | 種別 | 対象 | ブロック条件 | 対応 |
@@ -87,6 +93,7 @@ PR本文に次のセキュリティ確認欄を設け、該当有無を記載す
 - シークレット を平文でコミットしている、または秘密管理への移管手順がない。
 - Preview から Prod へ到達し得る設定変更がある。
 - `PR Quality Gate` workflow の `pr-body-traceability/lint/typecheck/test` のいずれかが未通過。
+- CODEOWNERS 対象パスの変更で、該当オーナー承認が未完了。
 
 ## レビュー差し戻し観点（IDトレース運用）
 

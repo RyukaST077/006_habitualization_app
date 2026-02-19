@@ -10,6 +10,11 @@
 - [ ] `test -f README.md` を実行し、初期セットアップ手順の存在を確認した。
 - [ ] `git status --short` を実行し、`.env*` の実値ファイルが未追跡であることを確認した。
 
+## 1.2 CODEOWNERS整備後の確認（PR-003）
+- [ ] `test -f .github/CODEOWNERS` を実行し、CODEOWNERS ファイルの存在を確認した。
+- [ ] `rg "^\\S+\\s+@" .github/CODEOWNERS` を実行し、パスルールとオーナー定義を確認した。
+- [ ] `rg "CODEOWNERS" docs/development/merge_policy.md` を実行し、レビュー要件の追記を確認した。
+
 ## 2. 環境分離チェック（PR前/デプロイ前）
 - [ ] Preview 環境の環境変数が Prod 接続先を参照していない。
 - [ ] Dev/Stg/Prod の `SUPABASE_URL` が環境ごとに分離されている。
