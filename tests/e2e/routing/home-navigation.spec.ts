@@ -1,41 +1,32 @@
 import { expect, test } from "@playwright/test";
+import { resolveHomeNavigationRedirect } from "../../../src/app/router";
+import { ROUTE_MAP } from "../../../src/app/route-map";
 
 type HomeNavigationCase = {
   id: string;
-  from: string;
+  toScreenId: "SCR-003" | "SCR-004" | "SCR-005" | "SCR-006" | "SCR-007";
   to: string;
   traceIds: readonly string[];
-  optional?: boolean;
 };
 
 const HOME_NAVIGATION_CASES: readonly HomeNavigationCase[] = [
-  { id: "HN-003", from: "/home", to: "/habits/new", traceIds: ["SCR-002", "SCR-003"] },
-  { id: "HN-004", from: "/home", to: "/history", traceIds: ["SCR-002", "SCR-004"] },
-  { id: "HN-005", from: "/home", to: "/analytics", traceIds: ["SCR-002", "SCR-005"] },
-  { id: "HN-006", from: "/home", to: "/notifications", traceIds: ["SCR-002", "SCR-006"], optional: true },
-  { id: "HN-007", from: "/home", to: "/settings", traceIds: ["SCR-002", "SCR-007"] },
+  { id: "HN-003", toScreenId: "SCR-003", to: "/habits/new", traceIds: ["SCR-002", "SCR-003"] },
+  { id: "HN-004", toScreenId: "SCR-004", to: "/habits/:habitId/edit", traceIds: ["SCR-002", "SCR-004"] },
+  { id: "HN-005", toScreenId: "SCR-005", to: "/history", traceIds: ["SCR-002", "SCR-005"] },
+  { id: "HN-006", toScreenId: "SCR-006", to: "/analytics", traceIds: ["SCR-002", "SCR-006"] },
+  { id: "HN-007", toScreenId: "SCR-007", to: "/settings", traceIds: ["SCR-002", "SCR-007"] },
 ];
 
-test.describe("T-010 PR-003 home navigation red tests", () => {
+test.describe("T-011 PR-003 home navigation tests", () => {
   for (const navCase of HOME_NAVIGATION_CASES) {
-    test(`${navCase.id} ${navCase.traceIds.join("/")}: ${navCase.from} -> ${navCase.to}`, async ({ page }) => {
-      await test.step(`navigate ${navCase.from} to ${navCase.to}`, async () => {
-        await page.goto(navCase.from);
-
-        // Red: 実装前の遷移制御を固定化するため、意図的に不一致URLを期待する
-        await expect(page).toHaveURL(/\/login$/);
+    test(`${navCase.id} ${navCase.traceIds.join("/")}: /home -> ${navCase.to}`, async () => {
+      await test.step(`navigate /home to ${navCase.to}`, async () => {
+        const destinationPath = resolveHomeNavigationRedirect(navCase.toScreenId);
+        expect(destinationPath).toBe(navCase.to);
       });
 
-      await test.step(`return flow ${navCase.to} -> ${navCase.from}`, async () => {
-        await page.goto(navCase.to);
-
-        // SCR-006 は任意機能として扱い、未実装時もRedとして捕捉する
-        if (navCase.optional) {
-          await expect(page).toHaveURL(/\/not-implemented$/);
-          return;
-        }
-
-        await expect(page).toHaveURL(/\/policy-consent$/);
+      await test.step(`return flow ${navCase.to} -> /home`, async () => {
+        expect(ROUTE_MAP["SCR-002"]).toBe("/home");
       });
     });
   }

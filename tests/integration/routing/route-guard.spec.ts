@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { resolveProtectedRouteGuard } from "../../../src/app/router";
 
 type GuardTarget = "/home" | "/habits/new" | "/history" | "/analytics" | "/settings";
 type GuardState = {
@@ -38,28 +39,22 @@ const GUARD_CASES: readonly GuardCase[] = [
   },
 ];
 
-// Red: 実装前のためガード結果を未定義として扱う
-const unresolvedGuardResult: Record<string, string | null> = {};
-
-describe("T-010 PR-003 route guard red tests", () => {
+describe("T-011 PR-004 route guard tests", () => {
   it("未認証・未同意の保護画面アクセスはログインへリダイレクト", () => {
     const guardCase = GUARD_CASES[0];
-    expect(unresolvedGuardResult[guardCase.id], guardCase.traceIds.join("/")).toBe(
-      guardCase.expectedRedirect,
-    );
+    const redirect = resolveProtectedRouteGuard(guardCase.state, guardCase.target);
+    expect(redirect, guardCase.traceIds.join("/")).toBe(guardCase.expectedRedirect);
   });
 
   it("認証済み・未同意の保護画面アクセスは同意画面へリダイレクト", () => {
     const guardCase = GUARD_CASES[1];
-    expect(unresolvedGuardResult[guardCase.id], guardCase.traceIds.join("/")).toBe(
-      guardCase.expectedRedirect,
-    );
+    const redirect = resolveProtectedRouteGuard(guardCase.state, guardCase.target);
+    expect(redirect, guardCase.traceIds.join("/")).toBe(guardCase.expectedRedirect);
   });
 
   it("認証済み・同意済みの場合は保護画面アクセスを許可", () => {
     const guardCase = GUARD_CASES[2];
-    expect(unresolvedGuardResult[guardCase.id], guardCase.traceIds.join("/")).toBe(
-      guardCase.expectedRedirect,
-    );
+    const redirect = resolveProtectedRouteGuard(guardCase.state, guardCase.target);
+    expect(redirect, guardCase.traceIds.join("/")).toBe(guardCase.expectedRedirect);
   });
 });

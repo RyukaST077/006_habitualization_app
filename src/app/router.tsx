@@ -1,0 +1,110 @@
+import { NAVIGATION_FLOW } from "./navigation-flow";
+import { ROUTE_MAP } from "./route-map";
+import type { ScreenId } from "../screens/types";
+
+export type AuthState = "unauthenticated" | "authenticated";
+export type ConsentState = "unknown" | "agreed" | "rejected";
+export type GuardTarget = "/home" | "/habits/new" | "/history" | "/analytics" | "/settings";
+
+export type RouteDefinition = {
+  screenId: ScreenId;
+  path: string;
+  next: readonly ScreenId[];
+};
+
+export type HomeNavigationTarget = (typeof NAVIGATION_FLOW)["SCR-002"][number];
+
+export const AUTH_CONSENT_ROUTES: readonly RouteDefinition[] = [
+  {
+    screenId: "SCR-001",
+    path: ROUTE_MAP["SCR-001"],
+    next: NAVIGATION_FLOW["SCR-001"],
+  },
+  {
+    screenId: "SCR-008",
+    path: ROUTE_MAP["SCR-008"],
+    next: NAVIGATION_FLOW["SCR-008"],
+  },
+  {
+    screenId: "SCR-002",
+    path: ROUTE_MAP["SCR-002"],
+    next: NAVIGATION_FLOW["SCR-002"],
+  },
+] as const;
+
+export const BUSINESS_ROUTES: readonly RouteDefinition[] = [
+  {
+    screenId: "SCR-003",
+    path: ROUTE_MAP["SCR-003"],
+    next: NAVIGATION_FLOW["SCR-003"],
+  },
+  {
+    screenId: "SCR-004",
+    path: ROUTE_MAP["SCR-004"],
+    next: NAVIGATION_FLOW["SCR-004"],
+  },
+  {
+    screenId: "SCR-005",
+    path: ROUTE_MAP["SCR-005"],
+    next: NAVIGATION_FLOW["SCR-005"],
+  },
+  {
+    screenId: "SCR-006",
+    path: ROUTE_MAP["SCR-006"],
+    next: NAVIGATION_FLOW["SCR-006"],
+  },
+  {
+    screenId: "SCR-007",
+    path: ROUTE_MAP["SCR-007"],
+    next: NAVIGATION_FLOW["SCR-007"],
+  },
+] as const;
+
+export function resolveAuthConsentRedirect(
+  startPath: string,
+  authState: AuthState,
+  consentState: ConsentState
+): string {
+  if (authState === "unauthenticated") {
+    return ROUTE_MAP["SCR-001"];
+  }
+
+  if (startPath === ROUTE_MAP["SCR-001"]) {
+    return consentState === "agreed" ? ROUTE_MAP["SCR-002"] : ROUTE_MAP["SCR-008"];
+  }
+
+  if (startPath === ROUTE_MAP["SCR-008"]) {
+    if (consentState === "rejected") {
+      return ROUTE_MAP["SCR-001"];
+    }
+
+    return ROUTE_MAP["SCR-002"];
+  }
+
+  return startPath;
+}
+
+export function resolveHomeNavigationRedirect(targetScreenId: HomeNavigationTarget): string {
+  return ROUTE_MAP[targetScreenId];
+}
+
+export function resolveProtectedRouteGuard(
+  state: { isAuthenticated: boolean; hasConsented: boolean },
+  target: GuardTarget
+): "/login" | "/policy-consent" | null {
+  const protectedPaths: readonly GuardTarget[] = ["/home", "/habits/new", "/history", "/analytics", "/settings"];
+
+  if (!protectedPaths.includes(target)) {
+    return null;
+  }
+
+  if (!state.isAuthenticated) {
+    return ROUTE_MAP["SCR-001"];
+  }
+
+  if (!state.hasConsented) {
+    return ROUTE_MAP["SCR-008"];
+  }
+
+  return null;
+}
