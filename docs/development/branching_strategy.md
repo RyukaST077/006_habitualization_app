@@ -28,6 +28,12 @@
 3. PRを作成し、レビューと必須チェックの完了を待つ。
 4. 承認後に `main` へマージする。
 
+### PR作成時の必須運用
+
+- PR作成時は `.github/PULL_REQUEST_TEMPLATE.md` を使用し、必須欄を埋める。
+- `lint/typecheck/test` の品質チェックが成功するまで `main` へマージしない。
+- `main` への `push` は運用者の保守操作に限定し、`build` の成功を確認する。
+
 ## `T-xxx` とPR本文の紐付け方針
 
 - ブランチ名の `T-xxx` とPR本文のタスクIDは一致させる。

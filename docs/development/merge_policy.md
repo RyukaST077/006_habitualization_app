@@ -59,6 +59,8 @@
 - テストID（`TC-xxx` / `TS-xxx`）
 - テスト証跡リンク（CI実行結果、テストログ、スクリーンショット等）
 
+PR本文は `.github/PULL_REQUEST_TEMPLATE.md` の項目順に沿って記載する。
+
 ### 記載ルール
 
 - 空欄は禁止。該当なしの場合は `N/A（理由）` を明記する。
@@ -84,6 +86,7 @@ PR本文に次のセキュリティ確認欄を設け、該当有無を記載す
 - 環境変数 の変更理由と適用環境（Dev/Stg/Prod）が不明。
 - シークレット を平文でコミットしている、または秘密管理への移管手順がない。
 - Preview から Prod へ到達し得る設定変更がある。
+- `PR Quality Gate` workflow の `pr-body-traceability/lint/typecheck/test` のいずれかが未通過。
 
 ## レビュー差し戻し観点（IDトレース運用）
 
