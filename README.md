@@ -118,3 +118,26 @@ npm run test:e2e:headed
 ```bash
 npm run test:e2e -- --list
 ```
+
+## E2Eスモーク雛形（T-004 / PR-002）
+
+`TC-AUTO-SMK-001`（ログイン→同意→ホーム）向けの雛形は
+`tests/e2e/smoke/auth-consent-home.spec.ts` にあります。
+
+実行前に次の環境変数を設定してください（未設定時は即失敗します）。
+
+```bash
+export E2E_BASE_URL="http://127.0.0.1:3000"
+export E2E_SMOKE_USER_EMAIL="smoke-user@example.com"
+export E2E_SMOKE_USER_PASSWORD="dummy-password"
+```
+
+スモーク実行:
+
+```bash
+npm run test:e2e -- tests/e2e/smoke/auth-consent-home.spec.ts
+```
+
+失敗時成果物の確認:
+- `test-results/` に失敗時スクリーンショットが出力されること
+- `test-results/` / `playwright-report/` で trace が確認できること
