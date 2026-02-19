@@ -96,6 +96,12 @@
 - [ ] `[E2E-GUARD] Production environment is forbidden for smoke tests` の場合は `SUPABASE_ENV` を非本番値へ修正する。
 - [ ] `[E2E-GUARD] Production-like URL is forbidden for smoke tests` の場合は `SUPABASE_URL` を検証環境向けへ修正する。
 
+### 8.2 PR時E2Eスモーク運用（T-004 / PR-003）
+- [ ] `.github/workflows/ci.yml` の `e2e-smoke` ジョブが `pull_request` で実行されることを確認した。
+- [ ] `e2e-smoke` で `npm run test:e2e -- --list` が実行されることを確認した。
+- [ ] 運用目安として、PR時スモークの完了目標を 10 分以内（`timeout-minutes: 10`）に設定した。
+- [ ] `e2e-smoke` が失敗した場合は必須チェック未達としてPRをマージしないことを確認した。
+
 ## 8.1 CSP/セキュリティヘッダ検証（手動/自動）
 - [ ] 自動: `npm run test -- tests/security/headers.spec.ts` が成功する。
 - [ ] 手動: `curl -I http://127.0.0.1:3000 | rg "Content-Security-Policy|X-Content-Type-Options|Referrer-Policy|X-Frame-Options"` で必須ヘッダが確認できる。

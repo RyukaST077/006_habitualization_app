@@ -55,6 +55,26 @@ jobs:
       - run: npm ci
       - run: npm run test --if-present
 
+  e2e-smoke:
+    if: github.event_name == 'pull_request'
+    needs: [lint, typecheck, test]
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    env:
+      CI: '1'
+      E2E_BASE_URL: http://127.0.0.1:3000
+      E2E_SMOKE_USER_EMAIL: ci-smoke-user@example.com
+      E2E_SMOKE_USER_PASSWORD: ci-dummy-password
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e -- --list
+
   build:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [lint, typecheck, test]

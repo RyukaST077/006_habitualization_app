@@ -141,3 +141,12 @@ npm run test:e2e -- tests/e2e/smoke/auth-consent-home.spec.ts
 失敗時成果物の確認:
 - `test-results/` に失敗時スクリーンショットが出力されること
 - `test-results/` / `playwright-report/` で trace が確認できること
+
+## PR時E2Eスモーク運用（T-004 / PR-003）
+
+CI（`.github/workflows/ci.yml`）では、`pull_request` 時に `e2e-smoke` ジョブで
+`npm run test:e2e -- --list` を実行します。
+
+運用基準:
+- 目標実行時間は 10 分以内（ジョブ `timeout-minutes: 10`）。
+- スモークジョブが失敗したPRはマージしない（必須ステータスチェックとして扱う）。
