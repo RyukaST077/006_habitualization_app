@@ -8,6 +8,8 @@
 - 要件ID (FR/NFR/CON/AC):
 - テストID (TC/TS):
 - テスト証跡リンク:
+- PR Quality Gate 実行結果リンク（Actions）:
+- `lint` / `typecheck` / `test` の結果要約:
 
 ## セキュリティ確認
 - 入力検証: 追加/変更した入力項目のバリデーション

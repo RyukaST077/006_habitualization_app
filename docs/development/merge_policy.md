@@ -17,7 +17,10 @@
 - Job: `test`
 - Workflow: `secret-scan`（`.github/workflows/secret-scan.yml`）
 
+ブランチ保護ルールの Required status checks には、上記の workflow / job 名を **同じ表記** で登録する。
+
 `main` への `push` では同 workflow 内で `build` を実行し、デプロイ前品質ゲートとして扱う。
+`build` は `needs: [lint, typecheck, test]` を必須とし、前段ジョブ成功時のみ実行する。
 
 ## CODEOWNERS に基づくレビュー要件
 

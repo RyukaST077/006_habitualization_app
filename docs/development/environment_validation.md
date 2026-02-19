@@ -77,6 +77,7 @@
 - [ ] `build` ジョブに `needs: [lint, typecheck, test]` が設定され、前段ジョブ成功時のみ実行される。
 - [ ] `build` 実行は `npm ci` と `npm run build` のみで完結し、平文Secretsをworkflowに埋め込んでいない。
 - [ ] `npm run build` の失敗時は `build` ジョブが失敗し、workflow全体が失敗ステータスになる。
+- [ ] `build` 失敗時は `npm run lint && npm run typecheck && npm run test && npm run build` の順でローカル再現して切り分ける。
 
 ## 8. E2Eスモーク実行前チェック（READMEと同一）
 ### E2E前提条件（共通）

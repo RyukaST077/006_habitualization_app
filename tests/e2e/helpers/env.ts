@@ -1,8 +1,4 @@
-const REQUIRED_ENV_KEYS = [
-  "E2E_BASE_URL",
-  "E2E_SMOKE_USER_EMAIL",
-  "E2E_SMOKE_USER_PASSWORD",
-] as const;
+type RequiredEnvKey = "E2E_BASE_URL" | "E2E_SMOKE_USER_EMAIL" | "E2E_SMOKE_USER_PASSWORD";
 
 export type SmokeEnv = {
   baseUrl: string;
@@ -10,7 +6,7 @@ export type SmokeEnv = {
   userPassword: string;
 };
 
-function getRequiredEnv(key: (typeof REQUIRED_ENV_KEYS)[number]): string {
+function getRequiredEnv(key: RequiredEnvKey): string {
   const value = process.env[key];
 
   if (!value || value.trim().length === 0) {

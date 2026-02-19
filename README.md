@@ -24,6 +24,17 @@ test -f README.md
 test -f docs/implements_plan.md
 ```
 
+## ローカル品質ゲート（T-005 / PR-001）
+
+次の4コマンドを順番に実行し、すべて成功することを確認してください。
+
+```bash
+npm run lint
+npm run typecheck
+npm run test
+npm run build
+```
+
 ## 環境変数セットアップ（Dev/Stg/Prod）
 
 環境ごとに接続先を分離し、テンプレートから環境変数を作成してください。
@@ -150,3 +161,31 @@ CI（`.github/workflows/ci.yml`）では、`pull_request` 時に `e2e-smoke` ジ
 運用基準:
 - 目標実行時間は 10 分以内（ジョブ `timeout-minutes: 10`）。
 - スモークジョブが失敗したPRはマージしない（必須ステータスチェックとして扱う）。
+
+## CI失敗時の一次切り分け（T-005 / PR-002）
+
+PR の `PR Quality Gate` が失敗した場合は、次をローカルで同順に確認してください。
+
+```bash
+npm run lint
+npm run typecheck
+npm run test
+```
+
+確認ポイント:
+- `lint`: 静的解析エラーの解消
+- `typecheck`: 型不整合の解消
+- `test`: 失敗テストの修正と再実行
+
+## `main` 反映前のローカル再現フロー（T-005 / PR-003）
+
+`main` push 時の `build` ゲートに備え、次を順番に実行してください。
+
+```bash
+npm run lint
+npm run typecheck
+npm run test
+npm run build
+```
+
+この順序で失敗箇所を切り分けると、CI の `needs: [lint, typecheck, test]` と同じ依存関係で再現できます。
