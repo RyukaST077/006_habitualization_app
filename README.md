@@ -53,3 +53,21 @@ cp .env.prod.example .env.prod.local
 - `docs/development/environment_validation.md`
 
 Secrets運用ルールの詳細は `docs/development/secrets_management.md` を参照してください。
+
+## テスト基盤セットアップ（T-003 / PR-001）
+
+Unit/IT テスト基盤の初期セットアップは次を実行してください。
+
+```bash
+npm install
+```
+
+最小Unitテストの実行:
+
+```bash
+npm run test -- tests/unit/sample.test.ts
+```
+
+成功条件:
+- コマンドの終了コードが `0` であること。
+- テスト実行後に `coverage/v8/lcov.info` が生成されること。
