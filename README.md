@@ -86,3 +86,35 @@ SUPABASE_ENV=production npm run test -- tests/integration/supabase-connectivity.
 
 期待結果:
 - `SUPABASE_ENV=production` の実行は `Production forbidden` を含んで失敗すること。
+
+## E2Eテスト基盤セットアップ（T-004 / PR-001）
+
+Playwright ベースの E2E 実行基盤は次でセットアップできます。
+
+```bash
+npm install
+```
+
+初期化（初回のみ、ブラウザ実行が必要な場合）:
+
+```bash
+npx playwright install --with-deps
+```
+
+E2E テストの実行:
+
+```bash
+npm run test:e2e
+```
+
+ヘッド付き実行:
+
+```bash
+npm run test:e2e:headed
+```
+
+起動確認（テスト一覧のみ）:
+
+```bash
+npm run test:e2e -- --list
+```
