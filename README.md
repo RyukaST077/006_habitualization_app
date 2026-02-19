@@ -51,3 +51,5 @@ cp .env.prod.example .env.prod.local
 - `docs/development/merge_policy.md`
 - `docs/development/secrets_management.md`
 - `docs/development/environment_validation.md`
+
+Secrets運用ルールの詳細は `docs/development/secrets_management.md` を参照してください。
