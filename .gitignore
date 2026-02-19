@@ -20,4 +20,6 @@ pnpm-debug.log*
 .env
 .env.*
 !.env.example
+!.env.stg.example
+!.env.prod.example
 !.env.template

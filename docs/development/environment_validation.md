@@ -15,6 +15,11 @@
 - [ ] `rg "^\\S+\\s+@" .github/CODEOWNERS` を実行し、パスルールとオーナー定義を確認した。
 - [ ] `rg "CODEOWNERS" docs/development/merge_policy.md` を実行し、レビュー要件の追記を確認した。
 
+## 1.3 環境雛形定義後の確認（T-002 / PR-001）
+- [ ] `test -f .env.example && test -f .env.stg.example && test -f .env.prod.example` を実行し、環境雛形ファイルの存在を確認した。
+- [ ] `rg "(prod|production).*(apikey|secret|service_role)" .env*.example` を実行し、雛形に本番実値の平文が含まれていないことを確認した。
+- [ ] `rg "Preview.*Prod|本番DBへ接続しない" README.md docs/development/environment_validation.md` を実行し、Preview から Prod への接続禁止ルールを確認した。
+
 ## 2. 環境分離チェック（PR前/デプロイ前）
 - [ ] Preview 環境の環境変数が Prod 接続先を参照していない。
 - [ ] Dev/Stg/Prod の `SUPABASE_URL` が環境ごとに分離されている。
