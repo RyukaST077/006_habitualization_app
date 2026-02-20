@@ -4,13 +4,27 @@ import {
   COMMON_UI_FOOTER_REQUIRED_ITEMS,
   COMMON_UI_HEADER_REQUIRED_ITEMS,
 } from "../../helpers/fixtures";
+import { resolveFooterViewModel } from "../../../src/ui/footer";
+import { resolveHeaderViewModel } from "../../../src/ui/header";
+import { resolveErrorPresentation } from "../../../src/ui/error-presentation";
 
 function resolveHeaderItemsForCurrentImplementation(): string[] {
-  return [];
+  const header = resolveHeaderViewModel();
+
+  return [
+    header.logoLabel,
+    ...header.navItems.map((item) => item.label),
+    header.logoutLabel,
+  ].filter((item): item is string => item !== null);
 }
 
 function resolveFooterItemsForCurrentImplementation(): string[] {
-  return [];
+  const footer = resolveFooterViewModel();
+
+  return [
+    ...footer.policyLinks.map((item) => item.label),
+    footer.copyright,
+  ].filter((item): item is string => item !== null);
 }
 
 function resolveCommonErrorPresentation(status: 400 | 403 | 409 | 500): {
@@ -18,10 +32,21 @@ function resolveCommonErrorPresentation(status: 400 | 403 | 409 | 500): {
   message: string;
   traceId: string | null;
 } {
+  const code =
+    status === 400
+      ? "VALIDATION_ERROR"
+      : status === 403
+        ? "FORBIDDEN"
+        : status === 409
+          ? "DOMAIN_CONFLICT"
+          : "INTERNAL_ERROR";
+
+  const presentation = resolveErrorPresentation(status, code);
+
   return {
-    status,
-    message: "NOT_IMPLEMENTED",
-    traceId: null,
+    status: presentation.status,
+    message: presentation.message,
+    traceId: presentation.visibleTraceId,
   };
 }
 
