@@ -5,6 +5,20 @@ export type TestFixtureUser = {
   locale: string;
 };
 
+export {
+  COMMON_UI_DISPLAY_ITEMS,
+  COMMON_UI_ERROR_CASES,
+  COMMON_UI_ERROR_RESPONSES,
+  COMMON_UI_FOOTER_REQUIRED_ITEMS,
+  COMMON_UI_HEADER_REQUIRED_ITEMS,
+  COMMON_UI_RESPONSIVE_BREAKPOINTS,
+} from "./ui/common-ui-fixtures";
+
+export type {
+  CommonUiBreakpointKey,
+  CommonUiErrorCase,
+} from "./ui/common-ui-fixtures";
+
 export const TEST_FIXTURE_USERS: Record<string, TestFixtureUser> = {
   USER_A: {
     key: "USER-A",
