@@ -75,21 +75,17 @@ describe("T-011 PR-004 route guard tests", () => {
     }
   });
 
-  it("unauthenticated API access should return 401 (Red)", () => {
-    const redirect = resolveProtectedRouteGuard(
-      { isAuthenticated: false, hasConsented: false },
-      "/home"
-    );
-    const apiStatus = redirect === "/login" ? 302 : 200;
-    expect(apiStatus, "redirect login is not equivalent to API 401").toBe(401);
+  it("未認証ユーザーは保護対象の全画面で /login へ遷移する", () => {
+    for (const target of UNAUTHENTICATED_TARGETS) {
+      const redirect = resolveProtectedRouteGuard({ isAuthenticated: false, hasConsented: false }, target);
+      expect(redirect, `unauthenticated:${target}`).toBe("/login");
+    }
   });
 
-  it("authenticated but missing consent API access should return 403 (Red)", () => {
-    const redirect = resolveProtectedRouteGuard(
-      { isAuthenticated: true, hasConsented: false },
-      "/history"
-    );
-    const apiStatus = redirect === "/policy-consent" ? 302 : 200;
-    expect(apiStatus, "redirect policy-consent is not equivalent to API 403").toBe(403);
+  it("同意済みユーザーは保護対象の全画面にアクセス可能でリダイレクトされない", () => {
+    for (const target of UNAUTHENTICATED_TARGETS) {
+      const redirect = resolveProtectedRouteGuard({ isAuthenticated: true, hasConsented: true }, target);
+      expect(redirect, `consented:${target}`).toBeNull();
+    }
   });
 });

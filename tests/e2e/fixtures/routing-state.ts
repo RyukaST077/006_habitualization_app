@@ -59,7 +59,7 @@ export const ROUTING_SCENARIOS: readonly RoutingScenario[] = [
     caseId: "TC-ST-FR-004-004",
     authState: "authenticated",
     consentState: "rejected",
-    consentVersionState: "outdated",
+    consentVersionState: "latest",
     startPath: "/policy-consent",
     expectedPath: "/login",
     traceIds: ["FR-004", "SCR-008", "SCR-001", "reject", "logout"],

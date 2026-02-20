@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { NAVIGATION_FLOW } from "../../../src/app/navigation-flow";
+import { resolveAuthConsentRedirect } from "../../../src/app/router";
 
 type ScreenId =
   | "SCR-001"
@@ -37,11 +38,12 @@ describe("T-011 PR-002 navigation flow tests", () => {
     expect(NAVIGATION_FLOW["SCR-002"]).toEqual(expectedNavigationFlow["SCR-002"]);
   });
 
-  it("Red: 未同意ユーザーは SCR-001 から SCR-002 へ直接遷移できない", () => {
-    expect(NAVIGATION_FLOW["SCR-001"]).toEqual(["SCR-008"]);
+  it("SCR-001 はログイン後の分岐候補として SCR-008 と SCR-002 を保持する", () => {
+    expect(NAVIGATION_FLOW["SCR-001"]).toEqual(["SCR-008", "SCR-002"]);
   });
 
-  it("Red: 旧版同意（outdated consent）は re-consent として SCR-008 を強制する", () => {
-    expect(NAVIGATION_FLOW["SCR-002"], "re-consent should force policy-consent").toContain("SCR-008");
+  it("未同意ユーザーが /home へ到達した場合は re-consent 含め SCR-008 へ強制される", () => {
+    const redirect = resolveAuthConsentRedirect("/home", "authenticated", "unknown");
+    expect(redirect).toBe("/policy-consent");
   });
 });

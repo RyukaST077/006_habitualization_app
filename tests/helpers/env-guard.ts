@@ -5,8 +5,11 @@ type SupabaseTestEnv = {
 };
 
 export type AuthGuardTestEnv = {
-  authState: "unauthenticated" | "authenticated";
-  expectedApiStatus: 401 | 403;
+  state: {
+    isAuthenticated: boolean;
+    hasConsented: boolean;
+  };
+  expectedRedirect: "/login" | "/policy-consent" | null;
 };
 
 const PROD_ENV_VALUES = new Set(["prod", "production"]);
@@ -48,7 +51,20 @@ export function validateSupabaseTestEnv(
 
 export function createUnauthenticatedGuardEnv(): AuthGuardTestEnv {
   return {
-    authState: "unauthenticated",
-    expectedApiStatus: 401,
+    state: {
+      isAuthenticated: false,
+      hasConsented: false,
+    },
+    expectedRedirect: "/login",
+  };
+}
+
+export function createUnconsentedGuardEnv(): AuthGuardTestEnv {
+  return {
+    state: {
+      isAuthenticated: true,
+      hasConsented: false,
+    },
+    expectedRedirect: "/policy-consent",
   };
 }

@@ -5,6 +5,7 @@ import type { ScreenId } from "../screens/types";
 export type AuthState = "unauthenticated" | "authenticated";
 export type ConsentState = "unknown" | "agreed" | "rejected";
 export type GuardTarget = "/home" | "/habits/new" | "/history" | "/analytics" | "/settings";
+export const PROTECTED_PATHS: readonly GuardTarget[] = ["/home", "/habits/new", "/history", "/analytics", "/settings"];
 
 export type RouteDefinition = {
   screenId: ScreenId;
@@ -60,6 +61,17 @@ export const BUSINESS_ROUTES: readonly RouteDefinition[] = [
   },
 ] as const;
 
+function isConsentRequiredPath(startPath: string): boolean {
+  return (
+    startPath === ROUTE_MAP["SCR-002"] ||
+    startPath === ROUTE_MAP["SCR-003"] ||
+    startPath === ROUTE_MAP["SCR-005"] ||
+    startPath === ROUTE_MAP["SCR-006"] ||
+    startPath === ROUTE_MAP["SCR-007"] ||
+    /^\/habits\/[^/]+\/edit$/.test(startPath)
+  );
+}
+
 export function resolveAuthConsentRedirect(
   startPath: string,
   authState: AuthState,
@@ -73,12 +85,16 @@ export function resolveAuthConsentRedirect(
     return consentState === "agreed" ? ROUTE_MAP["SCR-002"] : ROUTE_MAP["SCR-008"];
   }
 
-  if (startPath === ROUTE_MAP["SCR-008"]) {
-    if (consentState === "rejected") {
-      return ROUTE_MAP["SCR-001"];
-    }
+  if (consentState === "rejected") {
+    return ROUTE_MAP["SCR-001"];
+  }
 
+  if (startPath === ROUTE_MAP["SCR-008"]) {
     return ROUTE_MAP["SCR-002"];
+  }
+
+  if (isConsentRequiredPath(startPath) && consentState !== "agreed") {
+    return ROUTE_MAP["SCR-008"];
   }
 
   return startPath;
@@ -92,9 +108,7 @@ export function resolveProtectedRouteGuard(
   state: { isAuthenticated: boolean; hasConsented: boolean },
   target: GuardTarget
 ): "/login" | "/policy-consent" | null {
-  const protectedPaths: readonly GuardTarget[] = ["/home", "/habits/new", "/history", "/analytics", "/settings"];
-
-  if (!protectedPaths.includes(target)) {
+  if (!PROTECTED_PATHS.includes(target)) {
     return null;
   }
 
