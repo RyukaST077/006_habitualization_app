@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { resolveCommonUiRouteViewModel, resolveHomeNavigationRedirect, resolveProtectedRouteGuard } from "../../../src/app/router";
 import { ROUTE_MAP } from "../../../src/app/route-map";
 import { SCR002HomePage } from "../../../src/screens/SCR-002HomePage";
+import { SCR006AnalyticsPage } from "../../../src/screens/SCR-006AnalyticsPage";
 import { createUnauthenticatedGuardEnv, createUnconsentedGuardEnv } from "../../helpers/env-guard";
 
 type HomeNavigationCase = {
@@ -69,6 +70,27 @@ test.describe("T-011 PR-003 home navigation tests", () => {
         expect(observation.traceIdFieldName).toBe("trace_id");
         expect(observation.shouldExposeTraceId).toBe(false);
       });
+
+      if (navCase.toScreenId === "SCR-006") {
+        await test.step("SCR-006 mock route keeps round-trip path to /home", async () => {
+          let didNavigateBackHome = false;
+          const analyticsScreen = SCR006AnalyticsPage({
+            screenId: "SCR-006",
+            handlers: {
+              onBackHome: () => {
+                didNavigateBackHome = true;
+              },
+            },
+          });
+
+          expect(analyticsScreen.mockLabel).toBe("モック画面");
+          expect(analyticsScreen.actions.backHomeLabel).toBe("ホームに戻る");
+          analyticsScreen.actions.backHome();
+          expect(didNavigateBackHome).toBe(true);
+          expect(ROUTE_MAP["SCR-006"]).toBe("/analytics");
+          expect(ROUTE_MAP["SCR-002"]).toBe("/home");
+        });
+      }
     });
   }
 

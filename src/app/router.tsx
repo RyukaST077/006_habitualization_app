@@ -64,6 +64,7 @@ export const BUSINESS_ROUTES: readonly RouteDefinition[] = [
   },
   {
     screenId: "SCR-006",
+    // S-MOCK-04: analytics route is retained to preserve SCR-002 -> SCR-006 navigation while feature is mocked.
     path: ROUTE_MAP["SCR-006"],
     next: NAVIGATION_FLOW["SCR-006"],
   },

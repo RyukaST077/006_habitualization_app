@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { NAVIGATION_FLOW } from "../../../src/app/navigation-flow";
 import { resolveAuthConsentRedirect } from "../../../src/app/router";
+import { SCR006AnalyticsPage } from "../../../src/screens/SCR-006AnalyticsPage";
 
 type ScreenId =
   | "SCR-001"
@@ -85,5 +86,31 @@ describe("T-014 PR-003 common error presentation consistency checks", () => {
       expect(observation.exposesErrorCode, `${observation.screenId}:code`).toBe(true);
       expect(observation.traceIdFieldName, `${observation.screenId}:trace_id`).toBe("trace_id");
     }
+  });
+});
+
+describe("T-016 PR-003 S-MOCK-04 navigation traceability checks", () => {
+  it("SCR-002 <-> SCR-006 のモック導線を維持する", () => {
+    expect(NAVIGATION_FLOW["SCR-002"]).toContain("SCR-006");
+    expect(NAVIGATION_FLOW["SCR-006"]).toEqual(["SCR-002"]);
+  });
+
+  it("SCR-006 はモック画面契約を保持し、ホームへ戻れる", () => {
+    let didNavigateBackHome = false;
+    const screen = SCR006AnalyticsPage({
+      screenId: "SCR-006",
+      handlers: {
+        onBackHome: () => {
+          didNavigateBackHome = true;
+        },
+      },
+    });
+
+    expect(screen.mockLabel).toBe("モック画面");
+    expect(screen.unavailableNotice.title).toContain("準備中");
+    expect(screen.actions.backHomeLabel).toBe("ホームに戻る");
+
+    screen.actions.backHome();
+    expect(didNavigateBackHome).toBe(true);
   });
 });

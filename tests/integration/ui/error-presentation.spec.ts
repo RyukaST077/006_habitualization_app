@@ -46,4 +46,11 @@ describe("T-014 PR-003 error presentation integration tests", () => {
 
     expect(presentation.internalDetail).toBeNull();
   });
+
+  it("SCR-006モック導線の想定でも500以外は trace_id を表示しない", () => {
+    const presentation = resolveErrorPresentation(403, "FORBIDDEN", "SCR006-MOCK-403");
+
+    expect(presentation.status).toBe(403);
+    expect(presentation.visibleTraceId).toBeNull();
+  });
 });

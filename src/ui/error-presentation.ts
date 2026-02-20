@@ -22,13 +22,14 @@ const PUBLIC_MESSAGES: Readonly<Record<CommonErrorCode, string>> = {
   DOMAIN_CONFLICT: "現在の状態ではこの操作を完了できません",
   INTERNAL_ERROR: "システムエラーが発生しました",
 };
+const TRACE_ID_VISIBLE_STATUS: ErrorStatus = 500;
 
 export function resolveErrorPresentation(
   status: ErrorStatus,
   code: CommonErrorCode,
   traceId = "INTERNAL_ERROR"
 ): ErrorPresentation {
-  const shouldShowTraceId = status === 500 && code === "INTERNAL_ERROR";
+  const shouldShowTraceId = status === TRACE_ID_VISIBLE_STATUS && code === "INTERNAL_ERROR";
 
   return {
     status,

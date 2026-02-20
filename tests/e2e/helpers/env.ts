@@ -16,6 +16,14 @@ function getRequiredEnv(key: RequiredEnvKey): string {
   return value;
 }
 
+export function getMissingSmokeEnvKeys(): RequiredEnvKey[] {
+  const keys: RequiredEnvKey[] = ["E2E_BASE_URL", "E2E_SMOKE_USER_EMAIL", "E2E_SMOKE_USER_PASSWORD"];
+  return keys.filter((key) => {
+    const value = process.env[key];
+    return !value || value.trim().length === 0;
+  });
+}
+
 export function loadSmokeEnv(): SmokeEnv {
   return {
     baseUrl: getRequiredEnv("E2E_BASE_URL"),

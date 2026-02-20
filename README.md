@@ -118,6 +118,10 @@ E2E テストの実行:
 npm run test:e2e
 ```
 
+注意:
+- `npm run test:e2e` には smoke テストが含まれます。
+- `E2E_BASE_URL` / `E2E_SMOKE_USER_EMAIL` / `E2E_SMOKE_USER_PASSWORD` が未設定の場合、smoke テストは `skip` されます。
+
 ヘッド付き実行:
 
 ```bash
@@ -135,7 +139,7 @@ npm run test:e2e -- --list
 `TC-AUTO-SMK-001`（ログイン→同意→ホーム）向けの雛形は
 `tests/e2e/smoke/auth-consent-home.spec.ts` にあります。
 
-実行前に次の環境変数を設定してください（未設定時は即失敗します）。
+実行前に次の環境変数を設定してください（未設定時は smoke テストが `skip` されます）。
 
 ```bash
 export E2E_BASE_URL="http://127.0.0.1:3000"
