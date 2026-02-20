@@ -22,14 +22,14 @@ export interface PolicyConsentUniqueRedCase {
   featureRequirement: "FR-005";
 }
 
-export interface PolicyTypeConstraintRedCase {
+export interface PolicyTypeConstraintCase {
   traceId: string;
   tableName: "policy_settings" | "policy_consents";
   constraintName: "chk_policy_settings_type" | "chk_policy_consents_type";
   requiredDefinitionFragments: string[];
 }
 
-export interface PolicySettingsServiceRoleUpdateRedCase {
+export interface PolicySettingsServiceRoleUpdateCase {
   traceId: string;
   tableName: "policy_settings";
   requiredRlsEnabled: false;
@@ -164,7 +164,12 @@ export const CONSENT_AUDIT_TABLE_DDL_EXPECTATIONS: ConsentAuditTableDdlExpectati
       "metadata_json",
       "created_at",
     ],
-    requiredConstraints: ["pk_audit_logs", "chk_audit_logs_result", "chk_audit_logs_required"],
+    requiredConstraints: [
+      "pk_audit_logs",
+      "chk_audit_logs_result",
+      "chk_audit_logs_required",
+      "chk_audit_logs_policy_settings_metadata",
+    ],
     requiredIndexes: [
       "pk_audit_logs",
       "idx_audit_logs_occurred",
@@ -178,7 +183,7 @@ export const CONSENT_AUDIT_TABLE_DDL_EXPECTATIONS: ConsentAuditTableDdlExpectati
   },
 ];
 
-export const POLICY_CONSENTS_UNIQUE_RED_CASES: PolicyConsentUniqueRedCase[] = [
+export const POLICY_CONSENTS_UNIQUE_CASES: PolicyConsentUniqueRedCase[] = [
   {
     traceId: "TBL-007/FR-005/uq_policy_consents_user_type_ver",
     tableName: "policy_consents",
@@ -187,8 +192,9 @@ export const POLICY_CONSENTS_UNIQUE_RED_CASES: PolicyConsentUniqueRedCase[] = [
     featureRequirement: "FR-005",
   },
 ];
+export const POLICY_CONSENTS_UNIQUE_RED_CASES = POLICY_CONSENTS_UNIQUE_CASES;
 
-export const POLICY_TYPE_CONSTRAINT_RED_CASES: PolicyTypeConstraintRedCase[] = [
+export const POLICY_TYPE_CONSTRAINT_CASES: PolicyTypeConstraintCase[] = [
   {
     traceId: "TBL-006/chk_policy_settings_type",
     tableName: "policy_settings",
@@ -203,7 +209,9 @@ export const POLICY_TYPE_CONSTRAINT_RED_CASES: PolicyTypeConstraintRedCase[] = [
   },
 ];
 
-export const POLICY_SETTINGS_SERVICE_ROLE_UPDATE_RED_CASES: PolicySettingsServiceRoleUpdateRedCase[] =
+export const POLICY_TYPE_CONSTRAINT_RED_CASES = POLICY_TYPE_CONSTRAINT_CASES;
+
+export const POLICY_SETTINGS_SERVICE_ROLE_UPDATE_CASES: PolicySettingsServiceRoleUpdateCase[] =
   [
     {
       traceId: "TBL-006/FR-026/policy-settings-service-role-update",
@@ -216,7 +224,10 @@ export const POLICY_SETTINGS_SERVICE_ROLE_UPDATE_RED_CASES: PolicySettingsServic
     },
   ];
 
-export const POLICY_CONSENTS_FK_RED_CASES: PolicyConsentForeignKeyRedCase[] = [
+export const POLICY_SETTINGS_SERVICE_ROLE_UPDATE_RED_CASES =
+  POLICY_SETTINGS_SERVICE_ROLE_UPDATE_CASES;
+
+export const POLICY_CONSENTS_FK_CASES: PolicyConsentForeignKeyRedCase[] = [
   {
     traceId: "TBL-007/FR-025/fk_policy_consents_user",
     tableName: "policy_consents",
@@ -232,8 +243,9 @@ export const POLICY_CONSENTS_FK_RED_CASES: PolicyConsentForeignKeyRedCase[] = [
     featureRequirement: "FR-025",
   },
 ];
+export const POLICY_CONSENTS_FK_RED_CASES = POLICY_CONSENTS_FK_CASES;
 
-export const POLICY_CONSENTS_RLS_RED_CASES: PolicyConsentRlsRedCase[] = [
+export const POLICY_CONSENTS_RLS_CASES: PolicyConsentRlsRedCase[] = [
   {
     traceId: "TBL-007/RLS/select-own",
     command: "select",
@@ -260,8 +272,9 @@ export const POLICY_CONSENTS_RLS_RED_CASES: PolicyConsentRlsRedCase[] = [
     requiredUsingExpression: "auth.uid() = user_id",
   },
 ];
+export const POLICY_CONSENTS_RLS_RED_CASES = POLICY_CONSENTS_RLS_CASES;
 
-export const POLICY_CONSENT_AUDIT_RED_CASES: PolicyConsentAuditRedCase[] = [
+export const POLICY_CONSENT_AUDIT_CASES: PolicyConsentAuditRedCase[] = [
   {
     traceId: "TBL-007/FR-026/POLICY_CONSENT_ACCEPT",
     tableName: "policy_consents",
@@ -270,6 +283,7 @@ export const POLICY_CONSENT_AUDIT_RED_CASES: PolicyConsentAuditRedCase[] = [
     expectedBehavior: "同意受諾時に POLICY_CONSENT_ACCEPT 監査イベントを出力する",
   },
 ];
+export const POLICY_CONSENT_AUDIT_RED_CASES = POLICY_CONSENT_AUDIT_CASES;
 
 export const CONSENT_AUDIT_TRIGGER_RED_EXPECTATIONS: TriggerRedExpectation[] = [
   {
