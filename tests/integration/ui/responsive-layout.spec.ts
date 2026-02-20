@@ -5,28 +5,7 @@ import {
   COMMON_UI_RESPONSIVE_BREAKPOINTS,
   type CommonUiBreakpointKey,
 } from "../../helpers/fixtures";
-
-type ResponsiveLayoutSnapshot = {
-  width: number;
-  headerItems: string[];
-  footerItems: string[];
-  isBroken: boolean;
-  keyboardOperable: boolean;
-  focusVisible: boolean;
-  horizontalOverflow: boolean;
-};
-
-function resolveResponsiveLayoutSnapshot(width: number): ResponsiveLayoutSnapshot {
-  return {
-    width,
-    headerItems: [],
-    footerItems: [],
-    isBroken: true,
-    keyboardOperable: false,
-    focusVisible: false,
-    horizontalOverflow: true,
-  };
-}
+import { resolveResponsiveLayoutSnapshot } from "../../../src/ui/responsive-layout";
 
 describe("T-014 PR-004 responsive layout red tests", () => {
   const breakpoints: readonly CommonUiBreakpointKey[] = ["sm", "md", "lg"];
