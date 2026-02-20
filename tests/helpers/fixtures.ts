@@ -6,17 +6,25 @@ export type TestFixtureUser = {
 };
 
 export {
+  buildCommonUiRequiredFooterItems,
+  buildCommonUiRequiredHeaderItems,
+  COMMON_UI_BREAKPOINT_CASES,
   COMMON_UI_DISPLAY_ITEMS,
   COMMON_UI_ERROR_CASES,
   COMMON_UI_ERROR_RESPONSES,
   COMMON_UI_FOOTER_REQUIRED_ITEMS,
   COMMON_UI_HEADER_REQUIRED_ITEMS,
   COMMON_UI_RESPONSIVE_BREAKPOINTS,
+  createCommonUiErrorInput,
 } from "./ui/common-ui-fixtures";
 
 export type {
   CommonUiBreakpointKey,
+  CommonUiBreakpointWidth,
   CommonUiErrorCase,
+  CommonUiErrorCode,
+  CommonUiErrorInput,
+  CommonUiErrorStatus,
 } from "./ui/common-ui-fixtures";
 
 export const TEST_FIXTURE_USERS: Record<string, TestFixtureUser> = {

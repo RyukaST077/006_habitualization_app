@@ -1,9 +1,11 @@
 import { expect, test } from "@playwright/test";
 import { resolveCommonUiRouteViewModel, resolveHomeNavigationRedirect, resolveProtectedRouteGuard } from "../../../src/app/router";
+import type { GuardTarget } from "../../../src/app/router";
 import { ROUTE_MAP } from "../../../src/app/route-map";
 import { SCR002HomePage } from "../../../src/screens/SCR-002HomePage";
 import { SCR006AnalyticsPage } from "../../../src/screens/SCR-006AnalyticsPage";
 import { createUnauthenticatedGuardEnv, createUnconsentedGuardEnv } from "../../helpers/env-guard";
+import type { AuthGuardTestEnv } from "../../helpers/env-guard";
 
 type HomeNavigationCase = {
   id: string;
@@ -28,6 +30,29 @@ type CommonErrorUiObservation = {
   traceIdFieldName: "trace_id";
   shouldExposeTraceId: boolean;
 };
+
+async function expectHomeNavigationRedirectEventually(
+  toScreenId: HomeNavigationCase["toScreenId"],
+  expectedPath: string
+): Promise<void> {
+  await expect
+    .poll(() => resolveHomeNavigationRedirect(toScreenId), {
+      message: `${toScreenId} should resolve to ${expectedPath}`,
+    })
+    .toBe(expectedPath);
+}
+
+async function expectProtectedRouteGuardEventually(
+  state: AuthGuardTestEnv["state"],
+  targetPath: GuardTarget,
+  expectedRedirect: AuthGuardTestEnv["expectedRedirect"]
+): Promise<void> {
+  await expect
+    .poll(() => resolveProtectedRouteGuard(state, targetPath), {
+      message: `guard should resolve target ${targetPath} to ${String(expectedRedirect)}`,
+    })
+    .toBe(expectedRedirect);
+}
 
 function observeCommonErrorUi(route: string, status: CommonErrorUiObservation["status"]): CommonErrorUiObservation {
   const codeMap: Record<CommonErrorUiObservation["status"], CommonErrorUiObservation["code"]> = {
@@ -54,8 +79,7 @@ test.describe("T-011 PR-003 home navigation tests", () => {
   for (const navCase of HOME_NAVIGATION_CASES) {
     test(`${navCase.id} ${navCase.traceIds.join("/")}: /home -> ${navCase.to}`, async () => {
       await test.step(`navigate /home to ${navCase.to}`, async () => {
-        const destinationPath = resolveHomeNavigationRedirect(navCase.toScreenId);
-        expect(destinationPath).toBe(navCase.to);
+        await expectHomeNavigationRedirectEventually(navCase.toScreenId, navCase.to);
       });
 
       await test.step(`return flow ${navCase.to} -> /home`, async () => {
@@ -96,19 +120,17 @@ test.describe("T-011 PR-003 home navigation tests", () => {
 
   test("unauthenticated user should redirect login when trying protected transitions", async () => {
     const authEnv = createUnauthenticatedGuardEnv();
-    const redirect = resolveProtectedRouteGuard(authEnv.state, "/habits/new");
 
     await test.step("redirect to /login is required for unauthenticated access to protected path", async () => {
-      expect(redirect).toBe(authEnv.expectedRedirect);
+      await expectProtectedRouteGuardEventually(authEnv.state, "/habits/new", authEnv.expectedRedirect);
     });
   });
 
   test("authenticated but unconsented user should redirect policy-consent before home navigation", async () => {
     const authEnv = createUnconsentedGuardEnv();
-    const redirect = resolveProtectedRouteGuard(authEnv.state, "/settings");
 
     await test.step("redirect to /policy-consent is required for consent gate", async () => {
-      expect(redirect).toBe(authEnv.expectedRedirect);
+      await expectProtectedRouteGuardEventually(authEnv.state, "/settings", authEnv.expectedRedirect);
     });
   });
 

@@ -1,4 +1,4 @@
-import { AUTH_CONSENT_ROUTES, BUSINESS_ROUTES, type CommonUiRouteViewModel, resolveCommonUiRouteViewModel } from "./app/router";
+import { resolveAppRoutePaths, resolveCommonUiRouteViewModels, type CommonUiRouteViewModel } from "./app/router";
 
 export type AppShell = {
   name: "habitualization-app";
@@ -7,11 +7,11 @@ export type AppShell = {
 };
 
 export function createAppShell(): AppShell {
-  const routes = [...AUTH_CONSENT_ROUTES, ...BUSINESS_ROUTES].map((route) => route.path);
+  const routes = resolveAppRoutePaths();
 
   return {
     name: "habitualization-app",
     routes,
-    commonUiRoutes: routes.map((routePath) => resolveCommonUiRouteViewModel(routePath)),
+    commonUiRoutes: resolveCommonUiRouteViewModels(routes),
   };
 }

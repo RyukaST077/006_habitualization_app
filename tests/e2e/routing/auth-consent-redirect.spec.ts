@@ -2,19 +2,26 @@ import { expect, test } from "@playwright/test";
 
 import { ROUTING_SCENARIOS } from "../fixtures/routing-state";
 import { resolveAuthConsentRedirect } from "../../../src/app/router";
+import type { RoutingScenario } from "../fixtures/routing-state";
+
+async function expectResolvedPathEventually(scenario: RoutingScenario): Promise<void> {
+  await expect
+    .poll(
+      () =>
+        resolveAuthConsentRedirect(scenario.startPath, scenario.authState, scenario.consentState),
+      {
+        message: `[${scenario.caseId ?? scenario.id}] expected redirect path to be stable`,
+      }
+    )
+    .toBe(scenario.expectedPath);
+}
 
 test.describe("T-011 PR-002 auth/consent redirect tests", () => {
   test("FR-001 SCR-001 -> SCR-008: 未同意ユーザーを同意画面へ誘導する", async () => {
     const scenario = ROUTING_SCENARIOS[0];
 
     await test.step(`[${scenario.id}] ${scenario.traceIds.join("/")}`, async () => {
-      const resolvedPath = resolveAuthConsentRedirect(
-        scenario.startPath,
-        scenario.authState,
-        scenario.consentState
-      );
-
-      expect(resolvedPath).toBe(scenario.expectedPath);
+      await expectResolvedPathEventually(scenario);
     });
   });
 
@@ -22,13 +29,7 @@ test.describe("T-011 PR-002 auth/consent redirect tests", () => {
     const scenario = ROUTING_SCENARIOS[1];
 
     await test.step(`[${scenario.id}] ${scenario.traceIds.join("/")}`, async () => {
-      const resolvedPath = resolveAuthConsentRedirect(
-        scenario.startPath,
-        scenario.authState,
-        scenario.consentState
-      );
-
-      expect(resolvedPath).toBe(scenario.expectedPath);
+      await expectResolvedPathEventually(scenario);
     });
   });
 
@@ -36,13 +37,7 @@ test.describe("T-011 PR-002 auth/consent redirect tests", () => {
     const scenario = ROUTING_SCENARIOS[2];
 
     await test.step(`[${scenario.id}] ${scenario.traceIds.join("/")}`, async () => {
-      const resolvedPath = resolveAuthConsentRedirect(
-        scenario.startPath,
-        scenario.authState,
-        scenario.consentState
-      );
-
-      expect(resolvedPath).toBe(scenario.expectedPath);
+      await expectResolvedPathEventually(scenario);
     });
   });
 
@@ -50,13 +45,7 @@ test.describe("T-011 PR-002 auth/consent redirect tests", () => {
     const scenario = ROUTING_SCENARIOS[3];
 
     await test.step(`[${scenario.caseId ?? scenario.id}] ${scenario.traceIds.join("/")}`, async () => {
-      const resolvedPath = resolveAuthConsentRedirect(
-        scenario.startPath,
-        scenario.authState,
-        scenario.consentState
-      );
-
-      expect(resolvedPath).toBe(scenario.expectedPath);
+      await expectResolvedPathEventually(scenario);
     });
   });
 
@@ -64,13 +53,7 @@ test.describe("T-011 PR-002 auth/consent redirect tests", () => {
     const scenario = ROUTING_SCENARIOS[4];
 
     await test.step(`[${scenario.caseId ?? scenario.id}] ${scenario.traceIds.join("/")}`, async () => {
-      const resolvedPath = resolveAuthConsentRedirect(
-        scenario.startPath,
-        scenario.authState,
-        scenario.consentState
-      );
-
-      expect(resolvedPath).toBe(scenario.expectedPath);
+      await expectResolvedPathEventually(scenario);
     });
   });
 
@@ -78,13 +61,7 @@ test.describe("T-011 PR-002 auth/consent redirect tests", () => {
     const scenario = ROUTING_SCENARIOS[5];
 
     await test.step(`[${scenario.caseId ?? scenario.id}] ${scenario.traceIds.join("/")}`, async () => {
-      const resolvedPath = resolveAuthConsentRedirect(
-        scenario.startPath,
-        scenario.authState,
-        scenario.consentState
-      );
-
-      expect(resolvedPath).toBe(scenario.expectedPath);
+      await expectResolvedPathEventually(scenario);
     });
   });
 });
