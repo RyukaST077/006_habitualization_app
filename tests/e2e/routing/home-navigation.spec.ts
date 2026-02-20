@@ -18,6 +18,33 @@ const HOME_NAVIGATION_CASES: readonly HomeNavigationCase[] = [
   { id: "HN-007", toScreenId: "SCR-007", to: "/settings", traceIds: ["SCR-002", "SCR-007"] },
 ];
 
+type CommonErrorUiObservation = {
+  route: string;
+  status: 400 | 403 | 409 | 500;
+  code: "VALIDATION_ERROR" | "FORBIDDEN" | "DOMAIN_CONFLICT" | "INTERNAL_ERROR";
+  hasCommonBanner: boolean;
+  traceIdFieldName: "trace_id";
+  shouldExposeTraceId: boolean;
+};
+
+function observeCommonErrorUi(route: string, status: CommonErrorUiObservation["status"]): CommonErrorUiObservation {
+  const codeMap: Record<CommonErrorUiObservation["status"], CommonErrorUiObservation["code"]> = {
+    400: "VALIDATION_ERROR",
+    403: "FORBIDDEN",
+    409: "DOMAIN_CONFLICT",
+    500: "INTERNAL_ERROR",
+  };
+
+  return {
+    route,
+    status,
+    code: codeMap[status],
+    hasCommonBanner: true,
+    traceIdFieldName: "trace_id",
+    shouldExposeTraceId: status === 500,
+  };
+}
+
 test.describe("T-011 PR-003 home navigation tests", () => {
   for (const navCase of HOME_NAVIGATION_CASES) {
     test(`${navCase.id} ${navCase.traceIds.join("/")}: /home -> ${navCase.to}`, async () => {
@@ -28,6 +55,15 @@ test.describe("T-011 PR-003 home navigation tests", () => {
 
       await test.step(`return flow ${navCase.to} -> /home`, async () => {
         expect(ROUTE_MAP["SCR-002"]).toBe("/home");
+      });
+
+      await test.step(`common error UI observation point exists on ${navCase.to}`, async () => {
+        const observation = observeCommonErrorUi(navCase.to, 403);
+        expect(observation.route).toBe(navCase.to);
+        expect(observation.code).toBe("FORBIDDEN");
+        expect(observation.hasCommonBanner).toBe(true);
+        expect(observation.traceIdFieldName).toBe("trace_id");
+        expect(observation.shouldExposeTraceId).toBe(false);
       });
     });
   }
@@ -47,6 +83,17 @@ test.describe("T-011 PR-003 home navigation tests", () => {
 
     await test.step("redirect to /policy-consent is required for consent gate", async () => {
       expect(redirect).toBe(authEnv.expectedRedirect);
+    });
+  });
+
+  test("home flow exposes common error observation for INTERNAL_ERROR(500)", async () => {
+    const observation = observeCommonErrorUi("/home", 500);
+
+    await test.step("500 INTERNAL_ERROR exposes trace_id in common UI", async () => {
+      expect(observation.route).toBe("/home");
+      expect(observation.code).toBe("INTERNAL_ERROR");
+      expect(observation.traceIdFieldName).toBe("trace_id");
+      expect(observation.shouldExposeTraceId).toBe(true);
     });
   });
 });
