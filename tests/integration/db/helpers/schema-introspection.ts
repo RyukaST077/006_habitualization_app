@@ -1,7 +1,13 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
-export type CoreTableName = "profiles" | "habits" | "habit_logs";
+export type CoreTableName =
+  | "profiles"
+  | "habits"
+  | "habit_logs"
+  | "policy_settings"
+  | "policy_consents"
+  | "audit_logs";
 
 export interface ColumnMetadata {
   name: string;
@@ -38,6 +44,16 @@ export interface SchemaIntrospectionPort {
     tableName: CoreTableName,
     constraintName: string,
     referencedTable: string,
+  ): Promise<boolean>;
+  hasCheckConstraint(
+    tableName: CoreTableName,
+    constraintName: string,
+    requiredDefinitionFragments?: string[],
+  ): Promise<boolean>;
+  hasRlsPolicy(
+    tableName: CoreTableName,
+    policyName: string,
+    command?: RlsPolicyMetadata["command"],
   ): Promise<boolean>;
   hasTrigger(tableName: CoreTableName, triggerName: string): Promise<boolean>;
 }
@@ -273,6 +289,53 @@ export function createSchemaIntrospectionPort(): SchemaIntrospectionPort {
             AND c.contype = 'f'
             AND c.conname = '${escapedConstraintName}'
         ) AS has_fk
+      `);
+    },
+    async hasCheckConstraint(
+      tableName: CoreTableName,
+      constraintName: string,
+      requiredDefinitionFragments: string[] = [],
+    ): Promise<boolean> {
+      const escapedTableName = escapeSqlLiteral(tableName);
+      const escapedConstraintName = escapeSqlLiteral(constraintName);
+      const rows = await queryRows(`
+        SELECT pg_get_constraintdef(c.oid) AS definition
+        FROM pg_constraint c
+        JOIN pg_class tbl ON tbl.oid = c.conrelid
+        JOIN pg_namespace ns ON ns.oid = tbl.relnamespace
+        WHERE ns.nspname = 'public'
+          AND tbl.relname = '${escapedTableName}'
+          AND c.contype = 'c'
+          AND c.conname = '${escapedConstraintName}'
+      `);
+
+      if (rows.length === 0) {
+        return false;
+      }
+
+      const definition = (rows[0].definition ?? "").toLowerCase();
+      return requiredDefinitionFragments.every((fragment) =>
+        definition.includes(fragment.toLowerCase()),
+      );
+    },
+    async hasRlsPolicy(
+      tableName: CoreTableName,
+      policyName: string,
+      command?: RlsPolicyMetadata["command"],
+    ): Promise<boolean> {
+      const escapedTableName = escapeSqlLiteral(tableName);
+      const escapedPolicyName = escapeSqlLiteral(policyName);
+      const escapedCommand = command ? escapeSqlLiteral(command) : "";
+
+      return queryBoolean(`
+        SELECT EXISTS (
+          SELECT 1
+          FROM pg_policies p
+          WHERE p.schemaname = 'public'
+            AND p.tablename = '${escapedTableName}'
+            AND p.policyname = '${escapedPolicyName}'
+            AND ('${escapedCommand}' = '' OR p.cmd = '${escapedCommand}' OR p.cmd = 'ALL')
+        ) AS has_policy
       `);
     },
     async hasTrigger(tableName: CoreTableName, triggerName: string): Promise<boolean> {
