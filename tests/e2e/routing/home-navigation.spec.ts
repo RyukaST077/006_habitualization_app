@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
-import { resolveHomeNavigationRedirect, resolveProtectedRouteGuard } from "../../../src/app/router";
+import { resolveCommonUiRouteViewModel, resolveHomeNavigationRedirect, resolveProtectedRouteGuard } from "../../../src/app/router";
 import { ROUTE_MAP } from "../../../src/app/route-map";
+import { SCR002HomePage } from "../../../src/screens/SCR-002HomePage";
 import { createUnauthenticatedGuardEnv, createUnconsentedGuardEnv } from "../../helpers/env-guard";
 
 type HomeNavigationCase = {
@@ -34,14 +35,17 @@ function observeCommonErrorUi(route: string, status: CommonErrorUiObservation["s
     409: "DOMAIN_CONFLICT",
     500: "INTERNAL_ERROR",
   };
+  const code = codeMap[status];
+  const commonUi = resolveCommonUiRouteViewModel(route, { status, code });
+  const error = commonUi.error;
 
   return {
     route,
     status,
-    code: codeMap[status],
-    hasCommonBanner: true,
-    traceIdFieldName: "trace_id",
-    shouldExposeTraceId: status === 500,
+    code,
+    hasCommonBanner: commonUi.header.logoLabel !== null && commonUi.footer.copyright !== null,
+    traceIdFieldName: error.traceIdLabel,
+    shouldExposeTraceId: error.visibleTraceId !== null,
   };
 }
 
@@ -87,7 +91,17 @@ test.describe("T-011 PR-003 home navigation tests", () => {
   });
 
   test("home flow exposes common error observation for INTERNAL_ERROR(500)", async () => {
-    const observation = observeCommonErrorUi("/home", 500);
+    const homeScreen = SCR002HomePage({ screenId: "SCR-002" });
+    const error = homeScreen.actions.resolveError(500, "INTERNAL_ERROR", "HOME-FLOW-500");
+    const observation: CommonErrorUiObservation = {
+      route: "/home",
+      status: error.status,
+      code: error.code,
+      hasCommonBanner:
+        homeScreen.commonUi.header.logoLabel !== null && homeScreen.commonUi.footer.copyright !== null,
+      traceIdFieldName: error.traceIdLabel,
+      shouldExposeTraceId: error.visibleTraceId !== null,
+    };
 
     await test.step("500 INTERNAL_ERROR exposes trace_id in common UI", async () => {
       expect(observation.route).toBe("/home");
