@@ -6,11 +6,11 @@ import {
   HABIT_LOG_RLS_RED_CASES,
   HABIT_LOG_UNIQUE_RED_CASES,
 } from "./fixtures/core-tables";
-import { createPendingSchemaIntrospectionPort } from "./helpers/schema-introspection";
+import { createSchemaIntrospectionPort } from "./helpers/schema-introspection";
 
-const schemaIntrospection = createPendingSchemaIntrospectionPort();
+const schemaIntrospection = createSchemaIntrospectionPort();
 
-describe("T-018 PR-003 habit_logs DDL red tests", () => {
+describe("T-019 PR-002 habit_logs DDL tests", () => {
   it.each(HABIT_LOG_UNIQUE_RED_CASES)(
     "$traceId: uq_habit_logs_habit_date (habit_id + log_date) を満たす",
     async (redCase) => {
@@ -20,10 +20,9 @@ describe("T-018 PR-003 habit_logs DDL red tests", () => {
         redCase.columns,
       );
 
-      expect(
-        hasUnique,
-        `${redCase.traceId}: ${redCase.featureRequirement} 冪等制約のDDL実装未完了のためRed失敗を期待`,
-      ).toBe(true);
+      expect(hasUnique, `${redCase.traceId}: ${redCase.featureRequirement} 冪等制約が必要`).toBe(
+        true,
+      );
     },
   );
 
@@ -36,10 +35,9 @@ describe("T-018 PR-003 habit_logs DDL red tests", () => {
         redCase.referencedTable,
       );
 
-      expect(
-        hasForeignKey,
-        `${redCase.traceId}: ${redCase.featureRequirement} FK要件のDDL実装未完了のためRed失敗を期待`,
-      ).toBe(true);
+      expect(hasForeignKey, `${redCase.traceId}: ${redCase.featureRequirement} FK要件が必要`).toBe(
+        true,
+      );
     },
   );
 
@@ -50,7 +48,7 @@ describe("T-018 PR-003 habit_logs DDL red tests", () => {
 
       expect(
         hasValidationTrigger,
-        `${redCase.traceId}: ${redCase.featureRequirement} active制御のDDL実装未完了のためRed失敗を期待（status=${redCase.invalidHabitStatus})`,
+        `${redCase.traceId}: ${redCase.featureRequirement} active制御トリガーが必要（status=${redCase.invalidHabitStatus})`,
       ).toBe(true);
     },
   );
@@ -60,28 +58,24 @@ describe("T-018 PR-003 habit_logs DDL red tests", () => {
     async (rlsCase) => {
       const actual = await schemaIntrospection.getTableSchemaMetadata("habit_logs");
 
-      expect(
-        actual,
-        `${rlsCase.traceId}: FR-025 DDL実装未完了のためRed失敗を期待（actor=${rlsCase.actor}, decision=${rlsCase.expectedDecision})`,
-      ).not.toBeNull();
-
-      if (!actual) {
-        return;
-      }
-
       const policy = actual.rlsPolicies.find(
-        (candidate) => candidate.command === rlsCase.command || candidate.command === "all",
+        (candidate) =>
+          candidate.name === rlsCase.requiredPolicyName &&
+          (candidate.command === rlsCase.command || candidate.command === "all"),
       );
 
       expect(actual.rlsEnabled).toBe(true);
       expect(policy, `${rlsCase.traceId}: command=${rlsCase.command} のRLS policyが必要`).toBeDefined();
+      expect(policy?.name).toBe(rlsCase.requiredPolicyName);
 
-      if (!policy) {
-        return;
+      if (rlsCase.requiredUsingExpression) {
+        expect(policy?.usingExpression).toContain(rlsCase.requiredUsingExpression);
+        expect(policy?.usingExpression.toLowerCase()).not.toBe("true");
       }
-
-      expect(policy.usingExpression).toContain(rlsCase.requiredUsingExpression);
-      expect(policy.usingExpression.toLowerCase()).not.toBe("true");
+      if (rlsCase.requiredCheckExpression) {
+        expect(policy?.checkExpression ?? "").toContain(rlsCase.requiredCheckExpression);
+        expect((policy?.checkExpression ?? "").toLowerCase()).not.toBe("true");
+      }
     },
   );
 });

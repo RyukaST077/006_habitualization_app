@@ -25,9 +25,11 @@ export interface TriggerRedExpectation {
 export interface RlsPolicyRedCase {
   traceId: string;
   command: "select" | "insert" | "update" | "delete";
+  requiredPolicyName: string;
   actor: "owner" | "other_user" | "anonymous";
   expectedDecision: "allow" | "deny";
-  requiredUsingExpression: string;
+  requiredUsingExpression?: string;
+  requiredCheckExpression?: string;
 }
 
 export interface UniqueConstraintRedCase {
@@ -59,10 +61,14 @@ export const CORE_TABLE_DDL_EXPECTATIONS: CoreTableDdlExpectation[] = [
     traceId: "TBL-001",
     tableName: "profiles",
     requiredColumns: ["user_id", "timezone", "day_cutoff_time", "account_status", "updated_at"],
-    requiredConstraints: ["chk_profiles_timezone", "chk_profiles_cutoff"],
+    requiredConstraints: [
+      "chk_profiles_timezone",
+      "chk_profiles_cutoff",
+      "chk_profiles_account_status",
+    ],
     requiredIndexes: ["pk_profiles", "idx_profiles_status", "idx_profiles_updated_at"],
     requiredTriggers: ["trg_profiles_updated_at"],
-    requiredRlsUsingExpressions: ["auth.uid() = user_id"],
+    requiredRlsUsingExpressions: ["(auth.uid() = user_id)"],
   },
   {
     traceId: "TBL-002",
@@ -71,7 +77,7 @@ export const CORE_TABLE_DDL_EXPECTATIONS: CoreTableDdlExpectation[] = [
     requiredConstraints: ["chk_habits_status", "chk_habits_name_len"],
     requiredIndexes: ["pk_habits", "idx_habits_user_status_order", "idx_habits_user_updated"],
     requiredTriggers: ["trg_habits_archive"],
-    requiredRlsUsingExpressions: ["auth.uid() = user_id"],
+    requiredRlsUsingExpressions: ["(auth.uid() = user_id)"],
   },
   {
     traceId: "TBL-003",
@@ -80,7 +86,7 @@ export const CORE_TABLE_DDL_EXPECTATIONS: CoreTableDdlExpectation[] = [
     requiredConstraints: ["fk_habit_logs_habit", "uq_habit_logs_habit_date"],
     requiredIndexes: ["pk_habit_logs", "uq_habit_logs_habit_date", "idx_habit_logs_user_date", "idx_habit_logs_habit_date"],
     requiredTriggers: ["trg_habit_logs_validate_active", "trg_habit_logs_updated_at"],
-    requiredRlsUsingExpressions: ["auth.uid() = user_id"],
+    requiredRlsUsingExpressions: ["(auth.uid() = user_id)"],
   },
 ];
 
@@ -140,20 +146,49 @@ export const PROFILE_RLS_RED_CASES: RlsPolicyRedCase[] = [
   {
     traceId: "TBL-001/RLS/select-owner",
     command: "select",
+    requiredPolicyName: "profiles_select_own",
     actor: "owner",
     expectedDecision: "allow",
     requiredUsingExpression: "auth.uid() = user_id",
   },
   {
+    traceId: "TBL-001/RLS/insert-owner",
+    command: "insert",
+    requiredPolicyName: "profiles_insert_own",
+    actor: "owner",
+    expectedDecision: "allow",
+    requiredCheckExpression: "auth.uid() = user_id",
+  },
+  {
+    traceId: "TBL-001/RLS/update-owner",
+    command: "update",
+    requiredPolicyName: "profiles_update_own",
+    actor: "owner",
+    expectedDecision: "allow",
+    requiredUsingExpression: "auth.uid() = user_id",
+    requiredCheckExpression: "auth.uid() = user_id",
+  },
+  {
     traceId: "TBL-001/RLS/update-other-user",
     command: "update",
+    requiredPolicyName: "profiles_update_own",
     actor: "other_user",
     expectedDecision: "deny",
+    requiredUsingExpression: "auth.uid() = user_id",
+    requiredCheckExpression: "auth.uid() = user_id",
+  },
+  {
+    traceId: "TBL-001/RLS/delete-owner",
+    command: "delete",
+    requiredPolicyName: "profiles_delete_own",
+    actor: "owner",
+    expectedDecision: "allow",
     requiredUsingExpression: "auth.uid() = user_id",
   },
   {
     traceId: "TBL-001/RLS/select-anonymous",
     command: "select",
+    requiredPolicyName: "profiles_select_own",
     actor: "anonymous",
     expectedDecision: "deny",
     requiredUsingExpression: "auth.uid() = user_id",
@@ -164,23 +199,51 @@ export const HABIT_RLS_RED_CASES: RlsPolicyRedCase[] = [
   {
     traceId: "TBL-002/RLS/select-owner",
     command: "select",
+    requiredPolicyName: "habits_select_own",
     actor: "owner",
     expectedDecision: "allow",
     requiredUsingExpression: "auth.uid() = user_id",
   },
   {
+    traceId: "TBL-002/RLS/insert-owner",
+    command: "insert",
+    requiredPolicyName: "habits_insert_own",
+    actor: "owner",
+    expectedDecision: "allow",
+    requiredCheckExpression: "auth.uid() = user_id",
+  },
+  {
+    traceId: "TBL-002/RLS/update-owner",
+    command: "update",
+    requiredPolicyName: "habits_update_own",
+    actor: "owner",
+    expectedDecision: "allow",
+    requiredUsingExpression: "auth.uid() = user_id",
+    requiredCheckExpression: "auth.uid() = user_id",
+  },
+  {
     traceId: "TBL-002/RLS/delete-other-user",
     command: "delete",
+    requiredPolicyName: "habits_delete_own",
     actor: "other_user",
     expectedDecision: "deny",
     requiredUsingExpression: "auth.uid() = user_id",
   },
   {
+    traceId: "TBL-002/RLS/delete-owner",
+    command: "delete",
+    requiredPolicyName: "habits_delete_own",
+    actor: "owner",
+    expectedDecision: "allow",
+    requiredUsingExpression: "auth.uid() = user_id",
+  },
+  {
     traceId: "TBL-002/RLS/insert-anonymous",
     command: "insert",
+    requiredPolicyName: "habits_insert_own",
     actor: "anonymous",
     expectedDecision: "deny",
-    requiredUsingExpression: "auth.uid() = user_id",
+    requiredCheckExpression: "auth.uid() = user_id",
   },
 ];
 
@@ -218,20 +281,48 @@ export const HABIT_LOG_RLS_RED_CASES: RlsPolicyRedCase[] = [
   {
     traceId: "TBL-003/RLS/select-owner",
     command: "select",
+    requiredPolicyName: "habit_logs_select_own",
     actor: "owner",
     expectedDecision: "allow",
     requiredUsingExpression: "auth.uid() = user_id",
   },
   {
+    traceId: "TBL-003/RLS/insert-owner",
+    command: "insert",
+    requiredPolicyName: "habit_logs_insert_own",
+    actor: "owner",
+    expectedDecision: "allow",
+    requiredCheckExpression: "auth.uid() = user_id",
+  },
+  {
+    traceId: "TBL-003/RLS/update-owner",
+    command: "update",
+    requiredPolicyName: "habit_logs_update_own",
+    actor: "owner",
+    expectedDecision: "allow",
+    requiredUsingExpression: "auth.uid() = user_id",
+    requiredCheckExpression: "auth.uid() = user_id",
+  },
+  {
     traceId: "TBL-003/RLS/insert-other-user",
     command: "insert",
+    requiredPolicyName: "habit_logs_insert_own",
     actor: "other_user",
     expectedDecision: "deny",
+    requiredCheckExpression: "auth.uid() = user_id",
+  },
+  {
+    traceId: "TBL-003/RLS/delete-owner",
+    command: "delete",
+    requiredPolicyName: "habit_logs_delete_own",
+    actor: "owner",
+    expectedDecision: "allow",
     requiredUsingExpression: "auth.uid() = user_id",
   },
   {
     traceId: "TBL-003/RLS/delete-anonymous",
     command: "delete",
+    requiredPolicyName: "habit_logs_delete_own",
     actor: "anonymous",
     expectedDecision: "deny",
     requiredUsingExpression: "auth.uid() = user_id",

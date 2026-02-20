@@ -5,24 +5,15 @@ import {
   HABIT_RLS_RED_CASES,
   HABIT_TRIGGER_RED_EXPECTATIONS,
 } from "./fixtures/core-tables";
-import { createPendingSchemaIntrospectionPort } from "./helpers/schema-introspection";
+import { createSchemaIntrospectionPort } from "./helpers/schema-introspection";
 
-const schemaIntrospection = createPendingSchemaIntrospectionPort();
+const schemaIntrospection = createSchemaIntrospectionPort();
 
-describe("T-018 PR-002 habits DDL red tests", () => {
+describe("T-019 PR-002 habits DDL tests", () => {
   it.each(HABIT_DDL_CONSTRAINT_RED_CASES)(
     "$traceId: status/name 制約を満たす",
     async (redCase) => {
       const actual = await schemaIntrospection.getTableSchemaMetadata("habits");
-
-      expect(
-        actual,
-        `${redCase.traceId}: DDL実装未完了のためRed失敗を期待（invalid=${redCase.invalidValue})`,
-      ).not.toBeNull();
-
-      if (!actual) {
-        return;
-      }
 
       expect(actual.constraints).toContain(redCase.expectedConstraint);
     },
@@ -33,15 +24,6 @@ describe("T-018 PR-002 habits DDL red tests", () => {
     async (trigger) => {
       const actual = await schemaIntrospection.getTableSchemaMetadata("habits");
 
-      expect(
-        actual,
-        `${trigger.traceId}: DDL実装未完了のためRed失敗を期待（${trigger.expectedBehavior})`,
-      ).not.toBeNull();
-
-      if (!actual) {
-        return;
-      }
-
       expect(actual.triggers).toContain(trigger.triggerName);
     },
   );
@@ -51,28 +33,24 @@ describe("T-018 PR-002 habits DDL red tests", () => {
     async (rlsCase) => {
       const actual = await schemaIntrospection.getTableSchemaMetadata("habits");
 
-      expect(
-        actual,
-        `${rlsCase.traceId}: DDL実装未完了のためRed失敗を期待（actor=${rlsCase.actor}, decision=${rlsCase.expectedDecision})`,
-      ).not.toBeNull();
-
-      if (!actual) {
-        return;
-      }
-
       const policy = actual.rlsPolicies.find(
-        (candidate) => candidate.command === rlsCase.command || candidate.command === "all",
+        (candidate) =>
+          candidate.name === rlsCase.requiredPolicyName &&
+          (candidate.command === rlsCase.command || candidate.command === "all"),
       );
 
       expect(actual.rlsEnabled).toBe(true);
       expect(policy, `${rlsCase.traceId}: command=${rlsCase.command} のRLS policyが必要`).toBeDefined();
+      expect(policy?.name).toBe(rlsCase.requiredPolicyName);
 
-      if (!policy) {
-        return;
+      if (rlsCase.requiredUsingExpression) {
+        expect(policy?.usingExpression).toContain(rlsCase.requiredUsingExpression);
+        expect(policy?.usingExpression.toLowerCase()).not.toBe("true");
       }
-
-      expect(policy.usingExpression).toContain(rlsCase.requiredUsingExpression);
-      expect(policy.usingExpression.toLowerCase()).not.toBe("true");
+      if (rlsCase.requiredCheckExpression) {
+        expect(policy?.checkExpression ?? "").toContain(rlsCase.requiredCheckExpression);
+        expect((policy?.checkExpression ?? "").toLowerCase()).not.toBe("true");
+      }
     },
   );
 });
