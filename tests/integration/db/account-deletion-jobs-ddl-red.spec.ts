@@ -9,7 +9,7 @@ import { createSchemaIntrospectionPort } from "./helpers/schema-introspection";
 
 const schemaIntrospection = createSchemaIntrospectionPort();
 
-describe("T-022 PR-003 account_deletion_jobs DDL red tests", () => {
+describe("T-023 PR-002 account_deletion_jobs DDL tests", () => {
   it.each(ACCOUNT_DELETION_JOBS_STATUS_CHECK_RED_CASES)(
     "$traceId: job_status の状態遷移制約を満たす",
     async (redCase) => {

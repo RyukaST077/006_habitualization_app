@@ -10,7 +10,7 @@ import { createSchemaIntrospectionPort } from "./helpers/schema-introspection";
 
 const schemaIntrospection = createSchemaIntrospectionPort();
 
-describe("T-022 PR-003 monitoring_alert_events DDL red tests", () => {
+describe("T-023 PR-003 monitoring_alert_events DDL tests", () => {
   it.each(MONITORING_ALERT_EVENTS_LEVEL_CHECK_RED_CASES)(
     "$traceId: alert_level 通知レベル制約を満たす",
     async (redCase) => {

@@ -27,7 +27,7 @@ function getPolicyStatement(tableName: string, policyName: string): string | nul
   return match?.[0] ?? null;
 }
 
-describe("T-022 PR-001 ops DDL test plan", () => {
+describe("T-023 PR-003 ops DDL test plan", () => {
   it.each(OPS_TABLE_DDL_EXPECTATIONS)(
     "$traceId $tableName: カラム/制約/インデックス/RLS/トリガー要件を満たす",
     async (expected) => {

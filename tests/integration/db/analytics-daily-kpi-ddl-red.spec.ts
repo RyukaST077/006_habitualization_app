@@ -9,7 +9,7 @@ import { createSchemaIntrospectionPort } from "./helpers/schema-introspection";
 
 const schemaIntrospection = createSchemaIntrospectionPort();
 
-describe("T-022 PR-002 analytics_daily_kpi DDL red tests", () => {
+describe("T-023 PR-001 analytics_daily_kpi DDL tests", () => {
   it.each(ANALYTICS_DAILY_KPI_UNIQUE_RED_CASES)(
     "$traceId: uq_analytics_daily_kpi_key (metric_date + metric_key + dimension_hash) を満たす",
     async (redCase) => {

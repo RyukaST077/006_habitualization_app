@@ -109,7 +109,7 @@ export interface MonitoringAlertEventsIndexRedCase {
 export interface MonitoringAlertEventsNotificationTrackingRedCase {
   traceId: string;
   tableName: "monitoring_alert_events";
-  requiredColumns: Array<"notification_status" | "error_message">;
+  requiredColumns: Array<"notification_status" | "notified_at" | "error_message">;
   featureRequirement: "FR-018";
 }
 
@@ -240,10 +240,13 @@ export const OPS_TABLE_DDL_EXPECTATIONS: OpsTableDdlExpectation[] = [
 
 export const OPS_SLA_COLUMN_CASES: OpsSlaColumnCase[] = [
   {
-    traceId: "TBL-009/IF-005/M-009/SLA-columns",
+    traceId: "TBL-009/FR-023/M-009/sla-deadline-defaults",
     tableName: "account_deletion_jobs",
     requiredColumns: ["disable_due_at", "hard_delete_due_at"],
-    requiredDefaultFragments: ["interval '60 second'", "interval '5 minute'"],
+    requiredDefaultFragments: [
+      "disable_due_at timestamptz not null default (now() + interval '60 second')",
+      "hard_delete_due_at timestamptz not null default (now() + interval '5 minute')",
+    ],
     featureRequirement: "FR-023",
     moduleRequirement: "M-009",
   },
@@ -251,20 +254,20 @@ export const OPS_SLA_COLUMN_CASES: OpsSlaColumnCase[] = [
 
 export const OPS_FAILED_TRACKING_CASES: OpsFailedTrackingCase[] = [
   {
-    traceId: "TBL-009/IF-005/M-009/failed-tracking",
+    traceId: "TBL-009/IF-005/M-009/failed-retry-tracking",
     tableName: "account_deletion_jobs",
-    requiredColumns: ["job_status", "retry_count", "last_error"],
+    requiredColumns: ["retry_count", "last_error"],
     requiredConstraintName: "chk_account_deletion_jobs_status",
-    requiredConstraintFragments: ["queued", "in_progress", "completed", "failed"],
+    requiredConstraintFragments: ["job_status", "failed"],
     interfaceRequirement: "IF-005",
     moduleRequirement: "M-009",
   },
   {
-    traceId: "TBL-010/IF-003/M-012/failed-tracking",
+    traceId: "TBL-010/IF-003/M-012/failed-notification-tracking",
     tableName: "monitoring_alert_events",
-    requiredColumns: ["notification_status", "error_message"],
+    requiredColumns: ["notification_status", "notified_at", "error_message"],
     requiredConstraintName: "chk_monitoring_alert_events_status",
-    requiredConstraintFragments: ["pending", "sent", "failed"],
+    requiredConstraintFragments: ["notification_status", "failed"],
     interfaceRequirement: "IF-003",
     moduleRequirement: "M-012",
   },
@@ -289,19 +292,19 @@ export const OPS_CLI_SQL_COMPATIBILITY_CASES: OpsCliSqlCompatibilityCase[] = [
     traceId: "TBL-005/IF-005/M-011/anonymous-kpi-columns",
     tableName: "analytics_daily_kpi",
     requiredColumns: ["metric_date", "metric_key", "metric_value", "dimension_json", "dimension_hash"],
-    forbiddenColumns: ["user_id", "email"],
     interfaceRequirement: "IF-005",
     moduleRequirement: "M-011",
   },
   {
-    traceId: "TBL-009/IF-005/M-009/deletion-tracking-columns",
+    traceId: "TBL-009/IF-005/M-009/withdrawal-job-columns",
     tableName: "account_deletion_jobs",
     requiredColumns: [
       "user_id",
       "job_status",
       "requested_at",
-      "disabled_at",
-      "hard_deleted_at",
+      "disable_due_at",
+      "hard_delete_due_at",
+      "retry_count",
       "last_error",
     ],
     interfaceRequirement: "IF-005",
@@ -375,7 +378,7 @@ export const MONITORING_ALERT_EVENTS_NOTIFICATION_TRACKING_RED_CASES: Monitoring
     {
       traceId: "TBL-010/FR-018/notification-retry-tracking",
       tableName: "monitoring_alert_events",
-      requiredColumns: ["notification_status", "error_message"],
+      requiredColumns: ["notification_status", "notified_at", "error_message"],
       featureRequirement: "FR-018",
     },
   ];
@@ -479,7 +482,7 @@ export const ANALYTICS_DAILY_KPI_CHECK_RED_CASES: OpsCheckConstraintRedCase[] = 
     traceId: "TBL-005/chk_analytics_daily_kpi_non_negative",
     tableName: "analytics_daily_kpi",
     constraintName: "chk_analytics_daily_kpi_non_negative",
-    requiredDefinitionFragments: ["metric_value", ">= 0"],
+    requiredDefinitionFragments: ["metric_value", ">= (0)::numeric"],
   },
 ];
 

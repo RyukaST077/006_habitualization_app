@@ -9,7 +9,7 @@ import { createSchemaIntrospectionPort } from "./helpers/schema-introspection";
 
 const schemaIntrospection = createSchemaIntrospectionPort();
 
-describe("T-022 PR-002 user_daily_activity DDL red tests", () => {
+describe("T-023 PR-001 user_daily_activity DDL tests", () => {
   it.each(USER_DAILY_ACTIVITY_UNIQUE_RED_CASES)(
     "$traceId: uq_user_daily_activity_user_date (user_id + activity_date) を満たす",
     async (redCase) => {

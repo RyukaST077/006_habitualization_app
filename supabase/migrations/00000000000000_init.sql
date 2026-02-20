@@ -79,6 +79,16 @@ begin
 end;
 $$;
 
+create or replace function public.touch_analytics_daily_kpi_upsert()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.aggregated_at := now();
+  return new;
+end;
+$$;
+
 create table if not exists profiles (
   user_id uuid not null,
   timezone varchar(64) not null default 'Asia/Tokyo',
@@ -138,6 +148,87 @@ create table if not exists habit_logs (
 
 create index if not exists idx_habit_logs_user_date on habit_logs (user_id, log_date desc);
 create index if not exists idx_habit_logs_habit_date on habit_logs (habit_id, log_date desc);
+
+create table if not exists user_daily_activity (
+  id bigserial not null,
+  user_id uuid not null,
+  activity_date date not null,
+  login_count integer not null default 0,
+  checkin_count integer not null default 0,
+  timezone_snapshot varchar(64) not null default 'Asia/Tokyo',
+  cutoff_snapshot time not null default '03:00:00',
+  aggregated_at timestamptz not null default now(),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint pk_user_daily_activity primary key (id),
+  constraint fk_user_daily_activity_user foreign key (user_id) references profiles (user_id) on delete cascade,
+  constraint uq_user_daily_activity_user_date unique (user_id, activity_date),
+  constraint chk_user_daily_activity_counts check (login_count >= 0 and checkin_count >= 0)
+);
+
+create index if not exists idx_user_daily_activity_date on user_daily_activity (activity_date desc);
+
+create table if not exists analytics_daily_kpi (
+  id bigserial not null,
+  metric_date date not null,
+  metric_key varchar(64) not null,
+  metric_value numeric(14, 2) not null default 0,
+  dimension_json jsonb not null default '{}'::jsonb,
+  dimension_hash varchar(64) not null,
+  aggregated_at timestamptz not null default now(),
+  created_at timestamptz not null default now(),
+  constraint pk_analytics_daily_kpi primary key (id),
+  constraint uq_analytics_daily_kpi_key unique (metric_date, metric_key, dimension_hash),
+  constraint chk_analytics_daily_kpi_non_negative check (metric_value >= 0)
+);
+
+create index if not exists idx_analytics_daily_kpi_date_key
+  on analytics_daily_kpi (metric_date desc, metric_key);
+
+create table if not exists account_deletion_jobs (
+  id bigserial not null,
+  user_id uuid not null,
+  job_status varchar(16) not null default 'queued',
+  requested_at timestamptz not null default now(),
+  disable_due_at timestamptz not null default (now() + interval '60 second'),
+  disabled_at timestamptz,
+  hard_delete_due_at timestamptz not null default (now() + interval '5 minute'),
+  hard_deleted_at timestamptz,
+  retry_count smallint not null default 0,
+  last_error text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint pk_account_deletion_jobs primary key (id),
+  constraint fk_account_deletion_jobs_user foreign key (user_id) references profiles (user_id) on delete cascade,
+  constraint uq_account_deletion_jobs_user unique (user_id),
+  constraint chk_account_deletion_jobs_status check (job_status in ('queued', 'in_progress', 'completed', 'failed'))
+);
+
+create index if not exists idx_account_deletion_jobs_status_due
+  on account_deletion_jobs (job_status, hard_delete_due_at);
+
+create table if not exists monitoring_alert_events (
+  id bigserial not null,
+  alert_level varchar(8) not null,
+  alert_type varchar(32) not null,
+  threshold_rule varchar(128) not null,
+  observed_value numeric(10, 4) not null,
+  window_start_at timestamptz not null,
+  window_end_at timestamptz not null,
+  notification_target varchar(255) not null,
+  notification_status varchar(16) not null default 'pending',
+  notified_at timestamptz,
+  error_message text,
+  created_at timestamptz not null default now(),
+  constraint pk_monitoring_alert_events primary key (id),
+  constraint chk_monitoring_alert_events_level check (alert_level in ('P1', 'P2')),
+  constraint chk_monitoring_alert_events_status check (notification_status in ('pending', 'sent', 'failed'))
+);
+
+create index if not exists idx_monitoring_alert_events_status
+  on monitoring_alert_events (notification_status, created_at desc);
+create index if not exists idx_monitoring_alert_events_level_time
+  on monitoring_alert_events (alert_level, created_at desc);
 
 create table if not exists policy_settings (
   policy_type varchar(16) not null,
@@ -327,6 +418,21 @@ before update on habit_logs
 for each row
 execute function public.set_updated_at();
 
+create or replace trigger trg_user_daily_activity_upsert
+before update on user_daily_activity
+for each row
+execute function public.set_updated_at();
+
+create or replace trigger trg_analytics_daily_kpi_upsert
+before update on analytics_daily_kpi
+for each row
+execute function public.touch_analytics_daily_kpi_upsert();
+
+create or replace trigger trg_account_deletion_jobs_updated_at
+before update on account_deletion_jobs
+for each row
+execute function public.set_updated_at();
+
 alter table public.profiles enable row level security;
 drop policy if exists profiles_select_own on public.profiles;
 create policy profiles_select_own on public.profiles
@@ -390,6 +496,28 @@ with check (auth.uid() = user_id);
 
 drop policy if exists habit_logs_delete_own on public.habit_logs;
 create policy habit_logs_delete_own on public.habit_logs
+for delete
+using (auth.uid() = user_id);
+
+alter table public.user_daily_activity enable row level security;
+drop policy if exists user_daily_activity_select_own on public.user_daily_activity;
+create policy user_daily_activity_select_own on public.user_daily_activity
+for select
+using (auth.uid() = user_id);
+
+drop policy if exists user_daily_activity_insert_own on public.user_daily_activity;
+create policy user_daily_activity_insert_own on public.user_daily_activity
+for insert
+with check (auth.uid() = user_id);
+
+drop policy if exists user_daily_activity_update_own on public.user_daily_activity;
+create policy user_daily_activity_update_own on public.user_daily_activity
+for update
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+drop policy if exists user_daily_activity_delete_own on public.user_daily_activity;
+create policy user_daily_activity_delete_own on public.user_daily_activity
 for delete
 using (auth.uid() = user_id);
 
