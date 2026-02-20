@@ -5,6 +5,10 @@ export type CoreTableName =
   | "profiles"
   | "habits"
   | "habit_logs"
+  | "user_daily_activity"
+  | "analytics_daily_kpi"
+  | "account_deletion_jobs"
+  | "monitoring_alert_events"
   | "policy_settings"
   | "policy_consents"
   | "audit_logs";
