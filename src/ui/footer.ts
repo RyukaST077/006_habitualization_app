@@ -14,9 +14,22 @@ export type FooterViewModel = {
 
 export function resolveFooterViewModel(): FooterViewModel {
   return {
-    policyLinks: [],
-    copyright: null,
-    keyboardOperable: false,
-    focusVisible: false,
+    policyLinks: [
+      {
+        label: "利用規約",
+        href: "/terms",
+        keyboardOperable: true,
+        focusVisible: true,
+      },
+      {
+        label: "プライバシーポリシー",
+        href: "/privacy",
+        keyboardOperable: true,
+        focusVisible: true,
+      },
+    ],
+    copyright: "コピーライト",
+    keyboardOperable: true,
+    focusVisible: true,
   };
 }

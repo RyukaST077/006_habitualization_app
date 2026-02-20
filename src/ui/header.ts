@@ -15,10 +15,29 @@ export type HeaderViewModel = {
 
 export function resolveHeaderViewModel(): HeaderViewModel {
   return {
-    logoLabel: null,
-    navItems: [],
-    logoutLabel: null,
-    keyboardOperable: false,
-    focusVisible: false,
+    logoLabel: "ロゴ",
+    navItems: [
+      {
+        label: "ホーム",
+        href: "/home",
+        keyboardOperable: true,
+        focusVisible: true,
+      },
+      {
+        label: "履歴",
+        href: "/history",
+        keyboardOperable: true,
+        focusVisible: true,
+      },
+      {
+        label: "設定",
+        href: "/settings",
+        keyboardOperable: true,
+        focusVisible: true,
+      },
+    ],
+    logoutLabel: "ログアウト",
+    keyboardOperable: true,
+    focusVisible: true,
   };
 }
