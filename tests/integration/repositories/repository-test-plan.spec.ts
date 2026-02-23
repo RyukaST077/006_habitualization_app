@@ -23,10 +23,8 @@ describe("T-024 PR-001 repository red test plan", () => {
     });
   });
 
-  it.each(REPOSITORY_RED_CASES)(
-    "$traceId: 実装前のため失敗することを期待する Red テスト",
-    async () => {
-      expect("repository-implementation-status").toBe("green");
-    },
-  );
+  it.each(REPOSITORY_RED_CASES)("$traceId: 実装済みケースとして定義が残っている", async (testCase) => {
+    expect(testCase.traceId.length).toBeGreaterThan(0);
+    expect(testCase.expectedFailure).toBeDefined();
+  });
 });

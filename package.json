@@ -7,7 +7,7 @@
     "dev": "vite",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit --pretty false",
-    "test": "vitest run --config vitest.config.ts --coverage",
+    "test": "mkdir -p coverage/v8/.tmp && vitest run --config vitest.config.ts --coverage",
     "build": "tsc -p tsconfig.json --noEmit --pretty false",
     "test:watch": "vitest --config vitest.config.ts",
     "test:e2e": "playwright test",

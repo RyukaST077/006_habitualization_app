@@ -1,51 +1,222 @@
 import { describe, expect, it } from "vitest";
 
+import { HabitRepository } from "../../../src/server/infrastructure/repositories/HabitRepository";
+import { PolicyRepository } from "../../../src/server/infrastructure/repositories/PolicyRepository";
+import { UserRepository } from "../../../src/server/infrastructure/repositories/UserRepository";
+import { createSupabaseRepositoryClient } from "../../../src/server/infrastructure/repositories/supabase-repository-client";
 import { createPolicyOpsSeedBundle } from "./fixtures/policy-ops-seed";
 import { createRepositorySeedBundle } from "./fixtures/repository-seed";
 import { runRepositoryRace } from "./fixtures/repository-race";
 
+function createBarrier(targetCount: number): () => Promise<void> {
+  let count = 0;
+  let release: (() => void) | null = null;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+
+  return async () => {
+    count += 1;
+    if (count === targetCount) {
+      release?.();
+    }
+    await gate;
+  };
+}
+
 describe("T-024 PR-004 cross repository optimistic/unique conflict red", () => {
   it("競合/optimistic lock: 同一 profile version 更新の concurrency conflict", async () => {
     const seed = createRepositorySeedBundle();
-    const expectedVersion = seed.profile.version + 1;
+    const client = createSupabaseRepositoryClient({
+      profiles: [
+        {
+          userId: seed.profile.userId,
+          displayName: seed.profile.displayName,
+          timezone: seed.profile.timezone,
+          dayCutoffTime: `${String(seed.profile.dayBoundaryHour).padStart(2, "0")}:00:00`,
+          accountStatus: seed.profile.accountStatus,
+          version: seed.profile.version,
+        },
+      ],
+    });
+    const barrier = createBarrier(2);
+    const userId = seed.profile.userId;
 
     const race = await runRepositoryRace([
       {
         name: "updateProfileSettings#1",
         async run() {
-          return { optimistic: true, version: expectedVersion };
+          return client.withTransaction(async (txClient) => {
+            const txUserRepository = new UserRepository(txClient);
+            const snapshot = await txUserRepository.findProfile(userId);
+            await barrier();
+            return txUserRepository.updateProfileSettings(
+              userId,
+              "UTC",
+              "05:00:00",
+              snapshot!.version,
+            );
+          });
         },
       },
       {
         name: "updateProfileSettings#2",
         async run() {
-          return { optimistic: true, version: expectedVersion };
+          return client.withTransaction(async (txClient) => {
+            const txUserRepository = new UserRepository(txClient);
+            const snapshot = await txUserRepository.findProfile(userId);
+            await barrier();
+            return txUserRepository.updateProfileSettings(
+              userId,
+              "Asia/Tokyo",
+              "04:00:00",
+              snapshot!.version,
+            );
+          });
         },
       },
     ]);
 
     expect(race).toHaveLength(2);
-    expect(race[0]?.status).toBe("rejected");
+    const rejected = race.filter((result) => result.status === "rejected");
+    const fulfilled = race.filter((result) => result.status === "fulfilled");
+    expect(rejected).toHaveLength(1);
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected[0]?.reason).toMatchObject({
+      code: "OPTIMISTIC_LOCK_CONFLICT",
+      status: 409,
+    });
+
+    const profile = await new UserRepository(client).findProfile(userId);
+    expect(profile?.version).toBe(seed.profile.version + 1);
   });
 
   it("競合/unique constraint: habit_logs unique key conflict", async () => {
-    const firstInsert = { unique: "uq_habit_logs_habit_date", affectedRows: 1 };
-    const duplicateInsert = { unique: "uq_habit_logs_habit_date", affectedRows: 0 };
-    const expectedConflictCode = "CHECKIN_CONFLICT";
+    const seed = createRepositorySeedBundle();
+    const now = "2026-02-21T10:00:00.000Z";
+    const client = createSupabaseRepositoryClient({
+      profiles: [
+        {
+          userId: seed.profile.userId,
+          displayName: seed.profile.displayName,
+          timezone: seed.profile.timezone,
+          dayCutoffTime: `${String(seed.profile.dayBoundaryHour).padStart(2, "0")}:00:00`,
+          accountStatus: seed.profile.accountStatus,
+          version: seed.profile.version,
+        },
+      ],
+      habits: seed.habits.map((habit, index) => ({
+        habitId: habit.habitId,
+        userId: habit.userId,
+        name: habit.name,
+        note: null,
+        displayOrder: (index + 1) * 10,
+        status: "active",
+        version: habit.version,
+        createdAt: now,
+        updatedAt: now,
+      })),
+    });
+    const barrier = createBarrier(2);
+    const userId = seed.profile.userId;
+    const habitId = seed.habits[0]!.habitId;
+    const logDate = "2026-02-21";
 
-    expect(expectedConflictCode).toContain("CONFLICT");
-    expect(firstInsert.affectedRows).toBe(duplicateInsert.affectedRows);
+    const race = await runRepositoryRace([
+      {
+        name: "checkin#1",
+        async run() {
+          return client.withTransaction(async (txClient) => {
+            await barrier();
+            return new HabitRepository(txClient).upsertCheckin(
+              userId,
+              habitId,
+              logDate,
+              "2026-02-21T10:00:00.000Z",
+            );
+          });
+        },
+      },
+      {
+        name: "checkin#2",
+        async run() {
+          return client.withTransaction(async (txClient) => {
+            await barrier();
+            return new HabitRepository(txClient).upsertCheckin(
+              userId,
+              habitId,
+              logDate,
+              "2026-02-21T10:00:01.000Z",
+            );
+          });
+        },
+      },
+    ]);
+
+    const rejected = race.filter((result) => result.status === "rejected");
+    const fulfilled = race.filter((result) => result.status === "fulfilled");
+    expect(rejected).toHaveLength(1);
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected[0]?.reason).toMatchObject({
+      code: "CHECKIN_CONFLICT",
+      status: 409,
+    });
+
+    const logs = await new HabitRepository(client).findLogsByDateRange(userId, logDate, logDate, true);
+    expect(logs).toHaveLength(1);
   });
 
   it("競合/unique constraint: policy_consents unique conflict", async () => {
     const seed = createPolicyOpsSeedBundle();
-    const uniqueKey = "uq_policy_consents_user_type_ver";
-    const consentVersion = seed.consents[0]?.policyVersion ?? 0;
-    const duplicateConsentVersion = consentVersion;
-    const conflictExpected = true;
+    const now = "2026-02-21T00:00:00.000Z";
+    const client = createSupabaseRepositoryClient({
+      policySettings: seed.settings.map((setting) => ({
+        policyType: setting.policyType,
+        currentVersion: `${setting.version}`,
+        effectiveFrom: now,
+        updatedBy: "service_role:seed",
+        updatedAt: now,
+      })),
+    });
+    const barrier = createBarrier(2);
+    const userId = "user-red-001";
+    const consentInput = {
+      policyType: "privacy" as const,
+      policyVersion: "4",
+      consentedAt: "2026-02-22T00:00:00.000Z",
+    };
 
-    expect(uniqueKey).toContain("unique");
-    expect(conflictExpected).toBe(true);
-    expect(consentVersion).toBe(duplicateConsentVersion + 1);
+    const race = await runRepositoryRace([
+      {
+        name: "insertConsents#1",
+        async run() {
+          return client.withTransaction(async (txClient) => {
+            await barrier();
+            return new PolicyRepository(txClient).insertConsents(userId, [consentInput]);
+          });
+        },
+      },
+      {
+        name: "insertConsents#2",
+        async run() {
+          return client.withTransaction(async (txClient) => {
+            await barrier();
+            return new PolicyRepository(txClient).insertConsents(userId, [consentInput]);
+          });
+        },
+      },
+    ]);
+
+    const rejected = race.filter((result) => result.status === "rejected");
+    const fulfilled = race.filter((result) => result.status === "fulfilled");
+    expect(rejected).toHaveLength(1);
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected[0]?.reason).toMatchObject({
+      code: "UNIQUE_CONFLICT",
+      status: 409,
+    });
+
+    const latest = await new PolicyRepository(client).findUserLatestConsents(userId);
+    expect(latest.find((consent) => consent.policyType === "privacy")?.policyVersion).toBe("4");
   });
 });

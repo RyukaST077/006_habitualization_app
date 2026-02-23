@@ -66,14 +66,40 @@ const execFileAsync = promisify(execFile);
 
 type QueryRow = Record<string, string>;
 
-function getDatabaseUrl(): string {
+type PsqlConnectionConfig = {
+  connectionString: string;
+  password: string;
+};
+
+function getPsqlConnectionConfig(): PsqlConnectionConfig {
   const databaseUrl = process.env.DATABASE_URL;
 
   if (!databaseUrl) {
     throw new Error("DATABASE_URL is required for schema introspection tests");
   }
 
-  return databaseUrl;
+  const parsedUrl = new URL(databaseUrl);
+  const user = decodeURIComponent(parsedUrl.username);
+  const password = decodeURIComponent(parsedUrl.password);
+  const dbName = decodeURIComponent(parsedUrl.pathname.replace(/^\//, "")) || "postgres";
+  const port = parsedUrl.port || "5432";
+  const sslMode = parsedUrl.searchParams.get("sslmode") ?? "require";
+  const gssEncMode = parsedUrl.searchParams.get("gssencmode") ?? "disable";
+
+  if (!parsedUrl.hostname || !user || !password) {
+    throw new Error("DATABASE_URL must include host, user and password");
+  }
+
+  const connectionString = [
+    `host=${parsedUrl.hostname}`,
+    `port=${port}`,
+    `dbname=${dbName}`,
+    `user=${user}`,
+    `sslmode=${sslMode}`,
+    `gssencmode=${gssEncMode}`,
+  ].join(" ");
+
+  return { connectionString, password };
 }
 
 function escapeSqlLiteral(value: string): string {
@@ -87,19 +113,29 @@ function formatTextArray(values: string[]): string {
 }
 
 async function queryRows(sql: string): Promise<QueryRow[]> {
-  const { stdout } = await execFileAsync("psql", [
-    getDatabaseUrl(),
-    "-X",
-    "-v",
-    "ON_ERROR_STOP=1",
-    "-A",
-    "-F",
-    "\t",
-    "-P",
-    "footer=off",
-    "-c",
-    sql,
-  ]);
+  const { connectionString, password } = getPsqlConnectionConfig();
+  const { stdout } = await execFileAsync(
+    "psql",
+    [
+      connectionString,
+      "-X",
+      "-v",
+      "ON_ERROR_STOP=1",
+      "-A",
+      "-F",
+      "\t",
+      "-P",
+      "footer=off",
+      "-c",
+      sql,
+    ],
+    {
+      env: {
+        ...process.env,
+        PGPASSWORD: password,
+      },
+    },
+  );
 
   const lines = stdout
     .trim()
