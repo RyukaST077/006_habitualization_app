@@ -3,6 +3,11 @@ import { expect } from "vitest";
 import type { If002CaseDefinition, If002RequirementId } from "../fixtures/if-002-cases";
 import type { If002ErrorScenario } from "../fixtures/if-002-error-scenarios";
 import type { If002InvalidPayloadCase } from "../fixtures/if-002-invalid-payloads";
+import {
+  runErrorScenarioCase as runErrorScenarioCaseImpl,
+  runInvalidPayloadCase as runInvalidPayloadCaseImpl,
+  runPlannedCase as runPlannedCaseImpl,
+} from "../../../../src/server/application/if-002/case-runner";
 import { createIf002AuthHeaders } from "./if-002-auth";
 
 export interface If002ErrorResponse {
@@ -22,22 +27,25 @@ export interface If002TestHarness {
   assertCommonErrorShape(
     payload: unknown,
     expected: { code: string; requirementId: If002RequirementId },
-  ): asserts payload is If002ErrorResponse;
+  ): void;
   assertErrorMapping(
     actualStatus: number,
     payload: unknown,
     expected: { status: number; code: string; requirementId: If002RequirementId },
-  ): asserts payload is If002ErrorResponse;
+  ): void;
   runPlannedCase(testCase: If002CaseDefinition): Promise<If002PlannedResult>;
   runInvalidPayloadCase(testCase: If002InvalidPayloadCase): Promise<If002PlannedResult>;
   runErrorScenarioCase(testCase: If002ErrorScenario): Promise<If002PlannedResult>;
 }
 
 export function createIf002TestHarness(): If002TestHarness {
-  const assertErrorEnvelope = (
+  const assertErrorEnvelope: (
     payload: unknown,
     expected: { code: string; requirementId: If002RequirementId },
-  ): asserts payload is If002ErrorResponse => {
+  ) => void = (
+    payload: unknown,
+    expected: { code: string; requirementId: If002RequirementId },
+  ) => {
     expect(payload).toBeTypeOf("object");
     expect(payload).not.toBeNull();
 
@@ -55,7 +63,7 @@ export function createIf002TestHarness(): If002TestHarness {
     assertCommonErrorShape(
       payload: unknown,
       expected: { code: string; requirementId: If002RequirementId },
-    ): asserts payload is If002ErrorResponse {
+    ): void {
       assertErrorEnvelope(payload, expected);
       const response = payload as If002ErrorResponse;
       expect(typeof response.message).toBe("string");
@@ -64,18 +72,18 @@ export function createIf002TestHarness(): If002TestHarness {
       actualStatus: number,
       payload: unknown,
       expected: { status: number; code: string; requirementId: If002RequirementId },
-    ): asserts payload is If002ErrorResponse {
+    ): void {
       expect(actualStatus).toBe(expected.status);
       assertErrorEnvelope(payload, { code: expected.code, requirementId: expected.requirementId });
     },
-    async runPlannedCase(_testCase: If002CaseDefinition): Promise<If002PlannedResult> {
-      throw new Error("TODO(T-027): IF-002 API実呼び出しハーネスを実装する");
+    async runPlannedCase(testCase: If002CaseDefinition): Promise<If002PlannedResult> {
+      return runPlannedCaseImpl(testCase);
     },
-    async runInvalidPayloadCase(_testCase: If002InvalidPayloadCase): Promise<If002PlannedResult> {
-      throw new Error("TODO(T-027): DTO入力検証のAPI実呼び出しハーネスを実装する");
+    async runInvalidPayloadCase(testCase: If002InvalidPayloadCase): Promise<If002PlannedResult> {
+      return runInvalidPayloadCaseImpl(testCase);
     },
-    async runErrorScenarioCase(_testCase: If002ErrorScenario): Promise<If002PlannedResult> {
-      throw new Error("TODO(T-027): 403/409/500 エラーマッピングのAPI実呼び出しハーネスを実装する");
+    async runErrorScenarioCase(testCase: If002ErrorScenario): Promise<If002PlannedResult> {
+      return runErrorScenarioCaseImpl(testCase);
     },
   };
 }

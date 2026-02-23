@@ -57,11 +57,15 @@ describe("T-026 PR-001 IF-002 API DTO/validation red test plan", () => {
     );
   });
 
-  it("red: IF-002 APIハーネス未実装のため実行で失敗する", async () => {
+  it("IF-002: force_throw は 500 INTERNAL_ERROR + trace_id にマップされる", async () => {
     const harness = createIf002TestHarness();
-    const dtoCase = IF002_RED_CASES[0];
+    const systemCase = IF002_RED_CASES.find((testCase) => testCase.expectedStatus === 500);
 
-    const result = await harness.runPlannedCase(dtoCase);
-    expect(result.status).toBe(dtoCase.expectedStatus);
+    expect(systemCase).toBeDefined();
+
+    const result = await harness.runPlannedCase(systemCase!);
+    expect(result.status).toBe(500);
+    expect(result.body.code).toBe("INTERNAL_ERROR");
+    expect(result.body.trace_id).toContain("trace-");
   });
 });
