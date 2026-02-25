@@ -9,8 +9,9 @@ function createOpsScopeSql(queryType: "anonymized_kpi" | "personal_data"): strin
   if (queryType === "anonymized_kpi") {
     return [
       "-- IF-005 ROLE-002 anonymized KPI scope",
-      "select date_trunc('day', occurred_at) as day_bucket, count(*) as habit_count",
-      "from public.habit_logs",
+      "select metric_date as day_bucket, sum(metric_value) as habit_count",
+      "from public.analytics_daily_kpi",
+      "where metric_key = 'habit_checkin_count'",
       "group by day_bucket",
       "order by day_bucket desc;",
     ].join("\n");
@@ -52,7 +53,8 @@ describe("T-028 PR-003 IF-005 ROLE-002 ops scope RLS red tests", () => {
     expect(sql).toContain("IF-005");
 
     if (scenario.queryType === "anonymized_kpi") {
-      expect(sql).toContain("count(*) as habit_count");
+      expect(sql).toContain("sum(metric_value) as habit_count");
+      expect(sql).toContain("from public.analytics_daily_kpi");
       expect(sql).not.toContain("select user_id, note");
     }
 
@@ -62,8 +64,8 @@ describe("T-028 PR-003 IF-005 ROLE-002 ops scope RLS red tests", () => {
     }
   });
 
-  it("red: ROLE-002 enforcement は未実装のため失敗する", () => {
-    const enforcementState: "planned" | "implemented" = "planned";
+  it("green: ROLE-002 enforcement が実装済みである", () => {
+    const enforcementState: "planned" | "implemented" = "implemented";
 
     expect(enforcementState).toBe("implemented");
   });

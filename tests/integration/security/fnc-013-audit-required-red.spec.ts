@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { FNC013_AUDIT_REQUIRED_SCENARIOS } from "./fixtures/fnc-013-rls-cases";
+import { createFnc013RlsTestHarness } from "./helpers/fnc-013-rls-test-harness";
 
 function createAuditValidationSql(target: "audit_logs" | "policy_settings", missingField: string): string {
   if (target === "audit_logs") {
@@ -19,7 +20,7 @@ function createAuditValidationSql(target: "audit_logs" | "policy_settings", miss
   ].join("\n");
 }
 
-describe("T-028 PR-003 FR-026 audit required fields red tests", () => {
+describe("T-029 PR-004 FR-026 audit required fields green tests", () => {
   it("audit_logs 必須項目 actor/occurred_at/action/target_id/result 欠落は失敗となる前提を持つ", () => {
     const requiredFields = ["actor", "occurred_at", "action", "target_id", "result"];
     const auditLogScenarios = FNC013_AUDIT_REQUIRED_SCENARIOS.filter((scenario) => scenario.target === "audit_logs");
@@ -52,9 +53,34 @@ describe("T-028 PR-003 FR-026 audit required fields red tests", () => {
     expect(sql).toContain(scenario.missingField);
   });
 
-  it("red: audit required enforcement は未実装のため失敗する", () => {
-    const constraintState: "planned" | "implemented" = "planned";
+  it.each(FNC013_AUDIT_REQUIRED_SCENARIOS)(
+    "$traceId: 必須項目欠落を missing_required_fields として検知する",
+    async (scenario) => {
+      const harness = createFnc013RlsTestHarness();
+      const audit = await harness.checkAuditRecord({ traceId: scenario.traceId, target: scenario.target });
 
-    expect(constraintState).toBe("implemented");
+      expect(audit.traceId).toBe(scenario.traceId);
+      expect(audit.sql).toContain("public.");
+      expect(audit.auditRecordState).toBe("missing_required_fields");
+      expect(audit.implementationState).toBe("implemented");
+    },
+  );
+
+  it("green: 必須項目が揃うケースは required_fields_present を返す", async () => {
+    const harness = createFnc013RlsTestHarness();
+    const auditLogs = await harness.checkAuditRecord({
+      traceId: "FNC-013/FR-026/AC-026/audit_logs/complete",
+      target: "audit_logs",
+    });
+    const policySettings = await harness.checkAuditRecord({
+      traceId: "FNC-013/FR-026/AC-026/policy_settings/complete",
+      target: "policy_settings",
+    });
+
+    expect(auditLogs.auditRecordState).toBe("required_fields_present");
+    expect(policySettings.auditRecordState).toBe("required_fields_present");
+    expect(policySettings.sql).toContain("old_version");
+    expect(policySettings.sql).toContain("new_version");
+    expect(policySettings.sql).toContain("policy_type");
   });
 });

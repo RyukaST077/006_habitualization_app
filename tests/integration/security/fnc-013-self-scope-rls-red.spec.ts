@@ -9,7 +9,7 @@ import {
 } from "./fixtures/fnc-013-rls-seed";
 import { createFnc013RlsTestHarness } from "./helpers/fnc-013-rls-test-harness";
 
-describe("T-028 PR-002 FR-025 self-scope RLS red tests", () => {
+describe("T-029 PR-002 FR-025 self-scope RLS green tests", () => {
   it("profiles/habits/habit_logs/policy_consents の4テーブルを本人境界対象として固定する", () => {
     expect(FNC013_SELF_SCOPE_TABLES).toEqual([
       "profiles",
@@ -83,7 +83,7 @@ describe("T-028 PR-002 FR-025 self-scope RLS red tests", () => {
     },
   );
 
-  it("red: 実DB未接続のため self-scope 実装状態は planned のまま失敗する", async () => {
+  it("green: self-scope 実装状態が implemented で返る", async () => {
     const harness = createFnc013RlsTestHarness();
     const scenario = FNC013_SELF_SCOPE_ALLOW_SCENARIOS[0];
     const result = await harness.executeSelfScopeScenario({

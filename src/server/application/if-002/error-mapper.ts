@@ -1,6 +1,7 @@
 import type { If002ErrorResult } from "./error-response";
 
 type If002HandledErrorCode = "FORBIDDEN" | "DOMAIN_CONFLICT";
+const FORBIDDEN_REQUIREMENT_ID = "FR-025";
 
 const IF002_HANDLED_ERROR_STATUS: Record<If002HandledErrorCode, 403 | 409> = {
   FORBIDDEN: 403,
@@ -29,13 +30,15 @@ export function createIf002HandledError(
 
 export function mapIf002Error(error: unknown, traceId: string, fallbackRequirementId: string): If002ErrorResult {
   if (error instanceof If002HandledError) {
+    const requirementId = error.code === "FORBIDDEN" ? FORBIDDEN_REQUIREMENT_ID : error.requirementId;
+
     return {
       status: IF002_HANDLED_ERROR_STATUS[error.code],
       body: {
         code: error.code,
         message: error.message,
         trace_id: `trace-${traceId}`,
-        requirement_id: error.requirementId,
+        requirement_id: requirementId,
       },
     };
   }

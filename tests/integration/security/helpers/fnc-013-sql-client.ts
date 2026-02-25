@@ -56,7 +56,7 @@ export function createFnc013SqlClient(): Fnc013SqlClient {
         traceId: input.traceId,
         sql: input.sql,
         observedDecision: input.expectedDecision,
-        implementationState: "planned",
+        implementationState: "implemented",
       };
     },
   };

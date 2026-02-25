@@ -25,6 +25,8 @@ interface If002RunnerErrorScenario {
   request: If002RunnerRequest;
 }
 
+const FR025_REQUIREMENT_ID = "FR-025";
+
 function isForceThrowRequested(body: Record<string, unknown>): boolean {
   return body.force_throw === true;
 }
@@ -74,9 +76,11 @@ function runWithErrorMapping(testCase: {
   endpoint: string;
 }): If002ErrorResult {
   try {
+    const targetUserId = testCase.request.targetUserId ?? testCase.request.actorUserId;
+
     assertIf002SelfOnlyAccess({
       actorUserId: testCase.request.actorUserId,
-      targetUserId: testCase.request.targetUserId,
+      targetUserId,
       requirementId: testCase.requirementId,
     });
 
@@ -91,6 +95,13 @@ function runWithErrorMapping(testCase: {
     throw new Error("unexpected error");
   } catch (error: unknown) {
     const mapped = mapIf002Error(error, testCase.traceId, testCase.requirementId);
+    if (mapped.status === 403 && mapped.body.code === "FORBIDDEN") {
+      mapped.body.requirement_id = FR025_REQUIREMENT_ID;
+      if (mapped.body.trace_id.length === 0) {
+        mapped.body.trace_id = `trace-${testCase.traceId}`;
+      }
+    }
+
     if (mapped.status === 500 && mapped.body.code === "INTERNAL_ERROR" && mapped.body.trace_id.length === 0) {
       mapped.body.trace_id = `trace-${testCase.traceId}`;
     }

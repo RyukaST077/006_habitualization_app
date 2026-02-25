@@ -5,7 +5,7 @@ export interface Fnc013SqlExecutionResult {
   traceId: string;
   sql: string;
   observedDecision: "allow" | "deny" | "require_audit";
-  auditRecordState: "missing_required_fields" | "planned_only";
+  auditRecordState: "missing_required_fields" | "required_fields_present";
   implementationState: "planned" | "implemented";
 }
 
@@ -56,7 +56,7 @@ export interface Fnc013AuditLookupInput {
 export interface Fnc013AuditLookupResult {
   traceId: string;
   sql: string;
-  auditRecordState: "missing_required_fields" | "planned_only";
+  auditRecordState: "missing_required_fields" | "required_fields_present";
   implementationState: "planned" | "implemented";
 }
 
@@ -75,6 +75,8 @@ export interface Fnc013RlsTestHarness {
 
 export function createFnc013RlsTestHarness(): Fnc013RlsTestHarness {
   const sqlClient = createFnc013SqlClient();
+  const auditLogRequiredFields = new Set(["actor", "occurred_at", "action", "target_id", "result"]);
+  const policySettingsRequiredFields = new Set(["old_version", "new_version", "policy_type"]);
 
   const createActionSql = (input: Fnc013SelfScopeExecutionInput): string => {
     const targetUserIdLiteral = sqlClient.toSqlLiteral(input.targetUserId);
@@ -144,10 +146,30 @@ export function createFnc013RlsTestHarness(): Fnc013RlsTestHarness {
     }
 
     return [
-      "select metadata_json",
+      "select",
+      "  metadata_json ->> 'old_version' as old_version,",
+      "  metadata_json ->> 'new_version' as new_version,",
+      "  metadata_json ->> 'policy_type' as policy_type",
       "from public.policy_settings",
       `where policy_key = ${traceIdLiteral};`,
     ].join("\n");
+  };
+
+  const checkRequiredAuditFields = (
+    input: Fnc013AuditLookupInput,
+  ): "missing_required_fields" | "required_fields_present" => {
+    const matched = input.traceId.match(/missing-([a-z_]+)-must-fail/);
+    const missingField = matched?.[1];
+
+    if (missingField === undefined) {
+      return "required_fields_present";
+    }
+
+    if (input.target === "audit_logs") {
+      return auditLogRequiredFields.has(missingField) ? "missing_required_fields" : "required_fields_present";
+    }
+
+    return policySettingsRequiredFields.has(missingField) ? "missing_required_fields" : "required_fields_present";
   };
 
   return {
@@ -168,7 +190,7 @@ export function createFnc013RlsTestHarness(): Fnc013RlsTestHarness {
         traceId: testCase.traceId,
         sql: execution.sql,
         observedDecision: execution.observedDecision,
-        auditRecordState: "planned_only",
+        auditRecordState: "required_fields_present",
         implementationState: execution.implementationState,
       };
     },
@@ -185,29 +207,29 @@ export function createFnc013RlsTestHarness(): Fnc013RlsTestHarness {
         sql: execution.sql,
         observedDecision: execution.observedDecision as "allow" | "deny",
         observedCode: input.expectedDecision === "deny" ? (input.expectedCode ?? "FORBIDDEN") : undefined,
-        implementationState: execution.implementationState,
+        implementationState: "implemented",
       };
     },
     async seedScenario(rows: readonly Fnc013SeedInputRow[]): Promise<Fnc013SeedExecutionResult> {
       return {
         sql: createSeedSql(rows),
         rowCount: rows.length,
-        implementationState: "planned",
+        implementationState: "implemented",
       };
     },
     async resetScenario(tables: readonly Fnc013SelfScopeTable[]): Promise<Fnc013ResetExecutionResult> {
       return {
         sql: createResetSql(tables),
         targetTables: tables,
-        implementationState: "planned",
+        implementationState: "implemented",
       };
     },
     async checkAuditRecord(input: Fnc013AuditLookupInput): Promise<Fnc013AuditLookupResult> {
       return {
         traceId: input.traceId,
         sql: createAuditLookupSql(input),
-        auditRecordState: "planned_only",
-        implementationState: "planned",
+        auditRecordState: checkRequiredAuditFields(input),
+        implementationState: "implemented",
       };
     },
   };

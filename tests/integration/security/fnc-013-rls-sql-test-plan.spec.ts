@@ -8,18 +8,18 @@ import {
 } from "./fixtures/fnc-013-rls-cases";
 import { createFnc013RlsTestHarness } from "./helpers/fnc-013-rls-test-harness";
 
-const FNC013_RED_SUITE_ENTRYPOINT_COMMAND = "npm run test -- tests/integration/security/fnc-013-*.spec.ts";
-const FNC013_RED_SUITE_SPEC_PATHS = [
+const FNC013_GREEN_SUITE_ENTRYPOINT_COMMAND = "npm run test -- tests/integration/security/fnc-013-*.spec.ts";
+const FNC013_GREEN_SUITE_SPEC_PATHS = [
   "tests/integration/security/fnc-013-rls-sql-test-plan.spec.ts",
   "tests/integration/security/fnc-013-self-scope-rls-red.spec.ts",
   "tests/integration/security/fnc-013-ops-scope-rls-red.spec.ts",
   "tests/integration/security/fnc-013-audit-required-red.spec.ts",
 ] as const;
 
-describe("T-028 PR-004 FNC-013 RLS SQL test plan (RED entrypoint)", () => {
-  it("single entrypoint command で FNC-013 red suite を再実行できる導線を保持する", () => {
-    expect(FNC013_RED_SUITE_ENTRYPOINT_COMMAND).toBe("npm run test -- tests/integration/security/fnc-013-*.spec.ts");
-    expect(FNC013_RED_SUITE_SPEC_PATHS).toEqual([
+describe("T-029 PR-004 FNC-013 RLS SQL test plan (GREEN entrypoint)", () => {
+  it("single entrypoint command で FNC-013 green suite を再実行できる導線を保持する", () => {
+    expect(FNC013_GREEN_SUITE_ENTRYPOINT_COMMAND).toBe("npm run test -- tests/integration/security/fnc-013-*.spec.ts");
+    expect(FNC013_GREEN_SUITE_SPEC_PATHS).toEqual([
       "tests/integration/security/fnc-013-rls-sql-test-plan.spec.ts",
       "tests/integration/security/fnc-013-self-scope-rls-red.spec.ts",
       "tests/integration/security/fnc-013-ops-scope-rls-red.spec.ts",
@@ -67,15 +67,13 @@ describe("T-028 PR-004 FNC-013 RLS SQL test plan (RED entrypoint)", () => {
   });
 
   it.each(FNC013_RLS_SQL_CASES)(
-    "$traceId: SQL client分離後も RED前提のため未実装状態では失敗する",
+    "$traceId: SQL client分離後も implemented 状態を維持する",
     async (testCase) => {
       const harness = createFnc013RlsTestHarness();
       const result = await harness.executeScenario(testCase);
 
       expect(result.traceId).toBe(testCase.traceId);
       expect(result.sql).toContain(testCase.requirementId);
-
-      // Intentional RED assertion: T-029 implementation is expected to flip this to "implemented".
       expect(result.implementationState).toBe("implemented");
     },
   );
@@ -99,5 +97,7 @@ describe("T-028 PR-004 FNC-013 RLS SQL test plan (RED entrypoint)", () => {
     expect(seeded.sql).toContain("insert into public.profiles");
     expect(reset.sql).toContain("delete from public.profiles;");
     expect(audit.sql).toContain("from public.audit_logs");
+    expect(audit.auditRecordState).toBe("required_fields_present");
+    expect(audit.implementationState).toBe("implemented");
   });
 });

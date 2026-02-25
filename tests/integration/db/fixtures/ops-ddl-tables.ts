@@ -168,8 +168,13 @@ export const OPS_TABLE_DDL_EXPECTATIONS: OpsTableDdlExpectation[] = [
       "idx_analytics_daily_kpi_date_key",
     ],
     requiredTriggers: ["trg_analytics_daily_kpi_upsert"],
-    requiredRlsEnabled: false,
-    requiredRlsPolicyNames: [],
+    requiredRlsEnabled: true,
+    requiredRlsPolicyNames: [
+      "analytics_daily_kpi_select_ops",
+      "analytics_daily_kpi_insert_service_role",
+      "analytics_daily_kpi_update_service_role",
+      "analytics_daily_kpi_delete_service_role",
+    ],
     requiredRlsUsingExpressions: [],
   },
   {

@@ -32,8 +32,8 @@ export interface PolicyTypeConstraintCase {
 export interface PolicySettingsServiceRoleUpdateCase {
   traceId: string;
   tableName: "policy_settings";
-  requiredRlsEnabled: false;
-  expectedRlsPolicyCount: 0;
+  requiredRlsEnabled: true;
+  expectedRlsPolicyCount: 4;
   requiredTriggerName: "trg_policy_settings_update_audit";
   requiredActorRole: "service_role";
   expectedBehavior: string;
@@ -109,8 +109,13 @@ export const CONSENT_AUDIT_TABLE_DDL_EXPECTATIONS: ConsentAuditTableDdlExpectati
     requiredConstraints: ["pk_policy_settings", "chk_policy_settings_type"],
     requiredIndexes: ["pk_policy_settings", "idx_policy_settings_updated"],
     requiredTriggers: ["trg_policy_settings_update_audit"],
-    requiredRlsEnabled: false,
-    requiredRlsPolicyNames: [],
+    requiredRlsEnabled: true,
+    requiredRlsPolicyNames: [
+      "policy_settings_select_authenticated",
+      "policy_settings_insert_service_role",
+      "policy_settings_update_service_role",
+      "policy_settings_delete_service_role",
+    ],
     requiredRlsUsingExpressions: [],
   },
   {
@@ -177,8 +182,13 @@ export const CONSENT_AUDIT_TABLE_DDL_EXPECTATIONS: ConsentAuditTableDdlExpectati
       "idx_audit_logs_action_result",
     ],
     requiredTriggers: [],
-    requiredRlsEnabled: false,
-    requiredRlsPolicyNames: [],
+    requiredRlsEnabled: true,
+    requiredRlsPolicyNames: [
+      "audit_logs_select_service_role",
+      "audit_logs_insert_service_role",
+      "audit_logs_update_service_role",
+      "audit_logs_delete_service_role",
+    ],
     requiredRlsUsingExpressions: [],
   },
 ];
@@ -216,8 +226,8 @@ export const POLICY_SETTINGS_SERVICE_ROLE_UPDATE_CASES: PolicySettingsServiceRol
     {
       traceId: "TBL-006/FR-026/policy-settings-service-role-update",
       tableName: "policy_settings",
-      requiredRlsEnabled: false,
-      expectedRlsPolicyCount: 0,
+      requiredRlsEnabled: true,
+      expectedRlsPolicyCount: 4,
       requiredTriggerName: "trg_policy_settings_update_audit",
       requiredActorRole: "service_role",
       expectedBehavior: "policy_settings の更新は service role 前提で監査トリガーが有効である",
