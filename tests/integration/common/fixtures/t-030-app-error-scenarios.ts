@@ -22,7 +22,7 @@ export const T030_APP_ERROR_SCENARIOS: readonly T030AppErrorScenario[] = [
     expectedStatus: 409,
     expectedCode: "DOMAIN_CONFLICT",
     requirementId: "FR-013",
-    expectedMessage: "domain conflict",
+    expectedMessage: "archived habit cannot be checked in",
   },
   {
     traceId: "T-030/IF-002/common-error/500-internal-error-trace-id",

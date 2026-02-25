@@ -34,9 +34,7 @@ describe("T-021 PR-001 policy_settings DDL green tests", () => {
       );
       const hasRlsEnable = normalizedInitSql.includes("alter table public.policy_settings enable row level security");
       const policyMatches = normalizedInitSql.match(/create policy\s+.+\s+on\s+public\.policy_settings/g) ?? [];
-      const expectedRlsDisabled = greenCase.requiredRlsEnabled === false;
-
-      expect(!hasRlsEnable).toBe(expectedRlsDisabled);
+      expect(hasRlsEnable).toBe(greenCase.requiredRlsEnabled);
       expect(policyMatches).toHaveLength(greenCase.expectedRlsPolicyCount);
       expect(
         hasAuditTrigger,

@@ -2,6 +2,8 @@ import { expect } from "vitest";
 
 import type { T030ScopeMapEntry } from "../fixtures/t-030-scope-map";
 
+const T031_IMPLEMENTATION_STATE = "implemented" as const;
+
 export interface T030CommonErrorPayload {
   code: string;
   message: string;
@@ -57,7 +59,7 @@ export interface T030TestHarness {
   ): void;
   assertErrorContract(entry: T030ScopeMapEntry, expected: T030ErrorContractExpected): void;
   assertAuditRequiredFields(entry: T030ScopeMapEntry, expected: T030AuditAssertExpected): void;
-  getT031ImplementationState(): "planned";
+  getT031ImplementationState(): typeof T031_IMPLEMENTATION_STATE;
 }
 
 export function createT030TestHarness(): T030TestHarness {
@@ -146,8 +148,8 @@ export function createT030TestHarness(): T030TestHarness {
         expect(entry.auditRequiredFields).toContain(field);
       });
     },
-    getT031ImplementationState(): "planned" {
-      return "planned";
+    getT031ImplementationState(): typeof T031_IMPLEMENTATION_STATE {
+      return T031_IMPLEMENTATION_STATE;
     },
   };
 }

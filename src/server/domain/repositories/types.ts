@@ -87,19 +87,34 @@ export interface InsertConsentsResult {
 
 export interface AuditLogRecord {
   id: string;
-  actorUserId: UserId | null;
+  actorRole: string;
   action: string;
+  targetType: string;
+  targetId: string;
+  result: string;
+  requirementId: string;
+  traceId: string;
+  metadata: Record<string, unknown>;
+  actorUserId: UserId | null;
   resourceType: string;
   resourceId: string;
   detail: Record<string, unknown>;
+  occurredAt: ISODateTime;
   createdAt: ISODateTime;
 }
 
 export interface AuditLogRecordInput {
-  actorUserId: UserId | null;
+  actorRole?: string;
   action: string;
-  resourceType: string;
-  resourceId: string;
+  targetType?: string;
+  targetId?: string;
+  result?: string;
+  requirementId?: string;
+  traceId?: string;
+  metadata?: Record<string, unknown>;
+  actorUserId?: UserId | null;
+  resourceType?: string;
+  resourceId?: string;
   detail?: Record<string, unknown>;
 }
 
@@ -184,5 +199,6 @@ export interface AuditLogReportFilter {
   actorUserId?: UserId;
   actions?: string[];
   resourceTypes?: string[];
+  targetTypes?: string[];
   limit?: number;
 }

@@ -26,6 +26,7 @@ const ALLOWED_TRANSITIONS: Record<DeletionJobStatus, DeletionJobStatus[]> = {
 function cloneAuditLog(record: AuditLogRecord): AuditLogRecord {
   return {
     ...record,
+    metadata: { ...record.metadata },
     detail: { ...record.detail },
   };
 }
@@ -62,16 +63,29 @@ function getNextAuditLogTimestamp(existingLogs: Iterable<AuditLogRecord>, fallba
 export class OpsRepository implements OpsRepositoryContract {
   public constructor(private readonly client: SupabaseRepositoryClient) {}
 
-  public async insertAuditLog(record: AuditLogRecordInput): Promise<AuditLogRecord> {
+  public async insertAuditLog(auditRecord: AuditLogRecordInput): Promise<AuditLogRecord> {
     const now = this.client.now();
+    const metadata = { ...(auditRecord.metadata ?? auditRecord.detail ?? {}) };
+    const actorRole = auditRecord.actorRole ?? (auditRecord.actorUserId === null ? "system" : "user");
+    const targetType = auditRecord.targetType ?? auditRecord.resourceType ?? "unknown";
+    const targetId = auditRecord.targetId ?? auditRecord.resourceId ?? "";
+    const occurredAt = getNextAuditLogTimestamp(this.client.auditLogs.values(), now);
     const created: AuditLogRecord = {
       id: this.client.nextAuditLogId(),
-      actorUserId: record.actorUserId,
-      action: record.action,
-      resourceType: record.resourceType,
-      resourceId: record.resourceId,
-      detail: { ...(record.detail ?? {}) },
-      createdAt: getNextAuditLogTimestamp(this.client.auditLogs.values(), now),
+      actorRole,
+      action: auditRecord.action,
+      targetType,
+      targetId,
+      result: auditRecord.result ?? "success",
+      requirementId: auditRecord.requirementId ?? "",
+      traceId: auditRecord.traceId ?? "",
+      metadata,
+      actorUserId: auditRecord.actorUserId ?? null,
+      resourceType: auditRecord.resourceType ?? targetType,
+      resourceId: auditRecord.resourceId ?? targetId,
+      detail: metadata,
+      occurredAt,
+      createdAt: occurredAt,
     };
 
     this.client.auditLogs.set(created.id, created);
@@ -228,7 +242,8 @@ export class OpsRepository implements OpsRepositoryContract {
 
   public async queryAuditLogsForReport(filter: AuditLogReportFilter): Promise<AuditLogRecord[]> {
     const actions = filter.actions === undefined ? null : new Set(filter.actions);
-    const resourceTypes = filter.resourceTypes === undefined ? null : new Set(filter.resourceTypes);
+    const resourceTypes = filter.resourceTypes ?? filter.targetTypes;
+    const resourceTypeSet = resourceTypes === undefined ? null : new Set(resourceTypes);
     const limit = filter.limit ?? Number.POSITIVE_INFINITY;
 
     const rows = [...this.client.auditLogs.values()].filter((row) => {
@@ -241,7 +256,7 @@ export class OpsRepository implements OpsRepositoryContract {
       if (actions !== null && !actions.has(row.action)) {
         return false;
       }
-      if (resourceTypes !== null && !resourceTypes.has(row.resourceType)) {
+      if (resourceTypeSet !== null && !resourceTypeSet.has(row.resourceType)) {
         return false;
       }
       return true;

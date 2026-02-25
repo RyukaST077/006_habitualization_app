@@ -2,6 +2,9 @@ import { assertIf002SelfOnlyAccess } from "./authorization";
 import { validateHabitCreateDto, validateHabitUpdateDto, validateProfileSettingsDto } from "./dto-schemas";
 import { createIf002HandledError, mapIf002Error } from "./error-mapper";
 import { createValidationErrorResult, type If002ErrorResult } from "./error-response";
+import { AuditLogService } from "../audit/AuditLogService";
+import type { OpsRepositoryContract } from "../../domain/repositories/contracts";
+import type { AuditLogRecord, AuditLogRecordInput } from "../../domain/repositories/types";
 
 interface If002RunnerRequest {
   actorUserId: string;
@@ -26,6 +29,33 @@ interface If002RunnerErrorScenario {
 }
 
 const FR025_REQUIREMENT_ID = "FR-025";
+const IF002_AUDIT_ACTION = "if-002.error";
+
+let if002AuditSequence = 0;
+const if002AuditLogService = new AuditLogService({
+  async insertAuditLog(auditRecord: AuditLogRecordInput): Promise<AuditLogRecord> {
+    const timestamp = new Date().toISOString();
+    if002AuditSequence += 1;
+
+    return {
+      id: `${if002AuditSequence}`,
+      actorRole: auditRecord.actorRole ?? "user",
+      action: auditRecord.action,
+      targetType: auditRecord.targetType ?? "if-002",
+      targetId: auditRecord.targetId ?? "error",
+      result: auditRecord.result ?? "failure",
+      requirementId: auditRecord.requirementId ?? "",
+      traceId: auditRecord.traceId ?? "",
+      metadata: { ...(auditRecord.metadata ?? {}) },
+      actorUserId: auditRecord.actorUserId ?? null,
+      resourceType: auditRecord.resourceType ?? auditRecord.targetType ?? "if-002",
+      resourceId: auditRecord.resourceId ?? auditRecord.targetId ?? "error",
+      detail: { ...(auditRecord.detail ?? auditRecord.metadata ?? {}) },
+      occurredAt: timestamp,
+      createdAt: timestamp,
+    };
+  },
+} as OpsRepositoryContract);
 
 function isForceThrowRequested(body: Record<string, unknown>): boolean {
   return body.force_throw === true;
@@ -69,12 +99,12 @@ function maybeCreateDtoErrorResult(testCase: If002RunnerCase): If002ErrorResult 
   return null;
 }
 
-function runWithErrorMapping(testCase: {
+async function runWithErrorMapping(testCase: {
   traceId: string;
   requirementId: string;
   request: If002RunnerRequest;
   endpoint: string;
-}): If002ErrorResult {
+}): Promise<If002ErrorResult> {
   try {
     const targetUserId = testCase.request.targetUserId ?? testCase.request.actorUserId;
 
@@ -89,24 +119,50 @@ function runWithErrorMapping(testCase: {
     }
 
     if (testCase.endpoint === "/api/checkins" && testCase.request.body.habit_id === "habit-archived-001") {
-      throw createIf002HandledError("DOMAIN_CONFLICT", "archived habit cannot be checked in", testCase.requirementId);
+      throw createIf002HandledError(
+        "DOMAIN_CONFLICT",
+        "archived habit cannot be checked in",
+        testCase.requirementId,
+        testCase.traceId,
+      );
     }
 
     throw new Error("unexpected error");
   } catch (error: unknown) {
     const mapped = mapIf002Error(error, testCase.traceId, testCase.requirementId);
-    if (mapped.status === 403 && mapped.body.code === "FORBIDDEN") {
-      mapped.body.requirement_id = FR025_REQUIREMENT_ID;
-      if (mapped.body.trace_id.length === 0) {
-        mapped.body.trace_id = `trace-${testCase.traceId}`;
-      }
-    }
-
-    if (mapped.status === 500 && mapped.body.code === "INTERNAL_ERROR" && mapped.body.trace_id.length === 0) {
-      mapped.body.trace_id = `trace-${testCase.traceId}`;
-    }
+    await recordIf002ErrorAudit(testCase, mapped);
 
     return mapped;
+  }
+}
+
+async function recordIf002ErrorAudit(
+  testCase: {
+    traceId: string;
+    requirementId: string;
+    request: If002RunnerRequest;
+    endpoint: string;
+  },
+  mapped: If002ErrorResult,
+): Promise<void> {
+  try {
+    await if002AuditLogService.record({
+      actorRole: "user",
+      action: IF002_AUDIT_ACTION,
+      targetType: "if-002",
+      targetId: testCase.endpoint,
+      result: "failure",
+      requirementId: mapped.body.requirement_id || testCase.requirementId || FR025_REQUIREMENT_ID,
+      traceId: mapped.body.trace_id || testCase.traceId,
+      metadata: {
+        status: mapped.status,
+        code: mapped.body.code,
+        endpoint: testCase.endpoint,
+      },
+      actorUserId: testCase.request.actorUserId,
+    });
+  } catch {
+    // Error response priority: audit write failures must not mask mapped IF-002 errors in tests.
   }
 }
 
@@ -116,7 +172,7 @@ export async function runPlannedCase(testCase: If002RunnerCase): Promise<If002Er
     return dtoErrorResult;
   }
 
-  return runWithErrorMapping(testCase);
+  return await runWithErrorMapping(testCase);
 }
 
 export async function runInvalidPayloadCase(testCase: If002RunnerCase): Promise<If002ErrorResult> {
@@ -135,5 +191,5 @@ export async function runInvalidPayloadCase(testCase: If002RunnerCase): Promise<
 }
 
 export async function runErrorScenarioCase(testCase: If002RunnerErrorScenario): Promise<If002ErrorResult> {
-  return runWithErrorMapping(testCase);
+  return await runWithErrorMapping(testCase);
 }

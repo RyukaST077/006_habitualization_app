@@ -22,7 +22,7 @@ export const T030_AUDIT_REQUIRED_FIELDS = [
 
 export const T030_AUDIT_MISSING_FIELD_SCENARIOS: readonly T030AuditMissingFieldScenario[] = [
   {
-    traceId: "T-030/TBL-008/audit-logs/missing-actor/FR-026/AC-026",
+    traceId: "T-030/IF-002/TBL-008/audit-logs/missing-actor/FR-026/AC-026",
     title: "audit_logs は actor 欠落を許容しない",
     scope: "audit_logs",
     missingField: "actor",
@@ -30,7 +30,7 @@ export const T030_AUDIT_MISSING_FIELD_SCENARIOS: readonly T030AuditMissingFieldS
     acceptanceId: "AC-026",
   },
   {
-    traceId: "T-030/TBL-008/audit-logs/missing-occurred-at/FR-026/AC-026",
+    traceId: "T-030/IF-002/TBL-008/audit-logs/missing-occurred-at/FR-026/AC-026",
     title: "audit_logs は occurred_at 欠落を許容しない",
     scope: "audit_logs",
     missingField: "occurred_at",
@@ -38,7 +38,7 @@ export const T030_AUDIT_MISSING_FIELD_SCENARIOS: readonly T030AuditMissingFieldS
     acceptanceId: "AC-026",
   },
   {
-    traceId: "T-030/TBL-008/audit-logs/missing-action/FR-026/AC-026",
+    traceId: "T-030/IF-002/TBL-008/audit-logs/missing-action/FR-026/AC-026",
     title: "audit_logs は action 欠落を許容しない",
     scope: "audit_logs",
     missingField: "action",
@@ -46,7 +46,7 @@ export const T030_AUDIT_MISSING_FIELD_SCENARIOS: readonly T030AuditMissingFieldS
     acceptanceId: "AC-026",
   },
   {
-    traceId: "T-030/TBL-008/audit-logs/missing-target-id/FR-026/AC-026",
+    traceId: "T-030/IF-002/TBL-008/audit-logs/missing-target-id/FR-026/AC-026",
     title: "audit_logs は target_id 欠落を許容しない",
     scope: "audit_logs",
     missingField: "target_id",
@@ -54,7 +54,7 @@ export const T030_AUDIT_MISSING_FIELD_SCENARIOS: readonly T030AuditMissingFieldS
     acceptanceId: "AC-026",
   },
   {
-    traceId: "T-030/TBL-008/audit-logs/missing-result/FR-026/AC-026",
+    traceId: "T-030/IF-002/TBL-008/audit-logs/missing-result/FR-026/AC-026",
     title: "audit_logs は result 欠落を許容しない",
     scope: "audit_logs",
     missingField: "result",
@@ -62,7 +62,7 @@ export const T030_AUDIT_MISSING_FIELD_SCENARIOS: readonly T030AuditMissingFieldS
     acceptanceId: "AC-026",
   },
   {
-    traceId: "T-030/TBL-008/policy-settings/missing-old-version/FR-026/AC-026",
+    traceId: "T-030/IF-002/TBL-008/policy-settings/missing-old-version/FR-026/AC-026",
     title: "policy_settings は old_version 欠落を許容しない",
     scope: "policy_settings",
     missingField: "old_version",
@@ -70,7 +70,7 @@ export const T030_AUDIT_MISSING_FIELD_SCENARIOS: readonly T030AuditMissingFieldS
     acceptanceId: "AC-026",
   },
   {
-    traceId: "T-030/TBL-008/policy-settings/missing-new-version/FR-026/AC-026",
+    traceId: "T-030/IF-002/TBL-008/policy-settings/missing-new-version/FR-026/AC-026",
     title: "policy_settings は new_version 欠落を許容しない",
     scope: "policy_settings",
     missingField: "new_version",
@@ -78,7 +78,7 @@ export const T030_AUDIT_MISSING_FIELD_SCENARIOS: readonly T030AuditMissingFieldS
     acceptanceId: "AC-026",
   },
   {
-    traceId: "T-030/TBL-008/policy-settings/missing-policy-type/FR-026/AC-026",
+    traceId: "T-030/IF-002/TBL-008/policy-settings/missing-policy-type/FR-026/AC-026",
     title: "policy_settings は policy_type 欠落を許容しない",
     scope: "policy_settings",
     missingField: "policy_type",

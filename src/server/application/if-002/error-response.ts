@@ -1,4 +1,5 @@
 import type { If002ValidationError } from "./dto-schemas";
+import { normalizeTraceId } from "../common/trace-id";
 
 export interface If002ErrorResponse {
   code: string;
@@ -21,7 +22,7 @@ export function createValidationErrorResult(
     body: {
       code: "VALIDATION_ERROR",
       message: validationError.message,
-      trace_id: `trace-${traceId}`,
+      trace_id: normalizeTraceId(traceId),
       requirement_id: validationError.requirement_id,
     },
   };

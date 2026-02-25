@@ -65,7 +65,7 @@ export interface PolicyRepositoryContract {
 }
 
 export interface OpsRepositoryContract {
-  insertAuditLog(record: AuditLogRecordInput): Promise<AuditLogRecord>;
+  insertAuditLog(auditRecord: AuditLogRecordInput): Promise<AuditLogRecord>;
   upsertDailyKpi(rows: DailyKpiInput[]): Promise<DailyKpiRow[]>;
   createDeletionJob(job: AccountDeletionJobInput): Promise<AccountDeletionJob>;
   updateDeletionJobStatus(jobId: string, status: DeletionJobStatus): Promise<AccountDeletionJob>;
