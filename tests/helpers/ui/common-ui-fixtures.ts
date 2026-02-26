@@ -19,6 +19,8 @@ export type CommonUiErrorInput = {
   code: CommonUiErrorCode;
 };
 
+const T034_AUTH_UI_IMPLEMENTATION_STATE = "planned" as const;
+
 export const COMMON_UI_DISPLAY_ITEMS = {
   header: [
     "ロゴ",
@@ -88,6 +90,17 @@ export const COMMON_UI_BREAKPOINT_CASES: readonly {
   { key: "lg", width: COMMON_UI_RESPONSIVE_BREAKPOINTS.lg },
 ] as const;
 
+export const SCR001_LOGIN_BUTTON_LOADING_EXPECTATION = {
+  label: "Googleでログイン",
+  loading: true,
+  disabled: true,
+} as const;
+
+export const SCR001_AUTH_FAILURE_EXPECTATION = {
+  errorMessageContains: "認証失敗",
+  retryActionLabel: "再試行",
+} as const;
+
 export function createCommonUiErrorInput(status: CommonUiErrorStatus): CommonUiErrorInput {
   return {
     status,
@@ -101,4 +114,8 @@ export function buildCommonUiRequiredHeaderItems(): string[] {
 
 export function buildCommonUiRequiredFooterItems(): string[] {
   return [...COMMON_UI_FOOTER_REQUIRED_ITEMS];
+}
+
+export function getT034AuthUiImplementationState(): typeof T034_AUTH_UI_IMPLEMENTATION_STATE {
+  return T034_AUTH_UI_IMPLEMENTATION_STATE;
 }

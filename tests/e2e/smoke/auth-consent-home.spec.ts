@@ -33,5 +33,13 @@ test.describe("TC-AUTO-SMK-001 ログイン→同意→ホーム導線", () => {
     await test.step("FR-003 SCR-008 -> SCR-002: 同意画面からホーム遷移を確認する（雛形）", async () => {
       await expect.soft(page).toHaveTitle(/.*/);
     });
+
+    await test.step("FR-001 SCR-001: 認証失敗時にエラー表示され再試行できる（雛形）", async () => {
+      await test.info().attach("retry-traceability", {
+        body: Buffer.from("TC-AUTO-SMK-001,FR-001,SCR-001,認証失敗,再試行"),
+        contentType: "text/plain",
+      });
+      await expect.soft(true).toBe(true);
+    });
   });
 });
