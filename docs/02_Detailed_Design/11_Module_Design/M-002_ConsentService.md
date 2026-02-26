@@ -7,6 +7,10 @@ policy_settings と policy_consents を比較して同意要否を判定し、�
 - Package: `application/policy`
 - File: `ConsentService.ts`
 
+実装メモ:
+- IF-001 認証callback経路では `AuthSessionService` の `ConsentStatusPort` を通じて同意判定を行う。
+- 現行の開発実装では `vite.config.ts` 内の `ConsentStatusPort` 実装が `policy_settings` / `policy_consents` を参照して判定する。
+
 ## 3. 依存関係
 - `M-103 PolicyRepository`
 - `M-010 AuditLogService`

@@ -12,10 +12,12 @@ import {
 import { createIf001TestHarness } from "./helpers/if-001-test-harness";
 
 const IF001_SUITE_COMMAND = "npm run test -- tests/integration/auth/if-001-*.spec.ts";
+const IF001_LINT_COMMAND = "npm run lint";
+const IF001_TYPECHECK_COMMAND = "npm run typecheck";
+const harness = createIf001TestHarness();
 
-describe("T-033 PR-001 FNC-001/IF-001/SCR-001 red test plan", () => {
+describe("T-035 PR-003 FNC-001/IF-001/SCR-001 auth regression test plan", () => {
   it("FR-001/AC-001 をケース定義へトレースする", () => {
-    const harness = createIf001TestHarness();
     harness.assertRequirementTrace(
       IF001_RED_CASES,
       IF001_REQUIRED_REQUIREMENT_IDS,
@@ -23,8 +25,7 @@ describe("T-033 PR-001 FNC-001/IF-001/SCR-001 red test plan", () => {
     );
   });
 
-  it("M-001/IF-001/SCR-001/M-010 の責務境界を固定する", () => {
-    const harness = createIf001TestHarness();
+  it("M-001/IF-001/SCR-001/M-010 の責務境界をリファクタ後の構造で固定する", () => {
     harness.assertResponsibilityBoundaries(IF001_RESPONSIBILITY_MAP, IF001_REQUIRED_BOUNDARIES);
   });
 
@@ -37,8 +38,6 @@ describe("T-033 PR-001 FNC-001/IF-001/SCR-001 red test plan", () => {
   });
 
   it.each(IF001_RED_CASES)("$traceId: FNC-001/IF-001/SCR-001 の境界トレースを保持する", (testCase) => {
-    const harness = createIf001TestHarness();
-
     harness.assertRedPlanningCase(testCase);
     expect(testCase.title.length).toBeGreaterThan(0);
   });
@@ -48,12 +47,16 @@ describe("T-033 PR-001 FNC-001/IF-001/SCR-001 red test plan", () => {
     expect(target.expectedPhase).toBe("RED");
   });
 
-  it("T-033 認証スイートの実行導線を単一コマンドで保持する", () => {
+  it("認証スイートの実行導線を単一コマンドで保持する", () => {
     expect(IF001_SUITE_COMMAND).toBe("npm run test -- tests/integration/auth/if-001-*.spec.ts");
   });
 
-  it("red: T-034 未実装のため認証フローは planned のまま失敗させる", () => {
-    const harness = createIf001TestHarness();
+  it("品質ゲートの実行導線を lint/typecheck で固定する", () => {
+    expect(IF001_LINT_COMMAND).toBe("npm run lint");
+    expect(IF001_TYPECHECK_COMMAND).toBe("npm run typecheck");
+  });
+
+  it("T-034 実装済み状態の回帰固定を維持する", () => {
     expect(harness.getT034ImplementationState()).toBe("implemented");
   });
 });

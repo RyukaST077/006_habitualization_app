@@ -3,9 +3,10 @@ import { describe, expect, it } from "vitest";
 import { IF001_RED_CASES } from "./fixtures/if-001-cases";
 import { createIf001TestHarness } from "./helpers/if-001-test-harness";
 
+const harness = createIf001TestHarness();
+
 describe("T-033 PR-002 M-001 resolvePostLogin(userId) red tests", () => {
   it("同意済みユーザーは SCR-002 へ遷移し LOGIN_SUCCESS を扱う", async () => {
-    const harness = createIf001TestHarness();
     const resolvePostLogin = harness.createPostLoginResolver(["user-consented"]);
     const route = await resolvePostLogin("user-consented");
 
@@ -16,7 +17,6 @@ describe("T-033 PR-002 M-001 resolvePostLogin(userId) red tests", () => {
   });
 
   it("未同意ユーザーは SCR-008 へ遷移する", async () => {
-    const harness = createIf001TestHarness();
     const resolvePostLogin = harness.createPostLoginResolver(["user-consented"]);
     const route = await resolvePostLogin("user-not-consented");
 
@@ -24,7 +24,6 @@ describe("T-033 PR-002 M-001 resolvePostLogin(userId) red tests", () => {
   });
 
   it("resolvePostLogin(userId) の期待分岐 SCR-008/SCR-002 を固定する", async () => {
-    const harness = createIf001TestHarness();
     const resolvePostLogin = harness.createPostLoginResolver(["user-a"]);
     const routeSet = new Set([
       await resolvePostLogin("user-a"),
@@ -36,7 +35,6 @@ describe("T-033 PR-002 M-001 resolvePostLogin(userId) red tests", () => {
   });
 
   it("red: T-034 未実装のため post-login 分岐は失敗させる", () => {
-    const harness = createIf001TestHarness();
     expect(harness.getT034ImplementationState()).toBe("implemented");
   });
 });

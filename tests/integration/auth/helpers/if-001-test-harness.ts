@@ -1,7 +1,7 @@
 import { expect } from "vitest";
-import { isAppError } from "../../../../src/server/application/common/AppError";
 import { AuthSessionService, type AuthSessionAuditLogPort, type ConsentStatusPort } from "../../../../src/server/application/auth/AuthSessionService";
 import type { SupabaseAuthGatewayContract } from "../../../../src/server/application/auth/SupabaseAuthGateway";
+import { createIf001StartHandler } from "../../../../src/server/application/if-001/start-handler";
 import type {
   If001StartApiRequest,
   If001StartApiResponse,
@@ -25,6 +25,8 @@ const T034_IMPLEMENTATION_STATE = "implemented" as const;
 interface TestAuditRecord {
   action: string;
   result: string;
+  targetId: string;
+  requirementId: string;
   traceId: string;
   actorUserId?: string | null;
 }
@@ -89,6 +91,8 @@ function createAuthSessionService(options: HarnessServiceOptions): {
       auditRecords.push({
         action: input.action,
         result: input.result,
+        targetId: input.targetId,
+        requirementId: input.requirementId,
         traceId: input.traceId,
         actorUserId: input.actorUserId,
       });
@@ -103,6 +107,21 @@ function createAuthSessionService(options: HarnessServiceOptions): {
 }
 
 export function createIf001TestHarness(): If001TestHarness {
+  const assertRequiredAuditFields = (event: Pick<If001AuditEventFixture, "trace_id" | "action" | "target_id" | "result">): void => {
+    expect(event.trace_id.trim().length).toBeGreaterThan(0);
+    expect(event.action.trim().length).toBeGreaterThan(0);
+    expect(event.target_id.trim().length).toBeGreaterThan(0);
+    expect(event.result.trim().length).toBeGreaterThan(0);
+  };
+
+  const assertRequiredAuditRecord = (record: TestAuditRecord): void => {
+    expect(record.traceId.trim().length).toBeGreaterThan(0);
+    expect(record.action.trim().length).toBeGreaterThan(0);
+    expect(record.targetId.trim().length).toBeGreaterThan(0);
+    expect(record.result.trim().length).toBeGreaterThan(0);
+    expect(record.requirementId).toBe("FR-001");
+  };
+
   const assertTraceId = (traceId: string): void => {
     expect(typeof traceId).toBe("string");
     expect(traceId.length).toBeGreaterThan(0);
@@ -111,9 +130,11 @@ export function createIf001TestHarness(): If001TestHarness {
 
   const assertAuditEvent = (event: If001AuditEventFixture, action: If001AuditAction): void => {
     expect(event.action).toBe(action);
+    assertRequiredAuditFields(event);
     assertTraceId(event.trace_id);
     if (action === "LOGIN_START") {
       expect(event.result).toBe("SUCCESS");
+      expect(event.target_id).toBe("google_oauth");
       expect(event.user_id).toBeNull();
       return;
     }
@@ -171,58 +192,33 @@ export function createIf001TestHarness(): If001TestHarness {
     },
     createStartApiStub(): (request: If001StartApiRequest) => Promise<If001StartApiResponse> {
       return async (request: If001StartApiRequest): Promise<If001StartApiResponse> => {
-        if (!request.authorization) {
-          const auditEvent = {
-            ...IF001_AUDIT_EVENTS.LOGIN_FAILED,
-            trace_id: "trace-if001-start-401-auth-failed",
-          };
-          return {
-            status: 401,
-            body: {
-              code: "AUTH_FAILED",
-              trace_id: auditEvent.trace_id,
-              route: "SCR-001",
-              audit_action: auditEvent.action,
-            },
-          };
-        }
-
         const { service } = createAuthSessionService({
           consentedUserIds: [],
           providerError: request.redirectTo === "/cause-provider-error",
         });
-
-        try {
-          const result = await service.startGoogleLogin(request.redirectTo ?? "");
-          return {
-            status: 200,
-            body: {
-              auth_url: result.authUrl,
-              trace_id: result.traceId,
-              audit_action: result.auditAction,
-            },
-          };
-        } catch (error: unknown) {
-          const traceId = isAppError(error) ? error.traceId : "trace-if001-start-500-provider-error";
-          const code = isAppError(error) && error.code === "INVALID_REDIRECT" ? "INVALID_REDIRECT" : "AUTH_PROVIDER_ERROR";
-          const status = code === "INVALID_REDIRECT" ? 400 : 500;
-
-          return {
-            status,
-            body: {
-              code,
-              trace_id: traceId,
-              route: "SCR-001",
-              audit_action: "LOGIN_FAILED",
-            },
-          };
-        }
+        const startHandler = createIf001StartHandler({ authSessionService: service });
+        return startHandler(request);
       };
     },
     createPostLoginResolver(consentedUserIds: readonly string[]): (userId: string) => Promise<If001RouteId> {
-      const { service } = createAuthSessionService({ consentedUserIds, providerError: false });
+      const { service, auditRecords } = createAuthSessionService({ consentedUserIds, providerError: false });
       return async (userId: string): Promise<If001RouteId> => {
         const result = await service.resolvePostLogin(userId);
+        const latestAudit = auditRecords[auditRecords.length - 1];
+        expect(latestAudit).toBeDefined();
+        if (!latestAudit) {
+          throw new Error("latest audit event is required");
+        }
+        assertRequiredAuditRecord(latestAudit);
+        expect(latestAudit.targetId).toBe(userId);
+        expect(latestAudit.actorUserId).toBe(userId);
+        if (result.route === "SCR-002") {
+          expect(latestAudit.action).toBe("LOGIN_SUCCESS");
+          expect(latestAudit.result).toBe("SUCCESS");
+        } else {
+          expect(latestAudit.action).toBe("LOGIN_FAILED");
+          expect(latestAudit.result).toBe("FAILED");
+        }
         return result.route;
       };
     },
@@ -231,7 +227,13 @@ export function createIf001TestHarness(): If001TestHarness {
       return async (userId: string): Promise<If001ConsentDeclineLogoutResult> => {
         const result = await service.rejectConsentAndLogout(userId);
         const latestAudit = auditRecords[auditRecords.length - 1];
+        expect(latestAudit).toBeDefined();
+        if (!latestAudit) {
+          throw new Error("latest audit event is required");
+        }
+        assertRequiredAuditRecord(latestAudit);
         expect(latestAudit?.action).toBe("LOGIN_FAILED");
+        expect(latestAudit?.targetId).toBe(userId);
         expect(latestAudit?.result).toBe("FAILED");
         expect(latestAudit?.actorUserId).toBe(userId);
         return result;
@@ -246,7 +248,7 @@ export function createIf001TestHarness(): If001TestHarness {
       assertTraceId(response.body.trace_id);
       expect(response.body.audit_action).toBe(IF001_AUDIT_EVENTS.LOGIN_START.action);
       assertAuditEvent(
-        { ...IF001_AUDIT_EVENTS.LOGIN_START, trace_id: response.body.trace_id },
+        { ...IF001_AUDIT_EVENTS.LOGIN_START, trace_id: response.body.trace_id, target_id: "google_oauth" },
         "LOGIN_START",
       );
     },
@@ -258,8 +260,9 @@ export function createIf001TestHarness(): If001TestHarness {
       assertTraceId(response.body.trace_id);
       expect(response.body.route).toBe("SCR-001");
       expect(response.body.audit_action).toBe("LOGIN_FAILED");
+      const targetId = status === 400 ? "invalid_redirect" : "google_oauth";
       assertAuditEvent(
-        { ...IF001_AUDIT_EVENTS.LOGIN_FAILED, trace_id: response.body.trace_id },
+        { ...IF001_AUDIT_EVENTS.LOGIN_FAILED, trace_id: response.body.trace_id, target_id: targetId },
         "LOGIN_FAILED",
       );
       if (status === 400) {

@@ -7,23 +7,31 @@ interface If001StartHandlerDeps {
   authSessionService: Pick<AuthSessionService, "startGoogleLogin">;
 }
 
+type If001StartErrorCode = "INVALID_REDIRECT" | "AUTH_PROVIDER_ERROR";
+
 function hasAuthorizationHeader(value: string | undefined): boolean {
   return typeof value === "string" && value.trim().length > 0;
 }
 
-function mapAppErrorToResponse(error: unknown): { status: 400 | 500; code: "INVALID_REDIRECT" | "AUTH_PROVIDER_ERROR"; traceId: string } {
-  if (isAppError(error) && error.code === "INVALID_REDIRECT") {
-    return {
-      status: 400,
-      code: "INVALID_REDIRECT",
-      traceId: normalizeTraceId(error.traceId),
-    };
+function mapAppErrorToResponse(error: unknown): { status: 400 | 500; code: If001StartErrorCode; traceId: string } {
+  const traceId = normalizeTraceId(isAppError(error) ? error.traceId : "if001-start-provider-error");
+  if (!isAppError(error)) {
+    return { status: 500, code: "AUTH_PROVIDER_ERROR", traceId };
   }
 
-  return {
+  const responseByCode: Record<If001StartErrorCode, { status: 400 | 500; code: If001StartErrorCode }> = {
+    INVALID_REDIRECT: { status: 400, code: "INVALID_REDIRECT" },
+    AUTH_PROVIDER_ERROR: { status: 500, code: "AUTH_PROVIDER_ERROR" },
+  };
+
+  const mapped = responseByCode[error.code as If001StartErrorCode] ?? {
     status: 500,
-    code: "AUTH_PROVIDER_ERROR",
-    traceId: normalizeTraceId(isAppError(error) ? error.traceId : "if001-start-provider-error"),
+    code: "AUTH_PROVIDER_ERROR" as const,
+  };
+  return {
+    status: mapped.status,
+    code: mapped.code,
+    traceId,
   };
 }
 

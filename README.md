@@ -54,6 +54,26 @@ cp .env.prod.example .env.prod.local
 - `.env*.example` にはダミー値のみを置き、実値のシークレットを保存しない。
 - Preview 環境から Prod 接続先（本番DB / 本番Supabase URL）へは接続しない。
 - `SUPABASE_ENV` と `NEXT_PUBLIC_SUPABASE_URL` は必ず環境ごとに分離する。
+- IF-001（認証開始/コールバック）で必要な値:
+  - `SUPABASE_URL`（または `NEXT_PUBLIC_SUPABASE_URL`）
+  - `SUPABASE_SERVICE_ROLE_KEY`
+  - `APP_ORIGIN`（例: `http://localhost:5173`）
+
+ローカル実行例（`.env.local`）:
+
+```dotenv
+APP_ENV=dev
+SUPABASE_ENV=dev
+APP_ORIGIN=http://localhost:5173
+
+NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon-key>
+
+# テスト/サーバ参照互換
+SUPABASE_URL=https://<project-ref>.supabase.co
+SUPABASE_ANON_KEY=<anon-key>
+SUPABASE_SERVICE_ROLE_KEY=<service-role-key>
+```
 
 ## 主要ドキュメント
 

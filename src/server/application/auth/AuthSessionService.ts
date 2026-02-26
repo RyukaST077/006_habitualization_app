@@ -12,6 +12,8 @@ const TARGET_TYPE = "auth_session";
 const LOGIN_START = "LOGIN_START";
 const LOGIN_SUCCESS = "LOGIN_SUCCESS";
 const LOGIN_FAILED = "LOGIN_FAILED";
+type LoginAuditAction = typeof LOGIN_START | typeof LOGIN_SUCCESS | typeof LOGIN_FAILED;
+type LoginAuditResult = "SUCCESS" | "FAILED";
 
 export interface AuthSessionAuditLogPort {
   record(input: {
@@ -36,6 +38,8 @@ export interface StartGoogleLoginResult {
   traceId: string;
   auditAction: "LOGIN_START";
 }
+
+type StartGoogleLoginErrorCode = "INVALID_REDIRECT" | "AUTH_PROVIDER_ERROR";
 
 function isValidRedirectTo(redirectTo: string): boolean {
   if (redirectTo.trim() !== redirectTo) {
@@ -72,18 +76,27 @@ export class AuthSessionService {
     const traceId = createTraceId("login-start");
 
     if (!isValidRedirectTo(redirectTo)) {
-      await this.recordAudit(LOGIN_FAILED, "FAILED", "invalid_redirect", traceId, null, { redirectTo });
-      throw createAppError({
-        code: "INVALID_REDIRECT",
-        message: "redirectTo must be an internal path",
-        requirementId: AUTH_REQUIREMENT_ID,
+      await this.recordAudit({
+        action: LOGIN_FAILED,
+        result: "FAILED",
+        targetId: "invalid_redirect",
         traceId,
+        actorUserId: null,
+        metadata: { redirectTo },
       });
+      throw this.createStartGoogleLoginError("INVALID_REDIRECT", traceId, "redirectTo must be an internal path");
     }
 
     try {
       const authUrl = await this.authGateway.buildGoogleOAuthUrl(redirectTo);
-      await this.recordAudit(LOGIN_START, "SUCCESS", "google_oauth", traceId, null, { redirectTo });
+      await this.recordAudit({
+        action: LOGIN_START,
+        result: "SUCCESS",
+        targetId: "google_oauth",
+        traceId,
+        actorUserId: null,
+        metadata: { redirectTo },
+      });
 
       return {
         authUrl,
@@ -91,17 +104,15 @@ export class AuthSessionService {
         auditAction: LOGIN_START,
       };
     } catch (error: unknown) {
-      if (isAppError(error)) {
-        throw error;
-      }
-
-      await this.recordAudit(LOGIN_FAILED, "FAILED", "google_oauth", traceId, null, { redirectTo });
-      throw createAppError({
-        code: "AUTH_PROVIDER_ERROR",
-        message: "failed to create oauth url",
-        requirementId: AUTH_REQUIREMENT_ID,
+      await this.recordAudit({
+        action: LOGIN_FAILED,
+        result: "FAILED",
+        targetId: "google_oauth",
         traceId,
+        actorUserId: null,
+        metadata: { redirectTo },
       });
+      throw this.mapStartGoogleLoginError(error, traceId);
     }
   }
 
@@ -111,11 +122,24 @@ export class AuthSessionService {
     const isConsented = await this.consentStatusPort.hasConsented(userId);
 
     if (isConsented) {
-      await this.recordAudit(LOGIN_SUCCESS, "SUCCESS", userId, traceId, userId);
+      await this.recordAudit({
+        action: LOGIN_SUCCESS,
+        result: "SUCCESS",
+        targetId: userId,
+        traceId,
+        actorUserId: userId,
+      });
       return { route: "SCR-002" };
     }
 
-    await this.recordAudit(LOGIN_FAILED, "FAILED", userId, traceId, userId, { reason: "consent_required" });
+    await this.recordAudit({
+      action: LOGIN_FAILED,
+      result: "FAILED",
+      targetId: userId,
+      traceId,
+      actorUserId: userId,
+      metadata: { reason: "consent_required" },
+    });
     return { route: "SCR-008" };
   }
 
@@ -124,7 +148,14 @@ export class AuthSessionService {
     const traceId = createTraceId("consent-declined");
 
     await this.authGateway.clearSession(userId);
-    await this.recordAudit(LOGIN_FAILED, "FAILED", userId, traceId, userId, { reason: "consent_declined" });
+    await this.recordAudit({
+      action: LOGIN_FAILED,
+      result: "FAILED",
+      targetId: userId,
+      traceId,
+      actorUserId: userId,
+      metadata: { reason: "consent_declined" },
+    });
 
     return {
       route: "SCR-001",
@@ -133,24 +164,53 @@ export class AuthSessionService {
     };
   }
 
-  private async recordAudit(
-    action: string,
-    result: string,
-    targetId: string,
-    traceId: string,
+  private createLoginAuditRecord(input: {
+    action: LoginAuditAction;
+    result: LoginAuditResult;
+    targetId: string;
+    traceId: string;
     actorUserId?: string | null,
-    metadata?: Record<string, unknown>,
-  ): Promise<void> {
-    await this.auditLogService.record({
+    metadata?: Record<string, unknown>;
+  }): Parameters<AuthSessionAuditLogPort["record"]>[0] {
+    return {
       actorRole: ACTOR_ROLE,
-      action,
+      action: input.action,
       targetType: TARGET_TYPE,
-      targetId,
-      result,
+      targetId: input.targetId,
+      result: input.result,
+      requirementId: AUTH_REQUIREMENT_ID,
+      traceId: input.traceId,
+      metadata: input.metadata,
+      actorUserId: input.actorUserId,
+    };
+  }
+
+  private async recordAudit(input: {
+    action: LoginAuditAction;
+    result: LoginAuditResult;
+    targetId: string;
+    traceId: string;
+    actorUserId?: string | null;
+    metadata?: Record<string, unknown>;
+  }): Promise<void> {
+    await this.auditLogService.record({
+      ...this.createLoginAuditRecord(input),
+    });
+  }
+
+  private mapStartGoogleLoginError(error: unknown, traceId: string) {
+    if (isAppError(error) && error.code === "INVALID_REDIRECT") {
+      return this.createStartGoogleLoginError("INVALID_REDIRECT", traceId, error.message);
+    }
+    return this.createStartGoogleLoginError("AUTH_PROVIDER_ERROR", traceId, "failed to create oauth url");
+  }
+
+  private createStartGoogleLoginError(code: StartGoogleLoginErrorCode, traceId: string, message: string) {
+    return createAppError({
+      code,
+      message,
       requirementId: AUTH_REQUIREMENT_ID,
       traceId,
-      metadata,
-      actorUserId,
     });
   }
 }
