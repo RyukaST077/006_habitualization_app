@@ -5,6 +5,8 @@ import type {
   Habit,
   HabitLog,
   MonitoringAlertEvent,
+  PolicyType,
+  PolicyVersion,
   PolicySetting,
   Profile,
   UserDailyActivity,
@@ -236,7 +238,7 @@ function buildActivityKey(userId: string, logDate: string): string {
   return `${userId}:${logDate}`;
 }
 
-function buildConsentKey(userId: string, policyType: string, policyVersion: string): string {
+function buildConsentKey(userId: string, policyType: PolicyType, policyVersion: PolicyVersion): string {
   return `${userId}:${policyType}:${policyVersion}`;
 }
 
@@ -282,7 +284,11 @@ export function buildActivityKeyForRepository(userId: string, logDate: string): 
   return buildActivityKey(userId, logDate);
 }
 
-export function buildConsentKeyForRepository(userId: string, policyType: string, policyVersion: string): string {
+export function buildConsentKeyForRepository(
+  userId: string,
+  policyType: PolicyType,
+  policyVersion: PolicyVersion,
+): string {
   return buildConsentKey(userId, policyType, policyVersion);
 }
 

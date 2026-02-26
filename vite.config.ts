@@ -13,6 +13,7 @@ import { createIf001CallbackHandler } from "./src/server/application/if-001/call
 import { createIf001StartHandler } from "./src/server/application/if-001/start-handler";
 import type { If001StartApiRequest } from "./src/server/application/if-001/contracts";
 import type { If001CallbackHandlerRequest } from "./src/server/application/if-001/callback-handler";
+import type { If001CallbackDecisionResult, If001ConsentDeclineLogoutResult } from "./src/server/application/if-001/types";
 
 function parseRequestBody(req: IncomingMessage): Promise<unknown> {
   return new Promise((resolve, reject) => {
@@ -149,6 +150,19 @@ const authSessionService = new AuthSessionService(authGateway, consentStatusPort
 const startHandler = createIf001StartHandler({ authSessionService });
 const callbackHandler = createIf001CallbackHandler({ authSessionService });
 
+function normalizeCallbackResponse(
+  response: If001CallbackDecisionResult | If001ConsentDeclineLogoutResult,
+  consentState: If001CallbackHandlerRequest["consentState"],
+): If001CallbackDecisionResult | If001ConsentDeclineLogoutResult {
+  if (response.route === "SCR-001") {
+    return response;
+  }
+  if (response.route === "SCR-002" && consentState !== "agreed") {
+    return { route: "SCR-008" };
+  }
+  return response;
+}
+
 function isTargetRequest(req: IncomingMessage, method: "POST", pathname: string): boolean {
   if (req.method !== method || !req.url) {
     return false;
@@ -211,7 +225,7 @@ export default defineConfig(({ mode }) => {
                   return consentState === "agreed" || consentState === "rejected" ? consentState : "unknown";
                 })(),
               };
-              const response = await callbackHandler(request);
+              const response = normalizeCallbackResponse(await callbackHandler(request), request.consentState);
               res.statusCode = 200;
               res.setHeader("content-type", "application/json; charset=utf-8");
               res.end(JSON.stringify(response));

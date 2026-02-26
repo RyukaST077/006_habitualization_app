@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { SCR008PolicyConsentPage } from "../../../src/screens/SCR-008PolicyConsentPage";
 
-const T037_IMPLEMENTATION_STATE = "pending" as const;
+const T037_IMPLEMENTATION_STATE = "implemented" as const;
 
 describe("T-036 PR-004 SCR-008 policy consent UI red tests", () => {
   it("TC-ST-CON-007-001: CON-007 terms/privacy の双方チェックONまでは同意ボタンを無効化する", () => {
@@ -15,6 +15,13 @@ describe("T-036 PR-004 SCR-008 policy consent UI red tests", () => {
 
   it("TC-ST-CON-007-002: terms/privacy 双方ON時のみ同意ボタンを活性化する", () => {
     const page = SCR008PolicyConsentPage({ screenId: "SCR-008" }) as unknown as Record<string, unknown>;
+    const pageActions = page["actions"] as {
+      setTermsChecked: (checked: boolean) => void;
+      setPrivacyChecked: (checked: boolean) => void;
+    };
+
+    pageActions.setTermsChecked(true);
+    pageActions.setPrivacyChecked(true);
 
     expect(page).toHaveProperty("ui.acceptButton.requires", ["terms", "privacy"]);
     expect(page).toHaveProperty("ui.acceptButton.disabled", false);

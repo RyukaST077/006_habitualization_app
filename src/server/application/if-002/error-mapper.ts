@@ -9,13 +9,15 @@ const INTERNAL_ERROR_CODE = "INTERNAL_ERROR";
 const INTERNAL_ERROR_MESSAGE = "unexpected error";
 const DEFAULT_HANDLED_ERROR_TRACE_ID = "if-002-handled-error";
 
-const IF002_HANDLED_ERROR_STATUS: Record<If002HandledErrorCode, 403 | 409> = {
+type If002ResponseCode = If002HandledErrorCode | "VALIDATION_ERROR" | "INTERNAL_ERROR";
+const IF002_HANDLED_ERROR_STATUS: Record<If002HandledErrorCode | "VALIDATION_ERROR", 400 | 403 | 409> = {
   FORBIDDEN: 403,
   DOMAIN_CONFLICT: 409,
+  VALIDATION_ERROR: 400,
 };
 
 export function createIf002HandledError(
-  code: If002HandledErrorCode,
+  code: AppErrorCode,
   message: string,
   requirementId: string,
   traceId: string = "if-002-handled-error",
@@ -77,7 +79,7 @@ function ensureIf002AppError(error: AppError, fallbackTraceId: string, fallbackR
 }
 
 function resolveRequirementId(
-  responseCode: If002HandledErrorCode | "INTERNAL_ERROR",
+  responseCode: If002ResponseCode,
   appRequirementId: string,
   fallbackRequirementId: string,
 ): string {
@@ -97,17 +99,25 @@ function resolveTraceId(appTraceId: string, fallbackTraceId: string): string {
   return normalizedAppTrace;
 }
 
-function toIf002Status(code: If002HandledErrorCode | "INTERNAL_ERROR"): 403 | 409 | 500 {
+function toIf002Status(code: If002ResponseCode): 400 | 403 | 409 | 500 {
   if (code in IF002_HANDLED_ERROR_STATUS) {
-    return IF002_HANDLED_ERROR_STATUS[code as If002HandledErrorCode];
+    return IF002_HANDLED_ERROR_STATUS[code as If002HandledErrorCode | "VALIDATION_ERROR"];
   }
 
   return 500;
 }
 
-function toIf002ResponseCode(code: AppErrorCode): If002HandledErrorCode | "INTERNAL_ERROR" {
-  if (code === "FORBIDDEN" || code === "DOMAIN_CONFLICT") {
-    return code as If002HandledErrorCode;
+function toIf002ResponseCode(code: AppErrorCode): If002ResponseCode {
+  if (code === "FORBIDDEN" || code === "DOMAIN_CONFLICT" || code === "VALIDATION_ERROR") {
+    return code as If002HandledErrorCode | "VALIDATION_ERROR";
+  }
+
+  if (code === "POLICY_VERSION_MISMATCH" || code === "POLICY_VERSION_CONFLICT") {
+    return "DOMAIN_CONFLICT";
+  }
+
+  if (code === "CONSENT_ALREADY_EXISTS" || code === "DUPLICATE_CONSENT_INPUT") {
+    return "VALIDATION_ERROR";
   }
 
   return INTERNAL_ERROR_CODE;

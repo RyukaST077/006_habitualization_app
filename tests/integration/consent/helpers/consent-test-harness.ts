@@ -7,7 +7,7 @@ import type {
   ConsentRequirementId,
 } from "../fixtures/fnc-002-003-cases";
 
-const T037_IMPLEMENTATION_STATE = "pending" as const;
+const T037_IMPLEMENTATION_STATE = "implemented" as const;
 
 export interface ConsentTestHarness {
   assertRequirementTrace(
@@ -21,7 +21,7 @@ export interface ConsentTestHarness {
   ): void;
   assertReconsentRiskBinding(cases: readonly ConsentCaseDefinition[]): void;
   assertConstraintBoundaries(cases: readonly ConsentCaseDefinition[]): void;
-  assertRedPlanningCase(testCase: ConsentCaseDefinition): void;
+  assertGreenRegressionCase(testCase: ConsentCaseDefinition): void;
   getT037ImplementationState(): typeof T037_IMPLEMENTATION_STATE;
 }
 
@@ -68,8 +68,8 @@ export function createConsentTestHarness(): ConsentTestHarness {
       expect(con007Case?.notes).toContain("terms");
       expect(con007Case?.notes).toContain("privacy");
     },
-    assertRedPlanningCase(testCase: ConsentCaseDefinition): void {
-      expect(testCase.traceId).toContain("T-036");
+    assertGreenRegressionCase(testCase: ConsentCaseDefinition): void {
+      expect(testCase.traceId).toContain("T-037");
       expect(testCase.traceId).toContain(testCase.requirementId);
       expect(testCase.traceId).toContain(testCase.acceptanceId);
       expect(testCase.title.length).toBeGreaterThan(0);

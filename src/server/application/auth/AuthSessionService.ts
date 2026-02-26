@@ -6,14 +6,19 @@ import type { If001CallbackDecisionResult, If001ConsentDeclineLogoutResult } fro
 import type { SupabaseAuthGatewayContract } from "./SupabaseAuthGateway";
 
 const AUTH_REQUIREMENT_ID = "FR-001";
+const CONSENT_REQUIREMENT_ID = "FR-026";
 const ACTOR_ROLE = "user";
 const TARGET_TYPE = "auth_session";
+const CONSENT_TARGET_TYPE = "policy_consents";
 
 const LOGIN_START = "LOGIN_START";
-const LOGIN_SUCCESS = "LOGIN_SUCCESS";
 const LOGIN_FAILED = "LOGIN_FAILED";
-type LoginAuditAction = typeof LOGIN_START | typeof LOGIN_SUCCESS | typeof LOGIN_FAILED;
+const POLICY_CONSENT_ACCEPT = "POLICY_CONSENT_ACCEPT";
+const POLICY_CONSENT_REJECT = "POLICY_CONSENT_REJECT";
+type LoginAuditAction = typeof LOGIN_START | "LOGIN_SUCCESS" | typeof LOGIN_FAILED;
 type LoginAuditResult = "SUCCESS" | "FAILED";
+type ConsentAuditAction = typeof POLICY_CONSENT_ACCEPT | typeof POLICY_CONSENT_REJECT;
+type ConsentAuditResult = "SUCCESS" | "FAILED";
 
 export interface AuthSessionAuditLogPort {
   record(input: {
@@ -122,23 +127,27 @@ export class AuthSessionService {
     const isConsented = await this.consentStatusPort.hasConsented(userId);
 
     if (isConsented) {
-      await this.recordAudit({
-        action: LOGIN_SUCCESS,
+      await this.recordConsentAudit({
+        action: POLICY_CONSENT_ACCEPT,
         result: "SUCCESS",
         targetId: userId,
         traceId,
         actorUserId: userId,
+        metadata: { policy_type: ["terms", "privacy"] },
       });
       return { route: "SCR-002" };
     }
 
-    await this.recordAudit({
-      action: LOGIN_FAILED,
+    await this.recordConsentAudit({
+      action: POLICY_CONSENT_ACCEPT,
       result: "FAILED",
       targetId: userId,
       traceId,
       actorUserId: userId,
-      metadata: { reason: "consent_required" },
+      metadata: {
+        reason: "consent_required",
+        policy_type: ["terms", "privacy"],
+      },
     });
     return { route: "SCR-008" };
   }
@@ -148,19 +157,22 @@ export class AuthSessionService {
     const traceId = createTraceId("consent-declined");
 
     await this.authGateway.clearSession(userId);
-    await this.recordAudit({
-      action: LOGIN_FAILED,
+    await this.recordConsentAudit({
+      action: POLICY_CONSENT_REJECT,
       result: "FAILED",
       targetId: userId,
       traceId,
       actorUserId: userId,
-      metadata: { reason: "consent_declined" },
+      metadata: {
+        reason: "consent_declined",
+        policy_type: ["terms", "privacy"],
+      },
     });
 
     return {
       route: "SCR-001",
       sessionCleared: true,
-      auditAction: LOGIN_FAILED,
+      auditAction: POLICY_CONSENT_REJECT,
     };
   }
 
@@ -195,6 +207,40 @@ export class AuthSessionService {
   }): Promise<void> {
     await this.auditLogService.record({
       ...this.createLoginAuditRecord(input),
+    });
+  }
+
+  private createConsentAuditRecord(input: {
+    action: ConsentAuditAction;
+    result: ConsentAuditResult;
+    targetId: string;
+    traceId: string;
+    actorUserId?: string | null;
+    metadata?: Record<string, unknown>;
+  }): Parameters<AuthSessionAuditLogPort["record"]>[0] {
+    return {
+      actorRole: ACTOR_ROLE,
+      action: input.action,
+      targetType: CONSENT_TARGET_TYPE,
+      targetId: input.targetId,
+      result: input.result,
+      requirementId: CONSENT_REQUIREMENT_ID,
+      traceId: input.traceId,
+      metadata: input.metadata,
+      actorUserId: input.actorUserId,
+    };
+  }
+
+  private async recordConsentAudit(input: {
+    action: ConsentAuditAction;
+    result: ConsentAuditResult;
+    targetId: string;
+    traceId: string;
+    actorUserId?: string | null;
+    metadata?: Record<string, unknown>;
+  }): Promise<void> {
+    await this.auditLogService.record({
+      ...this.createConsentAuditRecord(input),
     });
   }
 

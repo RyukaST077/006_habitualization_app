@@ -1,10 +1,15 @@
 import { createAppShell } from "./App";
 import { ROUTE_MAP } from "./app/route-map";
+import { resolveAuthConsentRedirect } from "./app/router";
+import { SCR008PolicyConsentPage, type PolicyConsentAuditTrace } from "./screens/SCR-008PolicyConsentPage";
 import type { If001StartApiErrorResponse, If001StartApiSuccessResponse } from "./server/application/if-001/contracts";
 
 export function bootstrapApp() {
   return createAppShell();
 }
+
+const CALLBACK_USER_ID_STORAGE_KEY = "if001-callback-user-id";
+const POLICY_CONSENT_TRACE_STORAGE_KEY = "if001-policy-consent-trace";
 
 function renderAppShell() {
   if (typeof document === "undefined") {
@@ -30,7 +35,7 @@ function renderAppShell() {
     return;
   }
   if (window.location.pathname === ROUTE_MAP["SCR-008"]) {
-    renderSimpleRoutePage(root, app, "SCR-008 Policy Consent", "同意が必要なユーザー向け画面です。");
+    void renderPolicyConsentPage(root, app);
     return;
   }
 
@@ -100,6 +105,7 @@ function renderLoginPage(root: HTMLDivElement, app: ReturnType<typeof bootstrapA
 
 type If001CallbackApiResponse = {
   route: "SCR-001" | "SCR-002" | "SCR-008";
+  auditAction?: "POLICY_CONSENT_REJECT" | "LOGIN_FAILED";
   detail?: string;
 };
 
@@ -161,6 +167,7 @@ async function renderAuthCallbackPage(root: HTMLDivElement, app: ReturnType<type
     status.textContent = "認証失敗: access_token の userId(sub) を取得できませんでした。";
     return;
   }
+  writeSessionStorage(CALLBACK_USER_ID_STORAGE_KEY, userId);
 
   try {
     const response = await fetch("/api/auth/google/callback", {
@@ -179,6 +186,147 @@ async function renderAuthCallbackPage(root: HTMLDivElement, app: ReturnType<type
     setTimeout(() => window.location.assign(nextPath), 250);
   } catch (error: unknown) {
     status.textContent = `認証失敗: ${error instanceof Error ? error.message : "unknown error"}`;
+  }
+}
+
+function writeSessionStorage(key: string, value: string): void {
+  try {
+    window.sessionStorage.setItem(key, value);
+  } catch {
+    return;
+  }
+}
+
+function readSessionStorage(key: string): string | null {
+  try {
+    return window.sessionStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writePolicyConsentTrace(trace: PolicyConsentAuditTrace): string {
+  const traceId = `${trace.action.toLowerCase()}-${Date.now()}`;
+  writeSessionStorage(
+    POLICY_CONSENT_TRACE_STORAGE_KEY,
+    JSON.stringify({
+      trace_id: traceId,
+      action: trace.action,
+      requirement_id: trace.requirementId,
+      metadata: trace.metadata,
+    }),
+  );
+  return traceId;
+}
+
+async function renderPolicyConsentPage(root: HTMLDivElement, app: ReturnType<typeof bootstrapApp>) {
+  root.innerHTML = `<main style="font-family: sans-serif; max-width: 720px; margin: 32px auto; padding: 16px;">
+    <h1>${app.name}</h1>
+    <h2>SCR-008 Policy Consent</h2>
+    <p>利用規約とプライバシーポリシーの両方への同意が必要です。</p>
+    <label style="display: block; margin-top: 12px;">
+      <input id="consent-terms" type="checkbox" />
+      利用規約に同意する
+    </label>
+    <label style="display: block; margin-top: 8px;">
+      <input id="consent-privacy" type="checkbox" />
+      プライバシーポリシーに同意する
+    </label>
+    <div style="display: flex; gap: 8px; margin-top: 16px;">
+      <button id="consent-accept-button" type="button">同意して続行</button>
+      <button id="consent-reject-button" type="button">拒否してログインに戻る</button>
+    </div>
+    <pre id="consent-status" style="margin-top: 16px; white-space: pre-wrap;"></pre>
+  </main>`;
+
+  const termsInput = root.querySelector<HTMLInputElement>("#consent-terms");
+  const privacyInput = root.querySelector<HTMLInputElement>("#consent-privacy");
+  const acceptButton = root.querySelector<HTMLButtonElement>("#consent-accept-button");
+  const rejectButton = root.querySelector<HTMLButtonElement>("#consent-reject-button");
+  const status = root.querySelector<HTMLPreElement>("#consent-status");
+  if (!termsInput || !privacyInput || !acceptButton || !rejectButton || !status) {
+    return;
+  }
+
+  const page = SCR008PolicyConsentPage({
+    screenId: "SCR-008",
+    handlers: {
+      onAccept: (trace) => {
+        void submitPolicyConsentDecision(status, acceptButton, rejectButton, "agreed", trace);
+      },
+      onReject: (trace) => {
+        void submitPolicyConsentDecision(status, acceptButton, rejectButton, "rejected", trace);
+      },
+    },
+  });
+
+  const syncUiState = () => {
+    acceptButton.disabled = page.ui.acceptButton.disabled;
+  };
+
+  termsInput.checked = page.ui.terms.checked;
+  privacyInput.checked = page.ui.privacy.checked;
+  syncUiState();
+
+  termsInput.addEventListener("change", () => {
+    page.actions.setTermsChecked(termsInput.checked);
+    syncUiState();
+  });
+  privacyInput.addEventListener("change", () => {
+    page.actions.setPrivacyChecked(privacyInput.checked);
+    syncUiState();
+  });
+
+  acceptButton.addEventListener("click", () => {
+    if (!page.actions.accept()) {
+      status.textContent = "利用規約とプライバシーポリシーの両方を選択してください。";
+      syncUiState();
+    }
+  });
+  rejectButton.addEventListener("click", () => {
+    page.actions.reject();
+  });
+}
+
+async function submitPolicyConsentDecision(
+  status: HTMLPreElement,
+  acceptButton: HTMLButtonElement,
+  rejectButton: HTMLButtonElement,
+  consentState: "agreed" | "rejected",
+  trace: PolicyConsentAuditTrace,
+): Promise<void> {
+  const userId = readSessionStorage(CALLBACK_USER_ID_STORAGE_KEY);
+  if (!userId) {
+    status.textContent = "認証セッションが見つかりません。/login から再試行してください。";
+    return;
+  }
+
+  acceptButton.disabled = true;
+  rejectButton.disabled = true;
+  const traceId = writePolicyConsentTrace(trace);
+  status.textContent = `${trace.action} を監査トレースに保持しました。\ntrace_id: ${traceId}\n同意結果を送信中...`;
+
+  try {
+    const response = await fetch("/api/auth/google/callback", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ userId, consentState }),
+    });
+    const data = (await response.json()) as If001CallbackApiResponse;
+    if (!response.ok) {
+      status.textContent = `送信失敗: callback API ${response.status}${data.detail ? ` (${data.detail})` : ""}`;
+      acceptButton.disabled = consentState !== "agreed";
+      rejectButton.disabled = false;
+      return;
+    }
+
+    const nextPath = resolveAuthConsentRedirect(ROUTE_MAP["SCR-008"], "authenticated", consentState);
+    status.textContent = `送信成功: ${trace.action}\n${nextPath} に遷移します。`;
+    setTimeout(() => window.location.assign(nextPath), 250);
+  } catch (error: unknown) {
+    status.textContent = `送信失敗: ${error instanceof Error ? error.message : "unknown error"}`;
+    acceptButton.disabled = consentState !== "agreed";
+    rejectButton.disabled = false;
   }
 }
 

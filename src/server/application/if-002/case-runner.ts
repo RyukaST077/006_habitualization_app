@@ -1,5 +1,10 @@
 import { assertIf002SelfOnlyAccess } from "./authorization";
-import { validateHabitCreateDto, validateHabitUpdateDto, validateProfileSettingsDto } from "./dto-schemas";
+import {
+  validateHabitCreateDto,
+  validateHabitUpdateDto,
+  validatePolicyConsentsDto,
+  validateProfileSettingsDto,
+} from "./dto-schemas";
 import { createIf002HandledError, mapIf002Error } from "./error-mapper";
 import { createValidationErrorResult, type If002ErrorResult } from "./error-response";
 import { AuditLogService } from "../audit/AuditLogService";
@@ -29,7 +34,15 @@ interface If002RunnerErrorScenario {
 }
 
 const FR025_REQUIREMENT_ID = "FR-025";
+const FR005_REQUIREMENT_ID = "FR-005";
 const IF002_AUDIT_ACTION = "if-002.error";
+const POLICY_CONSENT_REJECT_AUDIT_ACTION = "POLICY_CONSENT_REJECT";
+const CONSENT_ENDPOINT = "/api/policies/consents";
+const CONSENT_TARGET_TYPE = "policy_consents";
+const POLICY_CURRENT_VERSIONS: Record<"terms" | "privacy", string> = {
+  terms: "v1.0",
+  privacy: "v1.0",
+};
 
 let if002AuditSequence = 0;
 const if002AuditLogService = new AuditLogService({
@@ -96,7 +109,64 @@ function maybeCreateDtoErrorResult(testCase: If002RunnerCase): If002ErrorResult 
     return validationError ? createValidationErrorResult(validationError, testCase.traceId) : null;
   }
 
+  if (endpoint === CONSENT_ENDPOINT && method === "POST") {
+    const validationError = validatePolicyConsentsDto(request.body);
+    return validationError ? createValidationErrorResult(validationError, testCase.traceId) : null;
+  }
+
   return null;
+}
+
+interface ConsentInput {
+  policy_type: "terms" | "privacy";
+  policy_version: string;
+}
+
+function extractConsentInputs(body: Record<string, unknown>): ConsentInput[] {
+  const rawConsents = body.consents;
+  if (!Array.isArray(rawConsents)) {
+    return [];
+  }
+
+  return rawConsents
+    .filter((value): value is Record<string, unknown> => typeof value === "object" && value !== null)
+    .map((consent) => ({ policy_type: consent.policy_type, policy_version: consent.policy_version }))
+    .filter(
+      (consent): consent is ConsentInput =>
+        (consent.policy_type === "terms" || consent.policy_type === "privacy") && typeof consent.policy_version === "string",
+    );
+}
+
+function maybeThrowConsentDomainError(testCase: {
+  traceId: string;
+  request: If002RunnerRequest;
+  endpoint: string;
+}): void {
+  if (testCase.endpoint !== CONSENT_ENDPOINT) {
+    return;
+  }
+
+  const consentInputs = extractConsentInputs(testCase.request.body);
+
+  if (testCase.request.body.force_duplicate_consent === true) {
+    throw createIf002HandledError(
+      "CONSENT_ALREADY_EXISTS",
+      "duplicate consent submission",
+      FR005_REQUIREMENT_ID,
+      testCase.traceId,
+    );
+  }
+
+  for (const consent of consentInputs) {
+    if (POLICY_CURRENT_VERSIONS[consent.policy_type] !== consent.policy_version) {
+      throw createIf002HandledError(
+        "POLICY_VERSION_MISMATCH",
+        `policy version mismatch: ${consent.policy_type} expected=${POLICY_CURRENT_VERSIONS[consent.policy_type]} actual=${consent.policy_version}`,
+        FR005_REQUIREMENT_ID,
+        testCase.traceId,
+      );
+    }
+  }
 }
 
 async function runWithErrorMapping(testCase: {
@@ -117,6 +187,8 @@ async function runWithErrorMapping(testCase: {
     if (isForceThrowRequested(testCase.request.body)) {
       throw new Error("force_throw");
     }
+
+    maybeThrowConsentDomainError(testCase);
 
     if (testCase.endpoint === "/api/checkins" && testCase.request.body.habit_id === "habit-archived-001") {
       throw createIf002HandledError(
@@ -145,12 +217,16 @@ async function recordIf002ErrorAudit(
   },
   mapped: If002ErrorResult,
 ): Promise<void> {
+  const isConsentRegistration = testCase.endpoint === CONSENT_ENDPOINT;
+  const consentInputs = extractConsentInputs(testCase.request.body);
+  const consentPolicyTypes = consentInputs.map((consent) => consent.policy_type);
+
   try {
     await if002AuditLogService.record({
       actorRole: "user",
-      action: IF002_AUDIT_ACTION,
-      targetType: "if-002",
-      targetId: testCase.endpoint,
+      action: isConsentRegistration ? POLICY_CONSENT_REJECT_AUDIT_ACTION : IF002_AUDIT_ACTION,
+      targetType: isConsentRegistration ? CONSENT_TARGET_TYPE : "if-002",
+      targetId: isConsentRegistration ? testCase.request.actorUserId : testCase.endpoint,
       result: "failure",
       requirementId: mapped.body.requirement_id || testCase.requirementId || FR025_REQUIREMENT_ID,
       traceId: mapped.body.trace_id || testCase.traceId,
@@ -158,6 +234,8 @@ async function recordIf002ErrorAudit(
         status: mapped.status,
         code: mapped.body.code,
         endpoint: testCase.endpoint,
+        source: isConsentRegistration ? "callback_after_login" : "if-002",
+        ...(isConsentRegistration ? { policy_type: consentPolicyTypes, consent_count: consentInputs.length } : {}),
       },
       actorUserId: testCase.request.actorUserId,
     });
@@ -169,6 +247,7 @@ async function recordIf002ErrorAudit(
 export async function runPlannedCase(testCase: If002RunnerCase): Promise<If002ErrorResult> {
   const dtoErrorResult = maybeCreateDtoErrorResult(testCase);
   if (dtoErrorResult) {
+    await recordIf002ErrorAudit(testCase, dtoErrorResult);
     return dtoErrorResult;
   }
 
@@ -178,16 +257,21 @@ export async function runPlannedCase(testCase: If002RunnerCase): Promise<If002Er
 export async function runInvalidPayloadCase(testCase: If002RunnerCase): Promise<If002ErrorResult> {
   const dtoErrorResult = maybeCreateDtoErrorResult(testCase);
   if (dtoErrorResult) {
+    await recordIf002ErrorAudit(testCase, dtoErrorResult);
     return dtoErrorResult;
   }
 
-  return createValidationErrorResult(
+  const fallbackValidation = createValidationErrorResult(
     {
       message: testCase.expectedMessage,
       requirement_id: testCase.requirementId,
     },
     testCase.traceId,
   );
+
+  await recordIf002ErrorAudit(testCase, fallbackValidation);
+
+  return fallbackValidation;
 }
 
 export async function runErrorScenarioCase(testCase: If002RunnerErrorScenario): Promise<If002ErrorResult> {

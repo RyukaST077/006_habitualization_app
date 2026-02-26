@@ -19,6 +19,9 @@
 
 ### 4.3 `insertConsents(userId, consents)`
 - 重複時は無変更成功。
+- 同一 `(user_id, policy_type, policy_version)` は no-op（`insertedCount=0`, `duplicateCount=1`）。
+- `policy_settings.current_version` より古い `policy_version` は `POLICY_VERSION_MISMATCH (409)` で拒否。
+- `current_version` と同値または将来版の `policy_version` は登録可能（重複キーは no-op）。
 
 ### 4.4 `updatePolicySetting(policyType, newVersion, effectiveFrom, actor)`
 - service role専用更新。
@@ -35,3 +38,4 @@ interface CurrentPolicy {
 ## 6. エラーハンドリング
 - `POLICY_NOT_FOUND`
 - `POLICY_VERSION_CONFLICT`
+- `POLICY_VERSION_MISMATCH`（同意登録時の旧版入力）

@@ -8,10 +8,14 @@ import {
 } from "./fixtures/fnc-002-003-cases";
 import { createConsentTestHarness } from "./helpers/consent-test-harness";
 
-const CONSENT_PLAN_COMMAND = "npm run test -- tests/integration/consent/fnc-002-003-test-plan.spec.ts";
+const CONSENT_PLAN_COMMAND =
+  "npm run test -- tests/integration/consent/*.spec.ts tests/unit/screens/scr-008-policy-consent-page-red.spec.ts";
+const ROUTING_REGRESSION_COMMAND =
+  "npm run test -- tests/integration/routing/auth-session-redirect-red.spec.ts tests/e2e/routing/auth-consent-redirect.spec.ts";
+const QUALITY_GATE_COMMAND = "npm run lint && npm run typecheck";
 const harness = createConsentTestHarness();
 
-describe("T-036 PR-001 FNC-002/FNC-003 consent red test plan", () => {
+describe("T-037 PR-006 FNC-002/FNC-003 consent green regression plan", () => {
   it("FR-002..FR-005 と AC-002..AC-005 のトレーサビリティを固定する", () => {
     harness.assertRequirementTrace(
       CONSENT_RED_CASES,
@@ -32,15 +36,21 @@ describe("T-036 PR-001 FNC-002/FNC-003 consent red test plan", () => {
     harness.assertConstraintBoundaries(CONSENT_RED_CASES);
   });
 
-  it.each(CONSENT_RED_CASES)("$traceId: ケース定義を Red 計画として保持する", (testCase) => {
-    harness.assertRedPlanningCase(testCase);
+  it.each(CONSENT_RED_CASES)("$traceId: 実装済み回帰ケースとして保持する", (testCase) => {
+    harness.assertGreenRegressionCase(testCase);
   });
 
-  it("検証導線として単一実行コマンドを固定する", () => {
-    expect(CONSENT_PLAN_COMMAND).toBe("npm run test -- tests/integration/consent/fnc-002-003-test-plan.spec.ts");
+  it("検証導線として受け入れ基準コマンド群を固定する", () => {
+    expect(CONSENT_PLAN_COMMAND).toBe(
+      "npm run test -- tests/integration/consent/*.spec.ts tests/unit/screens/scr-008-policy-consent-page-red.spec.ts",
+    );
+    expect(ROUTING_REGRESSION_COMMAND).toBe(
+      "npm run test -- tests/integration/routing/auth-session-redirect-red.spec.ts tests/e2e/routing/auth-consent-redirect.spec.ts",
+    );
+    expect(QUALITY_GATE_COMMAND).toBe("npm run lint && npm run typecheck");
   });
 
-  it("red: T-037 未実装のため同意判定/履歴シナリオを失敗状態で固定する", () => {
+  it("green: T-037 実装済みとして同意判定/履歴シナリオを回帰固定する", () => {
     expect(harness.getT037ImplementationState()).toBe("implemented");
   });
 });

@@ -1,20 +1,94 @@
 import type { ScreenContainerProps } from "./types";
 
-export type PolicyConsentPageHandlers = {
-  onAccept?: () => void;
-  onReject?: () => void;
+const CONSENT_REQUIREMENT_ID = "FR-026" as const;
+const POLICY_CONSENT_ACCEPT = "POLICY_CONSENT_ACCEPT" as const;
+const POLICY_CONSENT_REJECT = "POLICY_CONSENT_REJECT" as const;
+
+export type PolicyConsentAuditTrace = {
+  action: typeof POLICY_CONSENT_ACCEPT | typeof POLICY_CONSENT_REJECT;
+  requirementId: typeof CONSENT_REQUIREMENT_ID;
+  metadata: {
+    policyTypes: readonly ["terms", "privacy"];
+  };
 };
+
+export type PolicyConsentPageHandlers = {
+  onAccept?: (trace: PolicyConsentAuditTrace) => void;
+  onReject?: (trace: PolicyConsentAuditTrace) => void;
+};
+
+type ConsentCheckboxKey = "terms" | "privacy";
+type ConsentState = Record<ConsentCheckboxKey, boolean>;
+
+const REQUIRED_POLICIES = ["terms", "privacy"] as const;
 
 export function SCR008PolicyConsentPage({
   screenId,
   handlers,
 }: ScreenContainerProps & { handlers?: PolicyConsentPageHandlers }) {
+  const consentState: ConsentState = {
+    terms: false,
+    privacy: false,
+  };
+
+  const audit = {
+    accept: {
+      action: POLICY_CONSENT_ACCEPT,
+    },
+    reject: {
+      action: POLICY_CONSENT_REJECT,
+    },
+    requirementId: CONSENT_REQUIREMENT_ID,
+  } as const;
+
+  const createTrace = (action: PolicyConsentAuditTrace["action"]): PolicyConsentAuditTrace => ({
+    action,
+    requirementId: CONSENT_REQUIREMENT_ID,
+    metadata: {
+      policyTypes: REQUIRED_POLICIES,
+    },
+  });
+
+  const isAcceptEnabled = () => consentState.terms && consentState.privacy;
+
   return {
     screenId,
+    ui: {
+      terms: {
+        get checked() {
+          return consentState.terms;
+        },
+      },
+      privacy: {
+        get checked() {
+          return consentState.privacy;
+        },
+      },
+      acceptButton: {
+        requires: REQUIRED_POLICIES,
+        get disabled() {
+          return !isAcceptEnabled();
+        },
+      },
+    },
+    audit,
     actions: {
-      accept: () => handlers?.onAccept?.(),
-      reject: () => handlers?.onReject?.(),
+      setTermsChecked: (checked: boolean) => {
+        consentState.terms = checked;
+      },
+      setPrivacyChecked: (checked: boolean) => {
+        consentState.privacy = checked;
+      },
+      accept: () => {
+        if (!isAcceptEnabled()) {
+          return false;
+        }
+        handlers?.onAccept?.(createTrace(POLICY_CONSENT_ACCEPT));
+        return true;
+      },
+      reject: () => {
+        handlers?.onReject?.(createTrace(POLICY_CONSENT_REJECT));
+      },
     },
   };
 }
-

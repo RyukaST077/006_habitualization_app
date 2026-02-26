@@ -16,21 +16,49 @@ import {
   type SupabaseRepositoryClient,
 } from "./supabase-repository-client";
 
-function parseNumericVersion(version: string): number | null {
+function parseVersionTuple(version: string): [number, number, number] | null {
   const normalized = version.trim().replace(/^v/i, "");
-  const parsed = Number.parseInt(normalized, 10);
-  return Number.isFinite(parsed) ? parsed : null;
+  const match = normalized.match(/^(\d+)(?:\.(\d+))?(?:\.(\d+))?$/);
+  if (!match) {
+    return null;
+  }
+
+  const major = Number.parseInt(match[1], 10);
+  const minor = Number.parseInt(match[2] ?? "0", 10);
+  const patch = Number.parseInt(match[3] ?? "0", 10);
+  return [major, minor, patch];
+}
+
+function compareVersionTuple(left: [number, number, number], right: [number, number, number]): number {
+  if (left[0] !== right[0]) {
+    return left[0] - right[0];
+  }
+  if (left[1] !== right[1]) {
+    return left[1] - right[1];
+  }
+  return left[2] - right[2];
 }
 
 function isVersionConflict(currentVersion: string, nextVersion: string): boolean {
-  const currentNumeric = parseNumericVersion(currentVersion);
-  const nextNumeric = parseNumericVersion(nextVersion);
+  const currentTuple = parseVersionTuple(currentVersion);
+  const nextTuple = parseVersionTuple(nextVersion);
 
-  if (currentNumeric !== null && nextNumeric !== null) {
-    return nextNumeric <= currentNumeric;
+  if (currentTuple !== null && nextTuple !== null) {
+    return compareVersionTuple(nextTuple, currentTuple) <= 0;
   }
 
   return currentVersion === nextVersion;
+}
+
+function isOlderThanCurrentVersion(currentVersion: string, candidateVersion: string): boolean {
+  const currentTuple = parseVersionTuple(currentVersion);
+  const candidateTuple = parseVersionTuple(candidateVersion);
+
+  if (currentTuple !== null && candidateTuple !== null) {
+    return compareVersionTuple(candidateTuple, currentTuple) < 0;
+  }
+
+  return candidateVersion !== currentVersion;
 }
 
 export class PolicyRepository implements PolicyRepositoryContract {
@@ -69,6 +97,20 @@ export class PolicyRepository implements PolicyRepositoryContract {
   public async insertConsents(userId: string, consents: PolicyConsentInput[]): Promise<InsertConsentsResult> {
     let insertedCount = 0;
     let duplicateCount = 0;
+
+    for (const consent of consents) {
+      const policy = this.client.policySettings.get(consent.policyType);
+      if (policy === undefined) {
+        throw createRepositoryError("REPOSITORY_ERROR", `policy setting not found: ${consent.policyType}`);
+      }
+
+      if (isOlderThanCurrentVersion(policy.currentVersion, consent.policyVersion)) {
+        throw createRepositoryError(
+          "POLICY_VERSION_MISMATCH",
+          `policy version mismatch: ${consent.policyType} expected=${policy.currentVersion} actual=${consent.policyVersion}`,
+        );
+      }
+    }
 
     for (const consent of consents) {
       const key = buildConsentKeyForRepository(userId, consent.policyType, consent.policyVersion);

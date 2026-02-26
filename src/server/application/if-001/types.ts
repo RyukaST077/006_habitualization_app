@@ -7,5 +7,5 @@ export interface If001CallbackDecisionResult {
 export interface If001ConsentDeclineLogoutResult {
   route: "SCR-001";
   sessionCleared: boolean;
-  auditAction: "LOGIN_FAILED";
+  auditAction: "POLICY_CONSENT_REJECT" | "LOGIN_FAILED";
 }

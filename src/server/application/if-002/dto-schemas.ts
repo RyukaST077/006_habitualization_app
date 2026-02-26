@@ -10,6 +10,10 @@ const NAME_MAX = 80;
 const DISPLAY_ORDER_MIN = 1;
 const DISPLAY_ORDER_MAX = 9999;
 const HH_MM_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
+const POLICY_TYPE_SET = new Set(["terms", "privacy"]);
+const POLICY_VERSION_PATTERN = /^v\d+\.\d+(?:\.\d+)?$/;
+const POLICY_VERSION_MAX_LENGTH = 20;
+const CONSENT_REQUIREMENT_ID = "FR-005";
 
 function isObjectRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -97,6 +101,59 @@ export function validateProfileSettingsDto(payload: unknown): ValidationResult {
   const dayCutoffTime = payload.day_cutoff_time;
   if (typeof dayCutoffTime !== "string" || !HH_MM_PATTERN.test(dayCutoffTime)) {
     return { message: "day_cutoff_time must be hh:mm", requirement_id: "FR-021" };
+  }
+
+  return null;
+}
+
+export function validatePolicyConsentsDto(payload: unknown): ValidationResult {
+  if (!isObjectRecord(payload)) {
+    return { message: "consents is required", requirement_id: CONSENT_REQUIREMENT_ID };
+  }
+
+  const consents = payload.consents;
+  if (!Array.isArray(consents) || consents.length === 0) {
+    return { message: "consents must be a non-empty array", requirement_id: CONSENT_REQUIREMENT_ID };
+  }
+
+  const seenPolicyTypes = new Set<string>();
+
+  for (let index = 0; index < consents.length; index += 1) {
+    const consent = consents[index];
+
+    if (!isObjectRecord(consent)) {
+      return { message: `consents[${index}] must be an object`, requirement_id: CONSENT_REQUIREMENT_ID };
+    }
+
+    const policyType = consent.policy_type;
+    if (typeof policyType !== "string" || !POLICY_TYPE_SET.has(policyType)) {
+      return {
+        message: `consents[${index}].policy_type must be terms|privacy`,
+        requirement_id: CONSENT_REQUIREMENT_ID,
+      };
+    }
+
+    const policyVersion = consent.policy_version;
+    if (
+      typeof policyVersion !== "string"
+      || policyVersion.length === 0
+      || policyVersion.length > POLICY_VERSION_MAX_LENGTH
+      || !POLICY_VERSION_PATTERN.test(policyVersion)
+    ) {
+      return {
+        message: `consents[${index}].policy_version must match v<major>.<minor>[.<patch>]`,
+        requirement_id: CONSENT_REQUIREMENT_ID,
+      };
+    }
+
+    if (seenPolicyTypes.has(policyType)) {
+      return {
+        message: "duplicate consent for policy_type is not allowed",
+        requirement_id: CONSENT_REQUIREMENT_ID,
+      };
+    }
+
+    seenPolicyTypes.add(policyType);
   }
 
   return null;
