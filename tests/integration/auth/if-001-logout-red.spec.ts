@@ -3,18 +3,18 @@ import { describe, expect, it } from "vitest";
 import { createIf001TestHarness } from "./helpers/if-001-test-harness";
 
 describe("T-033 PR-002 SCR-001 consent decline logout red tests", () => {
-  it("同意拒否時はセッション破棄後に SCR-001 へ戻す", () => {
+  it("同意拒否時はセッション破棄後に SCR-001 へ戻す", async () => {
     const harness = createIf001TestHarness();
     const logout = harness.createConsentDeclineLogoutStub();
-    const result = logout("user-declined");
+    const result = await logout("user-declined");
 
     harness.assertConsentDeclineLogout(result);
   });
 
-  it("同意拒否時の監査イベントを LOGIN_FAILED として固定する", () => {
+  it("同意拒否時の監査イベントを LOGIN_FAILED として固定する", async () => {
     const harness = createIf001TestHarness();
     const logout = harness.createConsentDeclineLogoutStub();
-    const result = logout("user-declined");
+    const result = await logout("user-declined");
 
     expect(result.auditAction).toBe("LOGIN_FAILED");
     expect(result.route).toBe("SCR-001");

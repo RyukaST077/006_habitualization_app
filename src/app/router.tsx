@@ -73,12 +73,12 @@ export function resolveAuthConsentRedirect(
     return ROUTE_MAP["SCR-001"];
   }
 
-  if (startPath === ROUTE_MAP["SCR-001"]) {
-    return consentState === "agreed" ? ROUTE_MAP["SCR-002"] : ROUTE_MAP["SCR-008"];
-  }
-
   if (consentState === "rejected") {
     return ROUTE_MAP["SCR-001"];
+  }
+
+  if (startPath === ROUTE_MAP["SCR-001"]) {
+    return consentState === "agreed" ? ROUTE_MAP["SCR-002"] : ROUTE_MAP["SCR-008"];
   }
 
   if (startPath === ROUTE_MAP["SCR-008"]) {

@@ -19,7 +19,7 @@ export type CommonUiErrorInput = {
   code: CommonUiErrorCode;
 };
 
-const T034_AUTH_UI_IMPLEMENTATION_STATE = "planned" as const;
+const T034_AUTH_UI_IMPLEMENTATION_STATE = "implemented" as const;
 
 export const COMMON_UI_DISPLAY_ITEMS = {
   header: [

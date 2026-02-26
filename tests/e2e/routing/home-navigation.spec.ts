@@ -24,8 +24,8 @@ const HOME_NAVIGATION_CASES: readonly HomeNavigationCase[] = [
 
 type CommonErrorUiObservation = {
   route: string;
-  status: 400 | 403 | 409 | 500;
-  code: "VALIDATION_ERROR" | "FORBIDDEN" | "DOMAIN_CONFLICT" | "INTERNAL_ERROR";
+  status: 400 | 401 | 403 | 409 | 500;
+  code: "VALIDATION_ERROR" | "AUTH_FAILED" | "FORBIDDEN" | "DOMAIN_CONFLICT" | "INTERNAL_ERROR";
   hasCommonBanner: boolean;
   traceIdFieldName: "trace_id";
   shouldExposeTraceId: boolean;
@@ -57,6 +57,7 @@ async function expectProtectedRouteGuardEventually(
 function observeCommonErrorUi(route: string, status: CommonErrorUiObservation["status"]): CommonErrorUiObservation {
   const codeMap: Record<CommonErrorUiObservation["status"], CommonErrorUiObservation["code"]> = {
     400: "VALIDATION_ERROR",
+    401: "AUTH_FAILED",
     403: "FORBIDDEN",
     409: "DOMAIN_CONFLICT",
     500: "INTERNAL_ERROR",
