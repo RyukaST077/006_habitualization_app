@@ -14,7 +14,12 @@ import type {
   MonitoringAlertEvent,
   MonitoringAlertEventInput,
 } from "../../domain/repositories/types";
-import { buildDailyKpiKeyForRepository, type SupabaseRepositoryClient } from "./supabase-repository-client";
+import {
+  buildDailyKpiKeyForRepository,
+  cloneAuditLogForRepository,
+  cloneRepositoryValue,
+  type SupabaseRepositoryClient,
+} from "./supabase-repository-client";
 
 const ALLOWED_TRANSITIONS: Record<DeletionJobStatus, DeletionJobStatus[]> = {
   queued: ["in_progress"],
@@ -23,41 +28,28 @@ const ALLOWED_TRANSITIONS: Record<DeletionJobStatus, DeletionJobStatus[]> = {
   failed: [],
 };
 
-function cloneAuditLog(record: AuditLogRecord): AuditLogRecord {
-  return {
-    ...record,
-    metadata: { ...record.metadata },
-    detail: { ...record.detail },
-  };
-}
-
-function cloneDailyKpi(row: DailyKpiRow): DailyKpiRow {
-  return { ...row };
-}
-
-function cloneDeletionJob(job: AccountDeletionJob): AccountDeletionJob {
-  return { ...job };
-}
-
-function cloneAlertEvent(event: MonitoringAlertEvent): MonitoringAlertEvent {
-  return { ...event };
-}
-
 function isAllowedTransition(current: DeletionJobStatus, next: DeletionJobStatus): boolean {
   return ALLOWED_TRANSITIONS[current].includes(next);
 }
 
-function getNextAuditLogTimestamp(existingLogs: Iterable<AuditLogRecord>, fallbackIso: string): string {
-  let maxMs = Number.NEGATIVE_INFINITY;
-
-  for (const log of existingLogs) {
-    const createdAtMs = Date.parse(log.createdAt);
-    if (!Number.isNaN(createdAtMs) && createdAtMs > maxMs) {
-      maxMs = createdAtMs;
-    }
+function listDateRange(fromDate: string, toDate: string): string[] {
+  if (fromDate > toDate) {
+    return [];
   }
 
-  return maxMs === Number.NEGATIVE_INFINITY ? fallbackIso : new Date(maxMs + 1).toISOString();
+  const current = new Date(`${fromDate}T00:00:00.000Z`);
+  const end = new Date(`${toDate}T00:00:00.000Z`);
+  if (Number.isNaN(current.getTime()) || Number.isNaN(end.getTime())) {
+    return [];
+  }
+
+  const dates: string[] = [];
+  while (current <= end) {
+    dates.push(current.toISOString().slice(0, 10));
+    current.setUTCDate(current.getUTCDate() + 1);
+  }
+
+  return dates;
 }
 
 export class OpsRepository implements OpsRepositoryContract {
@@ -69,7 +61,7 @@ export class OpsRepository implements OpsRepositoryContract {
     const actorRole = auditRecord.actorRole ?? (auditRecord.actorUserId === null ? "system" : "user");
     const targetType = auditRecord.targetType ?? auditRecord.resourceType ?? "unknown";
     const targetId = auditRecord.targetId ?? auditRecord.resourceId ?? "";
-    const occurredAt = getNextAuditLogTimestamp(this.client.auditLogs.values(), now);
+    const occurredAt = this.client.nextAuditOccurredAt(now);
     const created: AuditLogRecord = {
       id: this.client.nextAuditLogId(),
       actorRole,
@@ -89,7 +81,7 @@ export class OpsRepository implements OpsRepositoryContract {
     };
 
     this.client.auditLogs.set(created.id, created);
-    return cloneAuditLog(created);
+    return cloneAuditLogForRepository(created);
   }
 
   public async upsertDailyKpi(rows: DailyKpiInput[]): Promise<DailyKpiRow[]> {
@@ -106,7 +98,7 @@ export class OpsRepository implements OpsRepositoryContract {
       };
 
       this.client.dailyKpis.set(key, next);
-      upsertedRows.push(cloneDailyKpi(next));
+      upsertedRows.push(cloneRepositoryValue(next));
     }
 
     return upsertedRows;
@@ -127,7 +119,7 @@ export class OpsRepository implements OpsRepositoryContract {
     };
 
     this.client.deletionJobs.set(created.jobId, created);
-    return cloneDeletionJob(created);
+    return cloneRepositoryValue(created);
   }
 
   public async updateDeletionJobStatus(jobId: string, status: DeletionJobStatus): Promise<AccountDeletionJob> {
@@ -141,7 +133,7 @@ export class OpsRepository implements OpsRepositoryContract {
     }
 
     if (current.status === status) {
-      return cloneDeletionJob(current);
+      return cloneRepositoryValue(current);
     }
 
     const now = this.client.now();
@@ -154,7 +146,7 @@ export class OpsRepository implements OpsRepositoryContract {
     };
 
     this.client.deletionJobs.set(jobId, updated);
-    return cloneDeletionJob(updated);
+    return cloneRepositoryValue(updated);
   }
 
   public async listPendingDeletionJobs(now: string): Promise<AccountDeletionJob[]> {
@@ -169,7 +161,7 @@ export class OpsRepository implements OpsRepositoryContract {
     });
 
     jobs.sort((a, b) => a.requestedAt.localeCompare(b.requestedAt));
-    return jobs.map(cloneDeletionJob);
+    return jobs.map(cloneRepositoryValue);
   }
 
   public async insertMonitoringAlertEvent(event: MonitoringAlertEventInput): Promise<MonitoringAlertEvent> {
@@ -189,7 +181,7 @@ export class OpsRepository implements OpsRepositoryContract {
     };
 
     this.client.monitoringAlertEvents.set(created.eventId, created);
-    return cloneAlertEvent(created);
+    return cloneRepositoryValue(created);
   }
 
   public async markAlertDispatched(id: string, result: AlertDispatchResult): Promise<MonitoringAlertEvent> {
@@ -203,7 +195,7 @@ export class OpsRepository implements OpsRepositoryContract {
       current.notifiedAt === result.notifiedAt &&
       current.errorMessage === (result.errorMessage ?? null)
     ) {
-      return cloneAlertEvent(current);
+      return cloneRepositoryValue(current);
     }
 
     const updated: MonitoringAlertEvent = {
@@ -214,20 +206,30 @@ export class OpsRepository implements OpsRepositoryContract {
     };
 
     this.client.monitoringAlertEvents.set(id, updated);
-    return cloneAlertEvent(updated);
+    return cloneRepositoryValue(updated);
   }
 
   public async queryKpiForReport(filter: KpiReportFilter): Promise<DailyKpiRow[]> {
-    const metricNameSet = filter.metricNames === undefined ? null : new Set(filter.metricNames);
-    const rows = [...this.client.dailyKpis.values()].filter((row) => {
-      if (row.kpiDate < filter.fromDate || row.kpiDate > filter.toDate) {
-        return false;
+    const rows: DailyKpiRow[] = [];
+
+    if (filter.metricNames !== undefined) {
+      const dates = listDateRange(filter.fromDate, filter.toDate);
+      for (const kpiDate of dates) {
+        for (const metricName of filter.metricNames) {
+          const row = this.client.dailyKpis.get(buildDailyKpiKeyForRepository(kpiDate, metricName));
+          if (row !== undefined) {
+            rows.push(row);
+          }
+        }
       }
-      if (metricNameSet !== null && !metricNameSet.has(row.metricName)) {
-        return false;
+    } else {
+      for (const row of this.client.dailyKpis.values()) {
+        if (row.kpiDate < filter.fromDate || row.kpiDate > filter.toDate) {
+          continue;
+        }
+        rows.push(row);
       }
-      return true;
-    });
+    }
 
     rows.sort((a, b) => {
       const byDate = a.kpiDate.localeCompare(b.kpiDate);
@@ -237,7 +239,7 @@ export class OpsRepository implements OpsRepositoryContract {
       return a.metricName.localeCompare(b.metricName);
     });
 
-    return rows.map(cloneDailyKpi);
+    return rows.map(cloneRepositoryValue);
   }
 
   public async queryAuditLogsForReport(filter: AuditLogReportFilter): Promise<AuditLogRecord[]> {
@@ -263,6 +265,6 @@ export class OpsRepository implements OpsRepositoryContract {
     });
 
     rows.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-    return rows.slice(0, limit).map(cloneAuditLog);
+    return rows.slice(0, limit).map(cloneAuditLogForRepository);
   }
 }

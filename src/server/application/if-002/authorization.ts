@@ -13,18 +13,25 @@ export interface If002SelfOnlyAuthorizationInput {
 const AUTHORIZATION_REQUIREMENT_ID = "FR-025";
 const authorizationPolicyService = new AuthorizationPolicyService();
 
+function resolveIf002AuthorizationRequirementId(requirementId: string): string {
+  void requirementId;
+  return AUTHORIZATION_REQUIREMENT_ID;
+}
+
 export function assertIf002SelfOnlyAccess({
   actorUserId,
   targetUserId,
   requirementId,
 }: If002SelfOnlyAuthorizationInput): void {
-  void requirementId;
-
   try {
     authorizationPolicyService.assertSelf(actorUserId, targetUserId);
   } catch (error: unknown) {
     if (error instanceof AuthorizationPolicyError) {
-      throw createIf002HandledError("FORBIDDEN", error.message, AUTHORIZATION_REQUIREMENT_ID);
+      throw createIf002HandledError(
+        "FORBIDDEN",
+        error.message,
+        resolveIf002AuthorizationRequirementId(requirementId),
+      );
     }
 
     throw error;

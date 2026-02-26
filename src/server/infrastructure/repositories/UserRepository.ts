@@ -3,23 +3,16 @@ import { createRepositoryError } from "../../domain/repositories/errors";
 import type { Profile, UserDailyActivity } from "../../domain/repositories/types";
 import {
   buildActivityKeyForRepository,
+  cloneRepositoryValue,
   type SupabaseRepositoryClient,
 } from "./supabase-repository-client";
-
-function cloneProfile(profile: Profile): Profile {
-  return { ...profile };
-}
-
-function cloneActivity(activity: UserDailyActivity): UserDailyActivity {
-  return { ...activity };
-}
 
 export class UserRepository implements UserRepositoryContract {
   public constructor(private readonly client: SupabaseRepositoryClient) {}
 
   public async findProfile(userId: string): Promise<Profile | null> {
     const profile = this.client.profiles.get(userId);
-    return profile === undefined ? null : cloneProfile(profile);
+    return profile === undefined ? null : cloneRepositoryValue(profile);
   }
 
   public async updateProfileSettings(
@@ -45,7 +38,7 @@ export class UserRepository implements UserRepositoryContract {
     };
 
     this.client.profiles.set(userId, updated);
-    return cloneProfile(updated);
+    return cloneRepositoryValue(updated);
   }
 
   public async incrementDailyActivity(
@@ -67,7 +60,7 @@ export class UserRepository implements UserRepositoryContract {
         updatedAt,
       };
       this.client.userDailyActivities.set(key, created);
-      return cloneActivity(created);
+      return cloneRepositoryValue(created);
     }
 
     const updated: UserDailyActivity = {
@@ -77,7 +70,7 @@ export class UserRepository implements UserRepositoryContract {
       updatedAt,
     };
     this.client.userDailyActivities.set(key, updated);
-    return cloneActivity(updated);
+    return cloneRepositoryValue(updated);
   }
 
   public async markAccountDisabled(userId: string, disabledAt: string): Promise<Profile> {
@@ -94,6 +87,6 @@ export class UserRepository implements UserRepositoryContract {
     };
 
     this.client.profiles.set(userId, updated);
-    return cloneProfile(updated);
+    return cloneRepositoryValue(updated);
   }
 }

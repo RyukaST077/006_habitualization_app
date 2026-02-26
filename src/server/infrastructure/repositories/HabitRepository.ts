@@ -2,39 +2,51 @@ import type { HabitRepositoryContract } from "../../domain/repositories/contract
 import { createRepositoryError } from "../../domain/repositories/errors";
 import type { Habit, HabitLog, HabitStatus, HabitUpdatePayload } from "../../domain/repositories/types";
 import {
-  buildForbiddenError,
+  assertRepositoryOwnership,
   buildHabitLogKeyForRepository,
+  cloneRepositoryValue,
   type SupabaseRepositoryClient,
 } from "./supabase-repository-client";
 
-function cloneHabit(habit: Habit): Habit {
-  return { ...habit };
-}
+function listDateRange(fromDate: string, toDate: string): string[] {
+  if (fromDate > toDate) {
+    return [];
+  }
 
-function cloneLog(log: HabitLog): HabitLog {
-  return { ...log };
-}
+  const current = new Date(`${fromDate}T00:00:00.000Z`);
+  const end = new Date(`${toDate}T00:00:00.000Z`);
+  if (Number.isNaN(current.getTime()) || Number.isNaN(end.getTime())) {
+    return [];
+  }
 
-function isInDateRange(value: string, fromDate: string, toDate: string): boolean {
-  return value >= fromDate && value <= toDate;
+  const dates: string[] = [];
+  while (current <= end) {
+    dates.push(current.toISOString().slice(0, 10));
+    current.setUTCDate(current.getUTCDate() + 1);
+  }
+  return dates;
 }
 
 export class HabitRepository implements HabitRepositoryContract {
   public constructor(private readonly client: SupabaseRepositoryClient) {}
 
   public async listHabits(userId: string, status?: HabitStatus): Promise<Habit[]> {
-    const habits = [...this.client.habits.values()].filter((habit) => {
+    const habits: Habit[] = [];
+    for (const habit of this.client.habits.values()) {
       if (habit.userId !== userId) {
-        return false;
+        continue;
       }
       if (status === undefined) {
-        return true;
+        habits.push(habit);
+        continue;
       }
-      return habit.status === status;
-    });
+      if (habit.status === status) {
+        habits.push(habit);
+      }
+    }
 
     habits.sort((a, b) => a.displayOrder - b.displayOrder);
-    return habits.map(cloneHabit);
+    return habits.map(cloneRepositoryValue);
   }
 
   public async createHabit(userId: string, name: string, displayOrder: number): Promise<Habit> {
@@ -52,7 +64,7 @@ export class HabitRepository implements HabitRepositoryContract {
     };
 
     this.client.habits.set(created.habitId, created);
-    return cloneHabit(created);
+    return cloneRepositoryValue(created);
   }
 
   public async updateHabit(userId: string, habitId: string, payload: HabitUpdatePayload): Promise<Habit> {
@@ -60,9 +72,7 @@ export class HabitRepository implements HabitRepositoryContract {
     if (current === undefined) {
       throw createRepositoryError("REPOSITORY_ERROR", `habit not found: ${habitId}`);
     }
-    if (current.userId !== userId) {
-      throw buildForbiddenError("habit ownership mismatch");
-    }
+    assertRepositoryOwnership(current.userId, userId, "habit ownership mismatch");
     if (current.version !== payload.version) {
       throw createRepositoryError("OPTIMISTIC_LOCK_CONFLICT", "habit version conflict");
     }
@@ -77,7 +87,7 @@ export class HabitRepository implements HabitRepositoryContract {
     };
 
     this.client.habits.set(habitId, updated);
-    return cloneHabit(updated);
+    return cloneRepositoryValue(updated);
   }
 
   public async setHabitStatus(userId: string, habitId: string, status: HabitStatus): Promise<Habit> {
@@ -85,9 +95,7 @@ export class HabitRepository implements HabitRepositoryContract {
     if (current === undefined) {
       throw createRepositoryError("REPOSITORY_ERROR", `habit not found: ${habitId}`);
     }
-    if (current.userId !== userId) {
-      throw buildForbiddenError("habit ownership mismatch");
-    }
+    assertRepositoryOwnership(current.userId, userId, "habit ownership mismatch");
 
     const updated: Habit = {
       ...current,
@@ -97,7 +105,7 @@ export class HabitRepository implements HabitRepositoryContract {
     };
 
     this.client.habits.set(habitId, updated);
-    return cloneHabit(updated);
+    return cloneRepositoryValue(updated);
   }
 
   public async upsertCheckin(
@@ -110,9 +118,7 @@ export class HabitRepository implements HabitRepositoryContract {
     if (habit === undefined) {
       throw createRepositoryError("REPOSITORY_ERROR", `habit not found: ${habitId}`);
     }
-    if (habit.userId !== userId) {
-      throw buildForbiddenError("habit ownership mismatch");
-    }
+    assertRepositoryOwnership(habit.userId, userId, "habit ownership mismatch");
     if (habit.status === "archived") {
       throw createRepositoryError("CHECKIN_CONFLICT", "archived habit does not accept checkin");
     }
@@ -121,7 +127,7 @@ export class HabitRepository implements HabitRepositoryContract {
     const existing = this.client.habitLogs.get(key);
     if (existing !== undefined) {
       if (existing.userId === userId && existing.checkedInAt === checkedInAt) {
-        return cloneLog(existing);
+        return cloneRepositoryValue(existing);
       }
       throw createRepositoryError("CHECKIN_CONFLICT", "duplicate habit/date checkin");
     }
@@ -133,13 +139,13 @@ export class HabitRepository implements HabitRepositoryContract {
       checkedInAt,
     };
     this.client.habitLogs.set(key, created);
-    return cloneLog(created);
+    return cloneRepositoryValue(created);
   }
 
   public async deleteCheckin(userId: string, habitId: string, logDate: string): Promise<boolean> {
     const habit = this.client.habits.get(habitId);
-    if (habit !== undefined && habit.userId !== userId) {
-      throw buildForbiddenError("habit ownership mismatch");
+    if (habit !== undefined) {
+      assertRepositoryOwnership(habit.userId, userId, "habit ownership mismatch");
     }
 
     const key = buildHabitLogKeyForRepository(habitId, logDate);
@@ -147,9 +153,7 @@ export class HabitRepository implements HabitRepositoryContract {
     if (existing === undefined) {
       return false;
     }
-    if (existing.userId !== userId) {
-      throw buildForbiddenError("checkin ownership mismatch");
-    }
+    assertRepositoryOwnership(existing.userId, userId, "checkin ownership mismatch");
 
     this.client.habitLogs.delete(key);
     return true;
@@ -161,23 +165,37 @@ export class HabitRepository implements HabitRepositoryContract {
     toDate: string,
     includeArchived: boolean,
   ): Promise<HabitLog[]> {
-    const logs = [...this.client.habitLogs.values()].filter((log) => {
-      if (log.userId !== userId) {
-        return false;
-      }
-      if (!isInDateRange(log.logDate, fromDate, toDate)) {
-        return false;
-      }
+    const targetDates = listDateRange(fromDate, toDate);
+    if (targetDates.length === 0) {
+      return [];
+    }
 
-      if (includeArchived) {
-        return true;
+    const targetHabitIds: string[] = [];
+    for (const habit of this.client.habits.values()) {
+      if (habit.userId !== userId) {
+        continue;
       }
+      if (!includeArchived && habit.status !== "active") {
+        continue;
+      }
+      targetHabitIds.push(habit.habitId);
+    }
 
-      const habit = this.client.habits.get(log.habitId);
-      return habit?.status === "active";
-    });
+    const logs: HabitLog[] = [];
+    for (const habitId of targetHabitIds) {
+      for (const logDate of targetDates) {
+        const log = this.client.habitLogs.get(buildHabitLogKeyForRepository(habitId, logDate));
+        if (log === undefined) {
+          continue;
+        }
+        if (log.userId !== userId) {
+          continue;
+        }
+        logs.push(log);
+      }
+    }
 
     logs.sort((a, b) => a.logDate.localeCompare(b.logDate));
-    return logs.map(cloneLog);
+    return logs.map(cloneRepositoryValue);
   }
 }

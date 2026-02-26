@@ -34,29 +34,36 @@ export interface RepositorySeedBundle {
   dailyActivities: RepositorySeedDailyActivity[];
 }
 
+const DEFAULT_PROFILE: RepositorySeedProfile = {
+  userId: "user-red-001",
+  displayName: "Red Tester",
+  timezone: "Asia/Tokyo",
+  dayBoundaryHour: 4,
+  version: 1,
+  accountStatus: "active",
+};
+
+const DEFAULT_HABITS: RepositorySeedHabit[] = [
+  {
+    habitId: "habit-red-001",
+    userId: "user-red-001",
+    name: "walk",
+    status: "active",
+    version: 1,
+  },
+];
+
+const EMPTY_CHECKINS: RepositorySeedCheckin[] = [];
+const EMPTY_DAILY_ACTIVITIES: RepositorySeedDailyActivity[] = [];
+
 export function createRepositorySeedBundle(overrides?: Partial<RepositorySeedBundle>): RepositorySeedBundle {
   return {
     profile: {
-      userId: "user-red-001",
-      displayName: "Red Tester",
-      timezone: "Asia/Tokyo",
-      dayBoundaryHour: 4,
-      version: 1,
-      accountStatus: "active",
+      ...DEFAULT_PROFILE,
       ...(overrides?.profile ?? {}),
     },
-    habits:
-      overrides?.habits ??
-      [
-        {
-          habitId: "habit-red-001",
-          userId: "user-red-001",
-          name: "walk",
-          status: "active",
-          version: 1,
-        },
-      ],
-    checkins: overrides?.checkins ?? [],
-    dailyActivities: overrides?.dailyActivities ?? [],
+    habits: overrides?.habits ?? DEFAULT_HABITS,
+    checkins: overrides?.checkins ?? EMPTY_CHECKINS,
+    dailyActivities: overrides?.dailyActivities ?? EMPTY_DAILY_ACTIVITIES,
   };
 }

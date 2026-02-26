@@ -9,22 +9,12 @@ import type {
   UserPolicyConsent,
 } from "../../domain/repositories/types";
 import {
-  buildConsentKeyForRepository,
   buildForbiddenError,
+  buildConsentKeyForRepository,
+  cloneRepositoryValue,
+  isServiceRoleActor,
   type SupabaseRepositoryClient,
 } from "./supabase-repository-client";
-
-function cloneCurrentPolicy(policy: CurrentPolicy): CurrentPolicy {
-  return { ...policy };
-}
-
-function clonePolicySetting(setting: PolicySetting): PolicySetting {
-  return { ...setting };
-}
-
-function cloneConsent(consent: UserPolicyConsent): UserPolicyConsent {
-  return { ...consent };
-}
 
 function parseNumericVersion(version: string): number | null {
   const normalized = version.trim().replace(/^v/i, "");
@@ -54,7 +44,7 @@ export class PolicyRepository implements PolicyRepositoryContract {
     }));
 
     policies.sort((a, b) => a.policyType.localeCompare(b.policyType));
-    return policies.map(cloneCurrentPolicy);
+    return policies.map(cloneRepositoryValue);
   }
 
   public async findUserLatestConsents(userId: string): Promise<UserPolicyConsent[]> {
@@ -73,7 +63,7 @@ export class PolicyRepository implements PolicyRepositoryContract {
 
     const values = [...latestByType.values()];
     values.sort((a, b) => a.policyType.localeCompare(b.policyType));
-    return values.map(cloneConsent);
+    return values.map(cloneRepositoryValue);
   }
 
   public async insertConsents(userId: string, consents: PolicyConsentInput[]): Promise<InsertConsentsResult> {
@@ -111,7 +101,7 @@ export class PolicyRepository implements PolicyRepositoryContract {
     effectiveFrom: string,
     actor: string,
   ): Promise<PolicySetting> {
-    if (!actor.includes("service_role")) {
+    if (!isServiceRoleActor(actor)) {
       throw buildForbiddenError("updatePolicySetting requires service_role actor");
     }
 
@@ -133,6 +123,6 @@ export class PolicyRepository implements PolicyRepositoryContract {
     };
 
     this.client.policySettings.set(policyType, updated);
-    return clonePolicySetting(updated);
+    return cloneRepositoryValue(updated);
   }
 }

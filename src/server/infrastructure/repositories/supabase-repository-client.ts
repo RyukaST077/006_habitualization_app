@@ -38,6 +38,7 @@ export interface SupabaseRepositoryClient {
   monitoringAlertEvents: Map<string, MonitoringAlertEvent>;
   nextHabitId(): string;
   nextAuditLogId(): string;
+  nextAuditOccurredAt(fallbackIso: string): string;
   nextDeletionJobId(): string;
   nextMonitoringAlertEventId(): string;
   now(): string;
@@ -47,6 +48,7 @@ export interface SupabaseRepositoryClient {
 interface MutableState {
   habitSequence: number;
   auditLogSequence: number;
+  latestAuditLogMs: number | null;
   deletionJobSequence: number;
   alertEventSequence: number;
 }
@@ -89,10 +91,7 @@ function clonePolicyConsent(consent: UserPolicyConsent): UserPolicyConsent {
 }
 
 function cloneAuditLog(record: AuditLogRecord): AuditLogRecord {
-  return {
-    ...record,
-    detail: { ...record.detail },
-  };
+  return { ...record };
 }
 
 function cloneDailyKpi(row: DailyKpiRow): DailyKpiRow {
@@ -150,36 +149,55 @@ function applyMutableMaps(target: MutableMaps, source: MutableMaps): void {
   replaceMapEntries(target.monitoringAlertEvents, source.monitoringAlertEvents);
 }
 
+interface TransactionConflictBaseline {
+  profileVersions: Map<string, number>;
+  habitLogKeys: Set<string>;
+  policyConsentKeys: Set<string>;
+}
+
+function buildTransactionConflictBaseline(maps: MutableMaps): TransactionConflictBaseline {
+  const profileVersions = new Map<string, number>();
+  for (const [userId, profile] of maps.profiles.entries()) {
+    profileVersions.set(userId, profile.version);
+  }
+
+  return {
+    profileVersions,
+    habitLogKeys: new Set(maps.habitLogs.keys()),
+    policyConsentKeys: new Set(maps.policyConsents.keys()),
+  };
+}
+
 function detectProfileOptimisticLockConflict(
-  baseline: Map<string, Profile>,
+  baselineProfileVersions: Map<string, number>,
   transactional: Map<string, Profile>,
   current: Map<string, Profile>,
 ): void {
   for (const [userId, nextProfile] of transactional.entries()) {
-    const baselineProfile = baseline.get(userId);
-    if (baselineProfile === undefined) {
+    const baselineVersion = baselineProfileVersions.get(userId);
+    if (baselineVersion === undefined) {
       continue;
     }
-    if (nextProfile.version === baselineProfile.version) {
+    if (nextProfile.version === baselineVersion) {
       continue;
     }
 
     const currentProfile = current.get(userId);
-    if (currentProfile === undefined || currentProfile.version !== baselineProfile.version) {
+    if (currentProfile === undefined || currentProfile.version !== baselineVersion) {
       throw createRepositoryError("OPTIMISTIC_LOCK_CONFLICT", "profile version conflict");
     }
   }
 }
 
 function detectInsertedKeyConflict<K, V>(
-  baseline: Map<K, V>,
+  baselineKeys: Set<K>,
   transactional: Map<K, V>,
   current: Map<K, V>,
   errorCode: "CHECKIN_CONFLICT" | "UNIQUE_CONFLICT",
   message: string,
 ): void {
   for (const key of transactional.keys()) {
-    if (baseline.has(key)) {
+    if (baselineKeys.has(key)) {
       continue;
     }
     if (current.has(key)) {
@@ -189,20 +207,20 @@ function detectInsertedKeyConflict<K, V>(
 }
 
 function detectTransactionConflicts(
-  baselineMaps: MutableMaps,
+  baseline: TransactionConflictBaseline,
   transactionalMaps: MutableMaps,
   currentMaps: MutableMaps,
 ): void {
-  detectProfileOptimisticLockConflict(baselineMaps.profiles, transactionalMaps.profiles, currentMaps.profiles);
+  detectProfileOptimisticLockConflict(baseline.profileVersions, transactionalMaps.profiles, currentMaps.profiles);
   detectInsertedKeyConflict(
-    baselineMaps.habitLogs,
+    baseline.habitLogKeys,
     transactionalMaps.habitLogs,
     currentMaps.habitLogs,
     "CHECKIN_CONFLICT",
     "duplicate habit/date checkin",
   );
   detectInsertedKeyConflict(
-    baselineMaps.policyConsents,
+    baseline.policyConsentKeys,
     transactionalMaps.policyConsents,
     currentMaps.policyConsents,
     "UNIQUE_CONFLICT",
@@ -232,6 +250,28 @@ export function buildForbiddenError(message: string): Error & { status: 403; cod
   error.status = 403;
   error.code = "FORBIDDEN";
   return error;
+}
+
+export function cloneRepositoryValue<T extends object>(value: T): T {
+  return { ...value };
+}
+
+export function cloneAuditLogForRepository(record: AuditLogRecord): AuditLogRecord {
+  return {
+    ...record,
+    metadata: { ...record.metadata },
+    detail: { ...record.detail },
+  };
+}
+
+export function assertRepositoryOwnership(ownerUserId: string, actorUserId: string, message: string): void {
+  if (ownerUserId !== actorUserId) {
+    throw buildForbiddenError(message);
+  }
+}
+
+export function isServiceRoleActor(actor: string): boolean {
+  return actor.includes("service_role");
 }
 
 export function buildHabitLogKeyForRepository(habitId: string, logDate: string): string {
@@ -264,6 +304,7 @@ export function createSupabaseRepositoryClient(seed: SupabaseRepositorySeedData 
   const state: MutableState = {
     habitSequence: 0,
     auditLogSequence: 0,
+    latestAuditLogMs: null,
     deletionJobSequence: 0,
     alertEventSequence: 0,
   };
@@ -307,6 +348,10 @@ export function createSupabaseRepositoryClient(seed: SupabaseRepositorySeedData 
     const parsedId = Number.parseInt(record.id, 10);
     if (Number.isFinite(parsedId)) {
       state.auditLogSequence = Math.max(state.auditLogSequence, parsedId);
+    }
+    const createdAtMs = Date.parse(record.createdAt);
+    if (!Number.isNaN(createdAtMs)) {
+      state.latestAuditLogMs = Math.max(state.latestAuditLogMs ?? Number.NEGATIVE_INFINITY, createdAtMs);
     }
   }
 
@@ -362,6 +407,18 @@ export function createSupabaseRepositoryClient(seed: SupabaseRepositorySeedData 
       targetState.auditLogSequence += 1;
       return `${targetState.auditLogSequence}`;
     },
+    nextAuditOccurredAt(fallbackIso: string): string {
+      if (targetState.latestAuditLogMs === null) {
+        const fallbackMs = Date.parse(fallbackIso);
+        if (!Number.isNaN(fallbackMs)) {
+          targetState.latestAuditLogMs = fallbackMs;
+        }
+        return fallbackIso;
+      }
+
+      targetState.latestAuditLogMs += 1;
+      return new Date(targetState.latestAuditLogMs).toISOString();
+    },
     nextDeletionJobId(): string {
       targetState.deletionJobSequence += 1;
       return `${targetState.deletionJobSequence}`;
@@ -374,13 +431,13 @@ export function createSupabaseRepositoryClient(seed: SupabaseRepositorySeedData 
       return new Date().toISOString();
     },
     async withTransaction<T>(action: (client: SupabaseRepositoryClient) => Promise<T> | T): Promise<T> {
-      const baselineMaps = cloneMutableMaps(targetMaps);
+      const baseline = buildTransactionConflictBaseline(targetMaps);
       const transactionalMaps = cloneMutableMaps(targetMaps);
       const transactionalState: MutableState = { ...targetState };
       const transactionalClient = buildClient(transactionalMaps, transactionalState);
 
       const result = await action(transactionalClient);
-      detectTransactionConflicts(baselineMaps, transactionalMaps, targetMaps);
+      detectTransactionConflicts(baseline, transactionalMaps, targetMaps);
       applyMutableMaps(targetMaps, transactionalMaps);
       Object.assign(targetState, transactionalState);
       return result;

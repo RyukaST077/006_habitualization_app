@@ -5,7 +5,7 @@ import {
   REPOSITORY_RED_CASES,
 } from "./fixtures/repository-cases";
 
-describe("T-024 PR-001 repository red test plan", () => {
+describe("T-024 PR-001 repository red test plan (T-032 PR-003 regression anchor)", () => {
   it("M-101 M-102 M-103 M-104: 対象Repositoryを全て含む", () => {
     const covered = new Set(REPOSITORY_RED_CASES.map((testCase) => testCase.repositoryId));
 
@@ -26,5 +26,9 @@ describe("T-024 PR-001 repository red test plan", () => {
   it.each(REPOSITORY_RED_CASES)("$traceId: 実装済みケースとして定義が残っている", async (testCase) => {
     expect(testCase.traceId.length).toBeGreaterThan(0);
     expect(testCase.expectedFailure).toBeDefined();
+  });
+
+  it("T-039/T-042 着手時も契約テスト導線で再利用する", () => {
+    expect(REPOSITORY_RED_CASES.length).toBeGreaterThan(0);
   });
 });
