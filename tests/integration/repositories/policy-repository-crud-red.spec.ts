@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { PolicyRepository } from "../../../src/server/infrastructure/repositories/PolicyRepository";
 import { createSupabaseRepositoryClient } from "../../../src/server/infrastructure/repositories/supabase-repository-client";
+import { CONSENT_RED_CASES } from "../consent/fixtures/fnc-002-003-cases";
 import { createPolicyOpsSeedBundle } from "./fixtures/policy-ops-seed";
 
 function createPolicyRepository() {
@@ -82,6 +83,15 @@ describe("T-025 PR-003 M-103 policy repository CRUD/conflict", () => {
       },
     ]);
     expect(duplicate).toEqual({ insertedCount: 0, duplicateCount: 1 });
+  });
+
+  it("FNC-003/CON-006: TC-IT-FR-005-002 duplicate no-op と uq_policy_consents_user_type_ver 境界を明示", () => {
+    const uniqueCase = CONSENT_RED_CASES.find((entry) => entry.testCaseId === "TC-IT-FR-005-002");
+
+    expect(uniqueCase?.notes).toContain("CON-006");
+    expect(uniqueCase?.notes).toContain("duplicate");
+    expect(uniqueCase?.notes).toContain("no-op");
+    expect(uniqueCase?.notes).toContain("uq_policy_consents_user_type_ver");
   });
 
   it("M-103/CRUD/updatePolicySetting: service_roleのみ更新可能、版競合はPOLICY_VERSION_CONFLICT", async () => {

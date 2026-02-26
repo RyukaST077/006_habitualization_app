@@ -25,6 +25,12 @@ describe("T-033 PR-003 auth session redirect red tests", () => {
     expect(route).toBe(ROUTE_MAP["SCR-001"]);
   });
 
+  it("TC-IT-FR-003-003: IF-004 policy_settings 更新で同意状態が unknown の間は SCR-008 に留める", () => {
+    const route = resolveAuthConsentRedirect(ROUTE_MAP["SCR-008"], "authenticated", "unknown");
+
+    expect(route).toBe(ROUTE_MAP["SCR-008"]);
+  });
+
   it("callback 分岐で rejected を最優先して SCR-001 を返す", async () => {
     const authGateway: SupabaseAuthGatewayContract = {
       async buildGoogleOAuthUrl(): Promise<string> {

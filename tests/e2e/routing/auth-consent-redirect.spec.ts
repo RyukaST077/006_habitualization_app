@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 
+import { CONSENT_FAILURE_SCENARIOS } from "../fixtures/consent-state";
 import { ROUTING_SCENARIOS } from "../fixtures/routing-state";
 import { resolveAuthConsentRedirect } from "../../../src/app/router";
 import type { RoutingScenario } from "../fixtures/routing-state";
@@ -62,6 +63,19 @@ test.describe("T-011 PR-002 auth/consent redirect tests", () => {
 
     await test.step(`[${scenario.caseId ?? scenario.id}] ${scenario.traceIds.join("/")}`, async () => {
       await expectResolvedPathEventually(scenario);
+    });
+  });
+
+  test("TC-IT-FR-026-002: 同意拒否導線に FR-026 監査イベント（POLICY_CONSENT_REJECT）トレースを保持する", async () => {
+    const scenario = CONSENT_FAILURE_SCENARIOS[3];
+
+    await test.step(`[${scenario.caseId}] ${scenario.traceIds.join("/")}`, async () => {
+      expect(scenario.traceIds).toContain("FR-026");
+      expect(scenario.traceIds).toContain("CON-007");
+      expect(scenario.traceIds).toContain("POLICY_CONSENT_REJECT");
+      expect(resolveAuthConsentRedirect(scenario.startPath, scenario.authState, scenario.consentState)).toBe(
+        scenario.expectedPath,
+      );
     });
   });
 });

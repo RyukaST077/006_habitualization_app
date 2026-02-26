@@ -1,6 +1,6 @@
 export type ConsentFailureScenario = {
   id: string;
-  caseId: "TC-IT-FR-003-002" | "TC-IT-FR-003-003" | "TC-ST-FR-004-004";
+  caseId: "TC-IT-FR-003-002" | "TC-IT-FR-003-003" | "TC-ST-FR-004-004" | "TC-IT-FR-026-002";
   authState: "authenticated";
   consentState: "unknown" | "rejected";
   consentVersionState: "missing" | "outdated";
@@ -39,5 +39,15 @@ export const CONSENT_FAILURE_SCENARIOS: readonly ConsentFailureScenario[] = [
     startPath: "/policy-consent",
     expectedPath: "/login",
     traceIds: ["FR-004", "SCR-008", "SCR-001", "logout"],
+  },
+  {
+    id: "CS-004",
+    caseId: "TC-IT-FR-026-002",
+    authState: "authenticated",
+    consentState: "rejected",
+    consentVersionState: "outdated",
+    startPath: "/policy-consent",
+    expectedPath: "/login",
+    traceIds: ["FR-026", "CON-007", "SCR-008", "POLICY_CONSENT_REJECT"],
   },
 ];
