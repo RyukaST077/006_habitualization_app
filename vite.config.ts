@@ -14,6 +14,16 @@ import { createIf001StartHandler } from "./src/server/application/if-001/start-h
 import type { If001StartApiRequest } from "./src/server/application/if-001/contracts";
 import type { If001CallbackHandlerRequest } from "./src/server/application/if-001/callback-handler";
 import type { If001CallbackDecisionResult, If001ConsentDeclineLogoutResult } from "./src/server/application/if-001/types";
+import {
+  decodeJwtPayload,
+  extractBearerToken,
+  hasLatestRequiredConsents,
+  isExpiredJwt,
+  normalizePolicyType,
+  type PolicyConsentRow,
+  type PolicySettingRow,
+} from "./src/server/application/if-001/session-state-utils";
+import { buildPolicyConsentRowsToInsert } from "./src/server/application/if-002/policy-consent-utils";
 
 function parseRequestBody(req: IncomingMessage): Promise<unknown> {
   return new Promise((resolve, reject) => {
@@ -100,99 +110,8 @@ async function ensureSupabaseProfileExists(userId: string): Promise<void> {
   }
 }
 
-type PolicySettingRow = {
-  policy_type: string;
-  current_version: string;
-};
-
-type PolicyConsentRow = {
-  policy_type: string;
-  policy_version: string;
-  consented_at: string;
-};
-
-type DecodedJwtPayload = {
-  sub?: unknown;
-  exp?: unknown;
-};
-
-function resolveLatestConsentsByType(rows: readonly PolicyConsentRow[]): Map<string, string> {
-  const latestByType = new Map<string, { version: string; consentedAtMs: number }>();
-  for (const row of rows) {
-    const policyType = normalizePolicyType(row.policy_type);
-    const current = latestByType.get(policyType);
-    const consentedAtMs = Date.parse(row.consented_at);
-    if (!current || consentedAtMs > current.consentedAtMs) {
-      latestByType.set(policyType, { version: row.policy_version, consentedAtMs });
-    }
-  }
-  const versions = new Map<string, string>();
-  for (const [policyType, entry] of latestByType.entries()) {
-    versions.set(policyType, entry.version);
-  }
-  return versions;
-}
-
-function normalizePolicyType(value: string): string {
-  return value.trim().toLowerCase();
-}
-
-function normalizePolicyVersion(version: string): string {
-  return version.trim().replace(/^v/i, "").toLowerCase();
-}
-
-function parseVersionTuple(version: string): [number, number, number] | null {
-  const normalized = normalizePolicyVersion(version);
-  const match = normalized.match(/^(\d+)(?:\.(\d+))?(?:\.(\d+))?$/);
-  if (!match) {
-    return null;
-  }
-  return [
-    Number.parseInt(match[1], 10),
-    Number.parseInt(match[2] ?? "0", 10),
-    Number.parseInt(match[3] ?? "0", 10),
-  ];
-}
-
-function isSamePolicyVersion(left: string, right: string): boolean {
-  const leftTuple = parseVersionTuple(left);
-  const rightTuple = parseVersionTuple(right);
-  if (leftTuple && rightTuple) {
-    return leftTuple[0] === rightTuple[0] && leftTuple[1] === rightTuple[1] && leftTuple[2] === rightTuple[2];
-  }
-  return normalizePolicyVersion(left) === normalizePolicyVersion(right);
-}
-
 function isUuidLike(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
-}
-
-function extractBearerToken(authorization?: string): string | null {
-  if (!authorization) {
-    return null;
-  }
-  const match = authorization.match(/^Bearer\s+(.+)$/i);
-  return match ? match[1] : null;
-}
-
-function decodeJwtPayload(token: string): DecodedJwtPayload | null {
-  const parts = token.split(".");
-  if (parts.length < 2) {
-    return null;
-  }
-  try {
-    const payloadJson = Buffer.from(parts[1].replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8");
-    return JSON.parse(payloadJson) as DecodedJwtPayload;
-  } catch {
-    return null;
-  }
-}
-
-function isExpiredJwt(payload: DecodedJwtPayload): boolean {
-  if (typeof payload.exp !== "number") {
-    return false;
-  }
-  return payload.exp * 1000 <= Date.now();
 }
 
 const authGateway: SupabaseAuthGatewayContract = {
@@ -235,15 +154,7 @@ const consentStatusPort: ConsentStatusPort = {
       const consentRows = await fetchSupabaseRest<PolicyConsentRow[]>(
         `policy_consents?select=policy_type,policy_version,consented_at&user_id=eq.${encodeURIComponent(userId)}&order=consented_at.desc`,
       );
-      const latestConsentByType = resolveLatestConsentsByType(consentRows);
-
-      return requiredPolicyTypes.every(
-        (policyType) =>
-          isSamePolicyVersion(
-            latestConsentByType.get(policyType) ?? "",
-            settingsByType.get(policyType) ?? "",
-          ),
-      );
+      return hasLatestRequiredConsents(policySettings, consentRows, requiredPolicyTypes);
     } catch (error: unknown) {
       console.error("[if-001] consent check failed; fallback to unconsented", error);
       return false;
@@ -411,30 +322,11 @@ export default defineConfig(({ mode }) => {
               const policySettings = await fetchSupabaseRest<PolicySettingRow[]>(
                 "policy_settings?select=policy_type,current_version",
               );
-              const requiredPolicyTypes = new Set(["terms", "privacy"]);
               const latestConsentRows = await fetchSupabaseRest<PolicyConsentRow[]>(
                 `policy_consents?select=policy_type,policy_version,consented_at&user_id=eq.${encodeURIComponent(userId)}&order=consented_at.desc`,
               );
-              const latestByType = resolveLatestConsentsByType(latestConsentRows);
-
               const now = new Date().toISOString();
-              const rowsToInsert: Array<{ user_id: string; policy_type: string; policy_version: string; consented_at: string }> = [];
-              for (const setting of policySettings) {
-                const normalizedType = normalizePolicyType(setting.policy_type);
-                if (!requiredPolicyTypes.has(normalizedType)) {
-                  continue;
-                }
-                const latestVersion = latestByType.get(normalizedType);
-                if (latestVersion && isSamePolicyVersion(latestVersion, setting.current_version)) {
-                  continue;
-                }
-                rowsToInsert.push({
-                  user_id: userId,
-                  policy_type: normalizedType,
-                  policy_version: setting.current_version,
-                  consented_at: now,
-                });
-              }
+              const rowsToInsert = buildPolicyConsentRowsToInsert(userId, policySettings, latestConsentRows, now);
 
               if (rowsToInsert.length > 0) {
                 await insertSupabasePolicyConsents(rowsToInsert);

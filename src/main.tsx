@@ -1,6 +1,11 @@
 import { createAppShell } from "./App";
 import { ROUTE_MAP } from "./app/route-map";
 import { resolveAuthConsentRedirect } from "./app/router";
+import {
+  resolvePolicyConsentEntryRoute,
+  type If001CallbackRoute,
+  type If001SessionState,
+} from "./app/policy-consent-entry";
 import { SCR008PolicyConsentPage, type PolicyConsentAuditTrace } from "./screens/SCR-008PolicyConsentPage";
 import type { If001StartApiErrorResponse, If001StartApiSuccessResponse } from "./server/application/if-001/contracts";
 
@@ -49,11 +54,7 @@ function renderAppShell() {
   </main>`;
 }
 
-type If001SessionStateResponse = {
-  authState: "unauthenticated" | "authenticated";
-  consentState: "unknown" | "agreed";
-  userId?: string;
-};
+type If001SessionStateResponse = If001SessionState;
 
 async function renderLoginOrRedirect(root: HTMLDivElement, app: ReturnType<typeof bootstrapApp>): Promise<void> {
   const accessToken = readSessionStorage(CALLBACK_ACCESS_TOKEN_STORAGE_KEY);
@@ -119,15 +120,11 @@ async function renderPolicyConsentOrRedirect(root: HTMLDivElement, app: ReturnTy
   const accessToken = readSessionStorage(CALLBACK_ACCESS_TOKEN_STORAGE_KEY);
   if (accessToken) {
     const sessionState = await fetchIf001SessionState(accessToken);
-    if (sessionState && sessionState.authState === "authenticated") {
+    if (sessionState) {
       if (sessionState.userId) {
         writeSessionStorage(CALLBACK_USER_ID_STORAGE_KEY, sessionState.userId);
       }
-      const nextPath = resolveAuthConsentRedirect(
-        ROUTE_MAP["SCR-008"],
-        sessionState.authState,
-        sessionState.consentState,
-      );
+      const nextPath = resolvePolicyConsentEntryRoute(sessionState, null);
       if (nextPath !== ROUTE_MAP["SCR-008"]) {
         window.location.replace(nextPath);
         return;
@@ -144,16 +141,12 @@ async function renderPolicyConsentOrRedirect(root: HTMLDivElement, app: ReturnTy
   }
 
   const callbackDecision = await fetchIf001CallbackDecision(fallbackUserId);
-  if (callbackDecision?.route === "SCR-002") {
-    window.location.replace(ROUTE_MAP["SCR-002"]);
-    return;
-  }
-  if (callbackDecision?.route === "SCR-008") {
+  const fallbackRoute = resolvePolicyConsentEntryRoute(null, callbackDecision?.route ?? null);
+  if (fallbackRoute === ROUTE_MAP["SCR-008"]) {
     await renderPolicyConsentPage(root, app);
     return;
   }
-
-  window.location.replace(ROUTE_MAP["SCR-001"]);
+  window.location.replace(fallbackRoute);
 }
 
 function renderSimpleRoutePage(root: HTMLDivElement, app: ReturnType<typeof bootstrapApp>, title: string, description: string) {
@@ -212,7 +205,7 @@ function renderLoginPage(root: HTMLDivElement, app: ReturnType<typeof bootstrapA
 }
 
 type If001CallbackApiResponse = {
-  route: "SCR-001" | "SCR-002" | "SCR-008";
+  route: If001CallbackRoute;
   auditAction?: "POLICY_CONSENT_REJECT" | "LOGIN_FAILED";
   detail?: string;
 };
