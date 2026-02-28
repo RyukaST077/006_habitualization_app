@@ -1,5 +1,8 @@
 import type { PolicyRepositoryContract } from "../../domain/repositories/contracts";
-import { createRepositoryError } from "../../domain/repositories/errors";
+import {
+  createRepositoryError,
+  POLICY_VERSION_REPOSITORY_ERROR_CODES,
+} from "../../domain/repositories/errors";
 import type {
   CurrentPolicy,
   InsertConsentsResult,
@@ -39,7 +42,7 @@ function compareVersionTuple(left: [number, number, number], right: [number, num
   return left[2] - right[2];
 }
 
-function isVersionConflict(currentVersion: string, nextVersion: string): boolean {
+function isUpdatePolicyVersionConflict(currentVersion: string, nextVersion: string): boolean {
   const currentTuple = parseVersionTuple(currentVersion);
   const nextTuple = parseVersionTuple(nextVersion);
 
@@ -50,7 +53,7 @@ function isVersionConflict(currentVersion: string, nextVersion: string): boolean
   return currentVersion === nextVersion;
 }
 
-function isOlderThanCurrentVersion(currentVersion: string, candidateVersion: string): boolean {
+function isStaleConsentVersion(currentVersion: string, candidateVersion: string): boolean {
   const currentTuple = parseVersionTuple(currentVersion);
   const candidateTuple = parseVersionTuple(candidateVersion);
 
@@ -59,6 +62,28 @@ function isOlderThanCurrentVersion(currentVersion: string, candidateVersion: str
   }
 
   return candidateVersion !== currentVersion;
+}
+
+function assertConsentVersionAccepted(policyType: PolicyType, currentVersion: string, consentVersion: string): void {
+  if (!isStaleConsentVersion(currentVersion, consentVersion)) {
+    return;
+  }
+
+  throw createRepositoryError(
+    POLICY_VERSION_REPOSITORY_ERROR_CODES.MISMATCH,
+    `policy version mismatch: ${policyType} expected=${currentVersion} actual=${consentVersion}`,
+  );
+}
+
+function assertUpdatePolicyVersionAccepted(currentVersion: string, newVersion: string): void {
+  if (!isUpdatePolicyVersionConflict(currentVersion, newVersion)) {
+    return;
+  }
+
+  throw createRepositoryError(
+    POLICY_VERSION_REPOSITORY_ERROR_CODES.CONFLICT,
+    "policy version conflict",
+  );
 }
 
 export class PolicyRepository implements PolicyRepositoryContract {
@@ -104,12 +129,7 @@ export class PolicyRepository implements PolicyRepositoryContract {
         throw createRepositoryError("REPOSITORY_ERROR", `policy setting not found: ${consent.policyType}`);
       }
 
-      if (isOlderThanCurrentVersion(policy.currentVersion, consent.policyVersion)) {
-        throw createRepositoryError(
-          "POLICY_VERSION_MISMATCH",
-          `policy version mismatch: ${consent.policyType} expected=${policy.currentVersion} actual=${consent.policyVersion}`,
-        );
-      }
+      assertConsentVersionAccepted(consent.policyType, policy.currentVersion, consent.policyVersion);
     }
 
     for (const consent of consents) {
@@ -152,9 +172,7 @@ export class PolicyRepository implements PolicyRepositoryContract {
       throw createRepositoryError("REPOSITORY_ERROR", `policy setting not found: ${policyType}`);
     }
 
-    if (isVersionConflict(current.currentVersion, newVersion)) {
-      throw createRepositoryError("POLICY_VERSION_CONFLICT", "policy version conflict");
-    }
+    assertUpdatePolicyVersionAccepted(current.currentVersion, newVersion);
 
     const updated: PolicySetting = {
       ...current,

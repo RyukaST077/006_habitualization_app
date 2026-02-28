@@ -46,6 +46,7 @@ describe("T-036 PR-003 FNC-003 version mismatch red tests", () => {
   it("TC-IT-FR-005-003: FR-005 AC-005 policy_version 不一致は 409 相当で拒否し DB 不変にする", async () => {
     const { repository, userId } = createVersionMismatchRepository();
     let rejection: unknown = null;
+    const before = await repository.findUserLatestConsents(userId);
 
     try {
       await repository.insertConsents(userId, [
@@ -59,20 +60,35 @@ describe("T-036 PR-003 FNC-003 version mismatch red tests", () => {
       rejection = error;
     }
 
-    expect(rejection).toMatchObject({
-      code: "POLICY_VERSION_MISMATCH",
-      status: 409,
-    });
-    const latest = await repository.findUserLatestConsents(userId);
-    expect(latest.find((consent) => consent.policyType === "terms")?.policyVersion).toBe("5");
+    expect(rejection).toMatchObject({ code: "POLICY_VERSION_MISMATCH", status: 409 });
+    const after = await repository.findUserLatestConsents(userId);
+    expect(after).toEqual(before);
   });
 
-  it("FNC-003 観点: policy_version mismatch 拒否ケースを固定する", () => {
-    const mismatchCase = CONSENT_RED_CASES.find((entry) => entry.testCaseId === "TC-IT-FR-005-003");
-
-    expect(mismatchCase?.requirementId).toBe("FR-005");
-    expect(mismatchCase?.acceptanceId).toBe("AC-005");
-    expect(mismatchCase?.notes).toContain("FR-026");
+  it("FNC-003 観点: 旧版送信拒否と更新競合ロールバック監査のトレースを固定する", () => {
+    harness.assertConflictCase(CONSENT_RED_CASES, {
+      testCaseId: "TC-IT-FR-003-003",
+      requirementId: "FR-003",
+      acceptanceId: "AC-003",
+      conflictKind: "STALE_VERSION_SUBMISSION",
+      conflictOutcome: "REJECT_WITH_409",
+      conflictReasonCode: "POLICY_VERSION_MISMATCH",
+      notesIncludes: ["old-version", "re-consent"],
+      requireRiskId: "T-RSK-003",
+      requireInterfaceId: "IF-004",
+      requireLinkedRequirement: "FR-026",
+    });
+    harness.assertConflictCase(CONSENT_RED_CASES, {
+      testCaseId: "TC-IT-FR-005-003",
+      requirementId: "FR-005",
+      acceptanceId: "AC-005",
+      conflictKind: "UPDATE_CONFLICT_ROLLBACK",
+      conflictOutcome: "KEEP_PREVIOUS_VERSION",
+      conflictReasonCode: "POLICY_VERSION_CONFLICT",
+      notesIncludes: ["FR-026", "keeps previous consent version", "audit trail"],
+      requireInterfaceId: "IF-004",
+      requireLinkedRequirement: "FR-026",
+    });
   });
 
   it("red: T-037 未実装のため FNC-003 版不一致拒否を失敗状態で固定する", () => {

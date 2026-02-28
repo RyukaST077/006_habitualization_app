@@ -4,9 +4,13 @@ import { HabitRepository } from "../../../src/server/infrastructure/repositories
 import { PolicyRepository } from "../../../src/server/infrastructure/repositories/PolicyRepository";
 import { UserRepository } from "../../../src/server/infrastructure/repositories/UserRepository";
 import { createSupabaseRepositoryClient } from "../../../src/server/infrastructure/repositories/supabase-repository-client";
+import { CONSENT_RED_CASES } from "../consent/fixtures/fnc-002-003-cases";
+import { createConsentTestHarness } from "../consent/helpers/consent-test-harness";
 import { createPolicyOpsSeedBundle } from "./fixtures/policy-ops-seed";
 import { createRepositorySeedBundle } from "./fixtures/repository-seed";
 import { runRepositoryRace } from "./fixtures/repository-race";
+
+const harness = createConsentTestHarness();
 
 function createBarrier(targetCount: number): () => Promise<void> {
   let count = 0;
@@ -78,12 +82,8 @@ describe("T-024 PR-004 cross repository optimistic/unique conflict red", () => {
     ]);
 
     expect(race).toHaveLength(2);
-    const rejected = race.filter((result) => result.status === "rejected");
-    const fulfilled = race.filter((result) => result.status === "fulfilled");
-    expect(rejected).toHaveLength(1);
-    expect(fulfilled).toHaveLength(1);
-    expect(rejected[0]?.reason).toMatchObject({
-      code: "OPTIMISTIC_LOCK_CONFLICT",
+    harness.assertRaceConflictResult(race, {
+      conflictCode: "OPTIMISTIC_LOCK_CONFLICT",
       status: 409,
     });
 
@@ -153,12 +153,8 @@ describe("T-024 PR-004 cross repository optimistic/unique conflict red", () => {
       },
     ]);
 
-    const rejected = race.filter((result) => result.status === "rejected");
-    const fulfilled = race.filter((result) => result.status === "fulfilled");
-    expect(rejected).toHaveLength(1);
-    expect(fulfilled).toHaveLength(1);
-    expect(rejected[0]?.reason).toMatchObject({
-      code: "CHECKIN_CONFLICT",
+    harness.assertRaceConflictResult(race, {
+      conflictCode: "CHECKIN_CONFLICT",
       status: 409,
     });
 
@@ -207,16 +203,35 @@ describe("T-024 PR-004 cross repository optimistic/unique conflict red", () => {
       },
     ]);
 
-    const rejected = race.filter((result) => result.status === "rejected");
-    const fulfilled = race.filter((result) => result.status === "fulfilled");
-    expect(rejected).toHaveLength(1);
-    expect(fulfilled).toHaveLength(1);
-    expect(rejected[0]?.reason).toMatchObject({
-      code: "UNIQUE_CONFLICT",
+    harness.assertRaceConflictResult(race, {
+      conflictCode: "UNIQUE_CONFLICT",
       status: 409,
     });
 
     const latest = await new PolicyRepository(client).findUserLatestConsents(userId);
     expect(latest.find((consent) => consent.policyType === "privacy")?.policyVersion).toBe("4");
+  });
+
+  it("FNC-003 観点: 重複送信と更新競合ロールバックの分類をケース定義で判別可能にする", () => {
+    harness.assertConflictCase(CONSENT_RED_CASES, {
+      testCaseId: "TC-IT-FR-005-002",
+      requirementId: "FR-005",
+      acceptanceId: "AC-005",
+      conflictKind: "DUPLICATE_SUBMISSION",
+      conflictOutcome: "NOOP_SUCCESS",
+      conflictReasonCode: "UNIQUE_CONFLICT",
+      notesIncludes: ["duplicate", "no-op"],
+    });
+    harness.assertConflictCase(CONSENT_RED_CASES, {
+      testCaseId: "TC-IT-FR-005-003",
+      requirementId: "FR-005",
+      acceptanceId: "AC-005",
+      conflictKind: "UPDATE_CONFLICT_ROLLBACK",
+      conflictOutcome: "KEEP_PREVIOUS_VERSION",
+      conflictReasonCode: "POLICY_VERSION_CONFLICT",
+      notesIncludes: ["FR-026", "keeps previous consent version"],
+      requireInterfaceId: "IF-004",
+      requireLinkedRequirement: "FR-026",
+    });
   });
 });

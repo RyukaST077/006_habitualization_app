@@ -111,6 +111,7 @@ describe("T-025 PR-003 M-103 policy repository CRUD/conflict", () => {
       "service_role:ops",
     );
     expect(updated.currentVersion).toBe("3");
+    const beforeConflict = await repository.getCurrentPolicies();
 
     await expect(
       repository.updatePolicySetting("terms", "2", "2026-04-01T00:00:00.000Z", "service_role:ops"),
@@ -118,5 +119,8 @@ describe("T-025 PR-003 M-103 policy repository CRUD/conflict", () => {
       code: "POLICY_VERSION_CONFLICT",
       status: 409,
     });
+
+    const afterConflict = await repository.getCurrentPolicies();
+    expect(afterConflict).toEqual(beforeConflict);
   });
 });

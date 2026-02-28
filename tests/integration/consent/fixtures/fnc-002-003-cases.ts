@@ -16,6 +16,15 @@ export type ConsentPerspective =
   | "UNIQUE_CONSTRAINT"
   | "DUAL_CONSENT_REQUIRED"
   | "AUDIT";
+export type ConsentConflictKind =
+  | "STALE_VERSION_SUBMISSION"
+  | "DUPLICATE_SUBMISSION"
+  | "UPDATE_CONFLICT_ROLLBACK";
+export type ConsentConflictOutcome =
+  | "REJECT_WITH_409"
+  | "NOOP_SUCCESS"
+  | "KEEP_PREVIOUS_VERSION";
+export type ConsentLinkedRequirementId = "FR-026";
 
 export interface ConsentCaseDefinition {
   traceId: string;
@@ -37,6 +46,10 @@ export interface ConsentCaseDefinition {
   interfaceId?: "IF-004";
   riskId?: "T-RSK-003";
   constraints?: readonly ("CON-006" | "CON-007")[];
+  conflictKind?: ConsentConflictKind;
+  conflictOutcome?: ConsentConflictOutcome;
+  conflictReasonCode?: "POLICY_VERSION_MISMATCH" | "UNIQUE_CONFLICT" | "POLICY_VERSION_CONFLICT";
+  linkedRequirementIds?: readonly ConsentLinkedRequirementId[];
 }
 
 export const CONSENT_REQUIRED_REQUIREMENT_IDS: readonly ConsentRequirementId[] = [
@@ -63,6 +76,15 @@ export const CONSENT_REQUIRED_PERSPECTIVES: readonly ConsentPerspective[] = [
   "AUDIT",
 ];
 
+export const CONSENT_PLAN_TRACE_REQUIREMENT_IDS = ["FR-003", "FR-005"] as const;
+export const CONSENT_PLAN_TRACE_LINKED_REQUIREMENT_IDS = ["FR-026"] as const;
+
+export const CONSENT_REGRESSION_SUITE_COMMAND =
+  "npm run test -- tests/integration/consent/*.spec.ts tests/integration/repositories/repository-concurrency-red.spec.ts";
+export const CONSENT_ROUTING_SMOKE_COMMAND =
+  "npm run test -- tests/integration/routing/auth-session-redirect-red.spec.ts tests/e2e/smoke/auth-consent-home.spec.ts";
+export const CONSENT_QUALITY_GATE_COMMAND = "npm run lint && npm run typecheck";
+
 export const CONSENT_RED_CASES: readonly ConsentCaseDefinition[] = [
   {
     traceId: "T-037/FNC-002/TC-IT-FR-002-001/FR-002/AC-002",
@@ -82,9 +104,14 @@ export const CONSENT_RED_CASES: readonly ConsentCaseDefinition[] = [
     perspective: "RECONSENT_ON_POLICY_UPDATE",
     boundary: "IF-004",
     title: "policy_settings 更新時に旧版同意ユーザーへ再同意を強制する",
-    notes: "FR-003 AC-003 IF-004 policy_settings version update re-consent regression fixed",
+    notes:
+      "FR-003 AC-003 IF-004 policy_settings old-version consent submission is rejected and re-consent is required",
     interfaceId: "IF-004",
     riskId: "T-RSK-003",
+    conflictKind: "STALE_VERSION_SUBMISSION",
+    conflictOutcome: "REJECT_WITH_409",
+    conflictReasonCode: "POLICY_VERSION_MISMATCH",
+    linkedRequirementIds: ["FR-026"],
   },
   {
     traceId: "T-037/FNC-002/TC-ST-FR-004-004/FR-004/AC-004",
@@ -116,6 +143,9 @@ export const CONSENT_RED_CASES: readonly ConsentCaseDefinition[] = [
     title: "同一版の重複同意は一意制約で no-op 成功として扱う",
     notes: "FR-005 AC-005 CON-006 uq_policy_consents_user_type_ver duplicate no-op regression fixed",
     constraints: ["CON-006"],
+    conflictKind: "DUPLICATE_SUBMISSION",
+    conflictOutcome: "NOOP_SUCCESS",
+    conflictReasonCode: "UNIQUE_CONFLICT",
   },
   {
     traceId: "T-037/FNC-002/TC-ST-FR-004-005/FR-004/AC-004",
@@ -135,7 +165,13 @@ export const CONSENT_RED_CASES: readonly ConsentCaseDefinition[] = [
     acceptanceId: "AC-005",
     perspective: "AUDIT",
     boundary: "M-010",
-    title: "同意受諾/拒否の監査イベントを FR-026 観点で連携確認する",
-    notes: "FR-005 AC-005 FR-026 POLICY_CONSENT_ACCEPT POLICY_CONSENT_REJECT regression fixed",
+    title: "同意受諾/拒否監査と更新競合失敗時の旧版維持を FR-026 観点で連携確認する",
+    notes:
+      "FR-005 AC-005 FR-026 policy update conflict keeps previous consent version and records audit trail",
+    interfaceId: "IF-004",
+    conflictKind: "UPDATE_CONFLICT_ROLLBACK",
+    conflictOutcome: "KEEP_PREVIOUS_VERSION",
+    conflictReasonCode: "POLICY_VERSION_CONFLICT",
+    linkedRequirementIds: ["FR-026"],
   },
 ] as const;

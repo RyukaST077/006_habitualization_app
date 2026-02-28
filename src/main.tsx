@@ -9,6 +9,7 @@ export function bootstrapApp() {
 }
 
 const CALLBACK_USER_ID_STORAGE_KEY = "if001-callback-user-id";
+const CALLBACK_ACCESS_TOKEN_STORAGE_KEY = "if001-callback-access-token";
 const POLICY_CONSENT_TRACE_STORAGE_KEY = "if001-policy-consent-trace";
 
 function renderAppShell() {
@@ -23,7 +24,7 @@ function renderAppShell() {
 
   const app = bootstrapApp();
   if (window.location.pathname === "/login") {
-    renderLoginPage(root, app);
+    void renderLoginOrRedirect(root, app);
     return;
   }
   if (window.location.pathname === "/auth/callback") {
@@ -35,7 +36,7 @@ function renderAppShell() {
     return;
   }
   if (window.location.pathname === ROUTE_MAP["SCR-008"]) {
-    void renderPolicyConsentPage(root, app);
+    void renderPolicyConsentOrRedirect(root, app);
     return;
   }
 
@@ -46,6 +47,113 @@ function renderAppShell() {
     <h2>Routes</h2>
     <ul>${routeList}</ul>
   </main>`;
+}
+
+type If001SessionStateResponse = {
+  authState: "unauthenticated" | "authenticated";
+  consentState: "unknown" | "agreed";
+  userId?: string;
+};
+
+async function renderLoginOrRedirect(root: HTMLDivElement, app: ReturnType<typeof bootstrapApp>): Promise<void> {
+  const accessToken = readSessionStorage(CALLBACK_ACCESS_TOKEN_STORAGE_KEY);
+  if (!accessToken) {
+    renderLoginPage(root, app);
+    return;
+  }
+
+  try {
+    const response = await fetch("/api/auth/session-state", {
+      method: "GET",
+      headers: {
+        authorization: `Bearer ${accessToken}`,
+      },
+    });
+    const data = (await response.json()) as If001SessionStateResponse;
+    if (data.authState === "authenticated") {
+      if (data.userId) {
+        writeSessionStorage(CALLBACK_USER_ID_STORAGE_KEY, data.userId);
+      }
+      const nextPath = resolveAuthConsentRedirect(ROUTE_MAP["SCR-001"], data.authState, data.consentState);
+      window.location.replace(nextPath);
+      return;
+    }
+  } catch {
+    // fall through
+  }
+
+  renderLoginPage(root, app);
+}
+
+async function fetchIf001SessionState(accessToken: string): Promise<If001SessionStateResponse | null> {
+  try {
+    const response = await fetch("/api/auth/session-state", {
+      method: "GET",
+      headers: {
+        authorization: `Bearer ${accessToken}`,
+      },
+    });
+    return (await response.json()) as If001SessionStateResponse;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchIf001CallbackDecision(userId: string): Promise<If001CallbackApiResponse | null> {
+  try {
+    const response = await fetch("/api/auth/google/callback", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ userId, consentState: "unknown" }),
+    });
+    if (!response.ok) {
+      return null;
+    }
+    return (await response.json()) as If001CallbackApiResponse;
+  } catch {
+    return null;
+  }
+}
+
+async function renderPolicyConsentOrRedirect(root: HTMLDivElement, app: ReturnType<typeof bootstrapApp>): Promise<void> {
+  const accessToken = readSessionStorage(CALLBACK_ACCESS_TOKEN_STORAGE_KEY);
+  if (accessToken) {
+    const sessionState = await fetchIf001SessionState(accessToken);
+    if (sessionState && sessionState.authState === "authenticated") {
+      if (sessionState.userId) {
+        writeSessionStorage(CALLBACK_USER_ID_STORAGE_KEY, sessionState.userId);
+      }
+      const nextPath = resolveAuthConsentRedirect(
+        ROUTE_MAP["SCR-008"],
+        sessionState.authState,
+        sessionState.consentState,
+      );
+      if (nextPath !== ROUTE_MAP["SCR-008"]) {
+        window.location.replace(nextPath);
+        return;
+      }
+      await renderPolicyConsentPage(root, app);
+      return;
+    }
+  }
+
+  const fallbackUserId = readSessionStorage(CALLBACK_USER_ID_STORAGE_KEY);
+  if (!fallbackUserId) {
+    window.location.replace(ROUTE_MAP["SCR-001"]);
+    return;
+  }
+
+  const callbackDecision = await fetchIf001CallbackDecision(fallbackUserId);
+  if (callbackDecision?.route === "SCR-002") {
+    window.location.replace(ROUTE_MAP["SCR-002"]);
+    return;
+  }
+  if (callbackDecision?.route === "SCR-008") {
+    await renderPolicyConsentPage(root, app);
+    return;
+  }
+
+  window.location.replace(ROUTE_MAP["SCR-001"]);
 }
 
 function renderSimpleRoutePage(root: HTMLDivElement, app: ReturnType<typeof bootstrapApp>, title: string, description: string) {
@@ -109,6 +217,15 @@ type If001CallbackApiResponse = {
   detail?: string;
 };
 
+type PolicyConsentInsertResponse = {
+  insertedCount: number;
+};
+type PolicyConsentInsertErrorResponse = {
+  code?: string;
+  message?: string;
+  detail?: string;
+};
+
 function parseHashParams(hash: string): URLSearchParams {
   return new URLSearchParams(hash.startsWith("#") ? hash.slice(1) : hash);
 }
@@ -167,6 +284,7 @@ async function renderAuthCallbackPage(root: HTMLDivElement, app: ReturnType<type
     status.textContent = "認証失敗: access_token の userId(sub) を取得できませんでした。";
     return;
   }
+  writeSessionStorage(CALLBACK_ACCESS_TOKEN_STORAGE_KEY, accessToken);
   writeSessionStorage(CALLBACK_USER_ID_STORAGE_KEY, userId);
 
   try {
@@ -307,6 +425,29 @@ async function submitPolicyConsentDecision(
   status.textContent = `${trace.action} を監査トレースに保持しました。\ntrace_id: ${traceId}\n同意結果を送信中...`;
 
   try {
+    if (consentState === "agreed") {
+      const persistResponse = await fetch("/api/policies/consents", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ userId }),
+      });
+      if (!persistResponse.ok) {
+        let detail = "";
+        try {
+          const errorBody = (await persistResponse.json()) as PolicyConsentInsertErrorResponse;
+          detail = errorBody.detail || errorBody.message || "";
+        } catch {
+          // ignore parse errors
+        }
+        status.textContent = `送信失敗: 同意履歴の保存に失敗しました (${persistResponse.status})${detail ? `\n${detail}` : ""}`;
+        acceptButton.disabled = false;
+        rejectButton.disabled = false;
+        return;
+      }
+      const persistData = (await persistResponse.json()) as PolicyConsentInsertResponse;
+      status.textContent = `${trace.action} を監査トレースに保持しました。\ntrace_id: ${traceId}\n同意履歴を保存しました (inserted=${persistData.insertedCount})。判定を更新中...`;
+    }
+
     const response = await fetch("/api/auth/google/callback", {
       method: "POST",
       headers: { "content-type": "application/json" },
