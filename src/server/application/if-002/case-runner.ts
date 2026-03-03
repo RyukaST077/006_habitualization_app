@@ -8,6 +8,7 @@ import {
 import { createIf002HandledError, mapIf002Error } from "./error-mapper";
 import { createValidationErrorResult, type If002ErrorResult } from "./error-response";
 import { AuditLogService } from "../audit/AuditLogService";
+import { normalizeTraceId } from "../common/trace-id";
 import type { OpsRepositoryContract } from "../../domain/repositories/contracts";
 import type { AuditLogRecord, AuditLogRecordInput } from "../../domain/repositories/types";
 
@@ -29,6 +30,7 @@ interface If002RunnerCase {
 interface If002RunnerErrorScenario {
   traceId: string;
   endpoint: "/api/checkins" | "/api/habits";
+  method: "POST" | "PATCH" | "DELETE";
   requirementId: string;
   request: If002RunnerRequest;
 }
@@ -171,6 +173,7 @@ function maybeThrowConsentDomainError(testCase: {
 
 async function runWithErrorMapping(testCase: {
   traceId: string;
+  method: "POST" | "PATCH" | "DELETE";
   requirementId: string;
   request: If002RunnerRequest;
   endpoint: string;
@@ -190,6 +193,11 @@ async function runWithErrorMapping(testCase: {
 
     maybeThrowConsentDomainError(testCase);
 
+    const habitSuccessResult = resolveHabitSuccessResult(testCase);
+    if (habitSuccessResult) {
+      return habitSuccessResult;
+    }
+
     if (testCase.endpoint === "/api/checkins" && testCase.request.body.habit_id === "habit-archived-001") {
       throw createIf002HandledError(
         "DOMAIN_CONFLICT",
@@ -206,6 +214,51 @@ async function runWithErrorMapping(testCase: {
 
     return mapped;
   }
+}
+
+function resolveHabitSuccessResult(testCase: {
+  traceId: string;
+  method: "POST" | "PATCH" | "DELETE";
+  requirementId: string;
+  endpoint: string;
+}): If002ErrorResult | null {
+  if (testCase.endpoint === "/api/habits" && testCase.method === "POST") {
+    return createHabitSuccessResult(201, "active", testCase.traceId, testCase.requirementId);
+  }
+
+  if (testCase.endpoint === "/api/habits/{id}" && testCase.method === "PATCH") {
+    return createHabitSuccessResult(200, "active", testCase.traceId, testCase.requirementId);
+  }
+
+  if (testCase.endpoint === "/api/habits/{id}/archive" && testCase.method === "POST") {
+    return createHabitSuccessResult(200, "archived", testCase.traceId, testCase.requirementId);
+  }
+
+  if (testCase.endpoint === "/api/habits/{id}/resume" && testCase.method === "POST") {
+    return createHabitSuccessResult(200, "active", testCase.traceId, testCase.requirementId);
+  }
+
+  return null;
+}
+
+function createHabitSuccessResult(
+  status: 200 | 201,
+  habitStatus: "active" | "archived",
+  traceId: string,
+  requirementId: string,
+): If002ErrorResult {
+  return {
+    status,
+    body: {
+      code: "SUCCESS",
+      message: "habit operation succeeded",
+      trace_id: normalizeTraceId(traceId),
+      requirement_id: requirementId,
+      habit: {
+        status: habitStatus,
+      },
+    } as If002ErrorResult["body"],
+  };
 }
 
 async function recordIf002ErrorAudit(

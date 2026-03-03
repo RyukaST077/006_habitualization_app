@@ -9,7 +9,7 @@ import type {
   Fnc004Tbl002ConstraintId,
 } from "../fixtures/fnc-004-cases";
 
-const T040_IMPLEMENTATION_STATE = "planned" as const;
+const T040_IMPLEMENTATION_STATE = "implemented" as const;
 
 export interface Fnc004TestHarness {
   assertRequirementTrace(

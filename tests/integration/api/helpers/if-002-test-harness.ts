@@ -68,7 +68,7 @@ export function createIf002TestHarness(): If002TestHarness {
   };
 
   return {
-    createAuthHeaders(actorUserId: string, requestId = "if-002-red-request-id"): Record<string, string> {
+    createAuthHeaders(actorUserId: string, requestId = "if-002-request-id"): Record<string, string> {
       return createIf002AuthHeaders(actorUserId, requestId);
     },
     assertCommonErrorShape(

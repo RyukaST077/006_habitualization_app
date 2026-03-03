@@ -268,7 +268,8 @@ export function cloneAuditLogForRepository(record: AuditLogRecord): AuditLogReco
 
 export function assertRepositoryOwnership(ownerUserId: string, actorUserId: string, message: string): void {
   if (ownerUserId !== actorUserId) {
-    throw buildForbiddenError(message);
+    const normalizedMessage = message.includes("RLS") ? message : `RLS policy denied: ${message}`;
+    throw buildForbiddenError(normalizedMessage);
   }
 }
 

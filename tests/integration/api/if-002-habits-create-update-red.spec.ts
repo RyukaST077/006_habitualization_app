@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { IF002_HABIT_LIFECYCLE_RED_CASES } from "./fixtures/if-002-cases";
 import { createIf002TestHarness } from "./helpers/if-002-test-harness";
 
-describe("T-039 PR-003 IF-002 habits create/update red tests", () => {
+describe("T-040 PR-004 IF-002 habits create/update green tests", () => {
   it("AC-006..AC-009 ケースを含み VALIDATION_ERROR/FORBIDDEN キーワードを維持する", () => {
     const traceIds = IF002_HABIT_LIFECYCLE_RED_CASES.map((testCase) => testCase.traceId).join(" ");
 
@@ -15,7 +15,7 @@ describe("T-039 PR-003 IF-002 habits create/update red tests", () => {
     expect("VALIDATION_ERROR FORBIDDEN").toContain("FORBIDDEN");
   });
 
-  it("AC-006/FR-006: 必須項目入力時は active で作成され 201 を返す（Red）", async () => {
+  it("AC-006/FR-006: 必須項目入力時は active で作成され 201 を返す", async () => {
     const harness = createIf002TestHarness();
     const createCase = IF002_HABIT_LIFECYCLE_RED_CASES.find((testCase) => testCase.acceptanceId === "AC-006");
 

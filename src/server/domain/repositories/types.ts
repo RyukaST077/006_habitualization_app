@@ -32,6 +32,7 @@ export interface Habit {
   note: string | null;
   displayOrder: number;
   status: HabitStatus;
+  archivedAt?: ISODateTime | null;
   version: number;
   createdAt: ISODateTime;
   updatedAt: ISODateTime;
@@ -42,6 +43,16 @@ export interface HabitUpdatePayload {
   note?: string | null;
   displayOrder?: number;
   version: number;
+}
+
+export interface HabitStatusUpdatePayload {
+  status: HabitStatus;
+  archivedAt: ISODateTime | null;
+}
+
+export interface HabitStatusPersistence {
+  status: HabitStatus;
+  archived_at: ISODateTime | null;
 }
 
 export interface HabitLog {

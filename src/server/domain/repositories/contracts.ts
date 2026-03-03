@@ -52,6 +52,24 @@ export interface HabitRepositoryContract {
   ): Promise<HabitLog[]>;
 }
 
+export interface HabitAuthorizationPolicyPort {
+  assertSelf(userId: string, targetUserId?: string): void;
+}
+
+export interface HabitAuditLogPort {
+  record(input: {
+    actorRole: string;
+    action: string;
+    targetType: string;
+    targetId: string;
+    result: string;
+    requirementId: string;
+    traceId: string;
+    metadata?: Record<string, unknown>;
+    actorUserId?: string | null;
+  }): Promise<unknown>;
+}
+
 export interface PolicyRepositoryContract {
   getCurrentPolicies(): Promise<CurrentPolicy[]>;
   findUserLatestConsents(userId: string): Promise<UserPolicyConsent[]>;

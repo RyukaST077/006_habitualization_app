@@ -14,6 +14,8 @@ const POLICY_TYPE_SET = new Set(["terms", "privacy"]);
 const POLICY_VERSION_PATTERN = /^v\d+\.\d+(?:\.\d+)?$/;
 const POLICY_VERSION_MAX_LENGTH = 20;
 const CONSENT_REQUIREMENT_ID = "FR-005";
+const HABIT_CREATE_REQUIREMENT_ID = "FR-006";
+const HABIT_UPDATE_REQUIREMENT_ID = "FR-007";
 
 function isObjectRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -28,26 +30,26 @@ function isValidIanaTimeZone(timezone: string): boolean {
   }
 }
 
-function validateName(name: unknown, required: boolean): ValidationResult {
+function validateName(name: unknown, required: boolean, requirementId: string): ValidationResult {
   if (name === undefined) {
-    return required ? { message: "name is required", requirement_id: "FR-011" } : null;
+    return required ? { message: "name is required", requirement_id: requirementId } : null;
   }
 
   if (typeof name !== "string" || name.length < NAME_MIN || name.length > NAME_MAX) {
-    return { message: "name must be 1..80 characters", requirement_id: "FR-011" };
+    return { message: "name must be 1..80 characters", requirement_id: requirementId };
   }
 
   return null;
 }
 
-function validateDisplayOrder(displayOrder: unknown): ValidationResult {
+function validateDisplayOrder(displayOrder: unknown, requirementId: string): ValidationResult {
   if (!Number.isInteger(displayOrder)) {
-    return { message: "display_order must be 1..9999", requirement_id: "FR-011" };
+    return { message: "display_order must be 1..9999", requirement_id: requirementId };
   }
 
   const value = displayOrder as number;
   if (value < DISPLAY_ORDER_MIN || value > DISPLAY_ORDER_MAX) {
-    return { message: "display_order must be 1..9999", requirement_id: "FR-011" };
+    return { message: "display_order must be 1..9999", requirement_id: requirementId };
   }
 
   return null;
@@ -55,31 +57,31 @@ function validateDisplayOrder(displayOrder: unknown): ValidationResult {
 
 export function validateHabitCreateDto(payload: unknown): ValidationResult {
   if (!isObjectRecord(payload)) {
-    return { message: "name is required", requirement_id: "FR-011" };
+    return { message: "name is required", requirement_id: HABIT_CREATE_REQUIREMENT_ID };
   }
 
-  const nameError = validateName(payload.name, true);
+  const nameError = validateName(payload.name, true, HABIT_CREATE_REQUIREMENT_ID);
   if (nameError) {
     return nameError;
   }
 
-  return validateDisplayOrder(payload.display_order);
+  return validateDisplayOrder(payload.display_order, HABIT_CREATE_REQUIREMENT_ID);
 }
 
 export function validateHabitUpdateDto(payload: unknown): ValidationResult {
   if (!isObjectRecord(payload)) {
-    return { message: "name must be 1..80 characters", requirement_id: "FR-011" };
+    return { message: "name must be 1..80 characters", requirement_id: HABIT_UPDATE_REQUIREMENT_ID };
   }
 
   if ("name" in payload) {
-    const nameError = validateName(payload.name, false);
+    const nameError = validateName(payload.name, false, HABIT_UPDATE_REQUIREMENT_ID);
     if (nameError) {
       return nameError;
     }
   }
 
   if ("display_order" in payload) {
-    const displayOrderError = validateDisplayOrder(payload.display_order);
+    const displayOrderError = validateDisplayOrder(payload.display_order, HABIT_UPDATE_REQUIREMENT_ID);
     if (displayOrderError) {
       return displayOrderError;
     }

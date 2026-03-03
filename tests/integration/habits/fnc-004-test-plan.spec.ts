@@ -13,7 +13,7 @@ import { createFnc004TestHarness } from "./helpers/fnc-004-test-harness";
 const FNC004_SUITE_COMMAND = "npm run test -- tests/integration/habits/fnc-004-test-plan.spec.ts";
 const FNC004_QUALITY_GATE_COMMAND = "npm run lint && npm run typecheck";
 
-describe("T-039 PR-001 FNC-004 habit lifecycle red test plan", () => {
+describe("T-040 PR-006 FNC-004 habit lifecycle green regression plan", () => {
   const harness = createFnc004TestHarness();
 
   it("FR-006..009 と AC-006..009 のトレーサビリティを固定する", () => {
@@ -45,7 +45,7 @@ describe("T-039 PR-001 FNC-004 habit lifecycle red test plan", () => {
     expect(FNC004_QUALITY_GATE_COMMAND).toBe("npm run lint && npm run typecheck");
   });
 
-  it("red: T-040 実装前のため FNC-004 lifecycle は planned のまま失敗させる", () => {
+  it("green: T-040 実装完了後は FNC-004 lifecycle が implemented である", () => {
     expect(harness.getT040ImplementationState()).toBe("implemented");
   });
 });

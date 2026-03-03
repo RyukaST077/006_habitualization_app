@@ -8,6 +8,35 @@ import {
   type SupabaseRepositoryClient,
 } from "./supabase-repository-client";
 
+const HABIT_NAME_MIN_LENGTH = 1;
+const HABIT_NAME_MAX_LENGTH = 80;
+const VALID_HABIT_STATUS = new Set<HabitStatus>(["active", "archived"]);
+
+function createConstraintError(
+  message: string,
+  constraint: "chk_habits_name_len" | "chk_habits_status",
+): ReturnType<typeof createRepositoryError<"INVALID_HABIT_INPUT">> & { constraint: string } {
+  const error = createRepositoryError("INVALID_HABIT_INPUT", message) as ReturnType<
+    typeof createRepositoryError<"INVALID_HABIT_INPUT">
+  > & { constraint: string };
+  error.constraint = constraint;
+  return error;
+}
+
+function assertHabitNameLength(name: string): void {
+  if (name.length >= HABIT_NAME_MIN_LENGTH && name.length <= HABIT_NAME_MAX_LENGTH) {
+    return;
+  }
+  throw createConstraintError("chk_habits_name_len violated", "chk_habits_name_len");
+}
+
+function assertHabitStatus(status: HabitStatus): void {
+  if (VALID_HABIT_STATUS.has(status)) {
+    return;
+  }
+  throw createConstraintError("chk_habits_status violated", "chk_habits_status");
+}
+
 function listDateRange(fromDate: string, toDate: string): string[] {
   if (fromDate > toDate) {
     return [];
@@ -50,6 +79,7 @@ export class HabitRepository implements HabitRepositoryContract {
   }
 
   public async createHabit(userId: string, name: string, displayOrder: number): Promise<Habit> {
+    assertHabitNameLength(name);
     const now = this.client.now();
     const created: Habit = {
       habitId: this.client.nextHabitId(),
@@ -91,21 +121,28 @@ export class HabitRepository implements HabitRepositoryContract {
   }
 
   public async setHabitStatus(userId: string, habitId: string, status: HabitStatus): Promise<Habit> {
+    assertHabitStatus(status);
     const current = this.client.habits.get(habitId);
     if (current === undefined) {
       throw createRepositoryError("REPOSITORY_ERROR", `habit not found: ${habitId}`);
     }
-    assertRepositoryOwnership(current.userId, userId, "habit ownership mismatch");
+    assertRepositoryOwnership(current.userId, userId, "RLS policy denied habit update");
+    const now = this.client.now();
+    const archivedAt = status === "archived" ? now : null;
 
     const updated: Habit = {
       ...current,
       status,
+      archivedAt,
       version: current.version + 1,
-      updatedAt: this.client.now(),
+      updatedAt: now,
     };
 
     this.client.habits.set(habitId, updated);
-    return cloneRepositoryValue(updated);
+    return cloneRepositoryValue({
+      ...updated,
+      archived_at: archivedAt,
+    } as Habit);
   }
 
   public async upsertCheckin(

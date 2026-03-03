@@ -112,6 +112,14 @@ function toIf002ResponseCode(code: AppErrorCode): If002ResponseCode {
     return code as If002HandledErrorCode | "VALIDATION_ERROR";
   }
 
+  if (code === "INVALID_HABIT_INPUT") {
+    return "VALIDATION_ERROR";
+  }
+
+  if (code === "INVALID_HABIT_STATUS_TRANSITION" || code === "OPTIMISTIC_LOCK_CONFLICT") {
+    return "DOMAIN_CONFLICT";
+  }
+
   if (code === "POLICY_VERSION_MISMATCH" || code === "POLICY_VERSION_CONFLICT") {
     return "DOMAIN_CONFLICT";
   }
