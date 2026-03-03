@@ -1,9 +1,9 @@
 import { expect } from "vitest";
 
 import type {
-  If002CaseDefinition,
   If002HabitLifecycleCase,
   If002RequirementId,
+  If002RunnableCase,
 } from "../fixtures/if-002-cases";
 import type { If002ErrorScenario } from "../fixtures/if-002-error-scenarios";
 import type { If002InvalidPayloadCase } from "../fixtures/if-002-invalid-payloads";
@@ -41,12 +41,13 @@ export interface If002TestHarness {
     payload: unknown,
     expected: { status: number; code: string; requirementId: If002RequirementId },
   ): void;
-  runPlannedCase(testCase: If002CaseDefinition): Promise<If002PlannedResult>;
+  runPlannedCase(testCase: If002RunnableCase): Promise<If002PlannedResult>;
   runHabitLifecycleCase(testCase: If002HabitLifecycleCase): Promise<If002PlannedResult>;
   runInvalidPayloadCase(testCase: If002InvalidPayloadCase): Promise<If002PlannedResult>;
   runErrorScenarioCase(testCase: If002ErrorScenario): Promise<If002PlannedResult>;
   assertForbiddenError(payload: unknown, requirementId: If002RequirementId): void;
   assertHabitStatus(payload: unknown, expectedStatus: "active" | "archived"): void;
+  assertCheckinLogDate(payload: unknown, expectedLogDate: string): void;
 }
 
 export function createIf002TestHarness(): If002TestHarness {
@@ -87,7 +88,7 @@ export function createIf002TestHarness(): If002TestHarness {
       expect(actualStatus).toBe(expected.status);
       assertErrorEnvelope(payload, { code: expected.code, requirementId: expected.requirementId });
     },
-    async runPlannedCase(testCase: If002CaseDefinition): Promise<If002PlannedResult> {
+    async runPlannedCase(testCase: If002RunnableCase): Promise<If002PlannedResult> {
       return runPlannedCaseImpl(testCase);
     },
     async runHabitLifecycleCase(testCase: If002HabitLifecycleCase): Promise<If002PlannedResult> {
@@ -115,6 +116,17 @@ export function createIf002TestHarness(): If002TestHarness {
 
       const response = payload as If002PlannedResult["body"];
       expect(response.habit?.status).toBe(expectedStatus);
+    },
+    assertCheckinLogDate(payload: unknown, expectedLogDate: string): void {
+      expect(payload).toBeTypeOf("object");
+      expect(payload).not.toBeNull();
+
+      const response = payload as If002PlannedResult["body"] & {
+        checkin?: {
+          log_date?: string;
+        };
+      };
+      expect(response.checkin?.log_date).toBe(expectedLogDate);
     },
   };
 }

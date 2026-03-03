@@ -7,6 +7,7 @@ export type If002ErrorCode =
   | "DOMAIN_CONFLICT"
   | "INTERNAL_ERROR";
 export type If002RequirementId =
+  | "FR-010"
   | "FR-006"
   | "FR-007"
   | "FR-008"
@@ -19,6 +20,20 @@ export type If002RequirementId =
 export type If002Perspective = "DTO_REQUIRED" | "DTO_TYPE_RANGE" | "AUTHZ_SELF_ONLY" | "DOMAIN_STATE" | "SYSTEM";
 export type If002HabitLifecycleAcceptanceId = "AC-006" | "AC-007" | "AC-008" | "AC-009";
 export type If002HabitTransitionRequirementId = "FR-008" | "FR-009";
+export type If002CheckinsBusinessDateAcceptanceId = "AC-010";
+
+export interface If002RunnableCase {
+  traceId: string;
+  endpoint: string;
+  method: If002Method;
+  requirementId: If002RequirementId;
+  expectedMessage: string;
+  request: {
+    actorUserId: string;
+    targetUserId?: string;
+    body: Record<string, unknown>;
+  };
+}
 
 export interface HabitStatusTransitionVocabulary {
   action: HabitStatusTransitionAction;
@@ -56,19 +71,30 @@ export interface If002HabitStatusTransitionCase extends HabitStatusTransitionVoc
   };
 }
 
-export interface If002CaseDefinition {
-  traceId: string;
-  endpoint: string;
-  method: If002Method;
+export interface If002CaseDefinition extends If002RunnableCase {
   perspective: If002Perspective;
-  requirementId: If002RequirementId;
   expectedStatus: 400 | 403 | 409 | 500;
   expectedCode: If002ErrorCode;
-  expectedMessage: string;
+}
+
+export interface If002CheckinsBusinessDateActorCase {
+  actorLabel: "USER-A" | "USER-B";
+  actorUserId: string;
+  timezone: "Asia/Tokyo" | "UTC";
+  dayCutoffTime: string;
+  expectedLogDate: string;
+}
+
+export interface If002CheckinsBusinessDateRedCase {
+  traceId: string;
+  endpoint: "/api/checkins";
+  method: "POST";
+  requirementId: "FR-010";
+  acceptanceId: If002CheckinsBusinessDateAcceptanceId;
+  nowUtc: string;
+  actors: readonly [If002CheckinsBusinessDateActorCase, If002CheckinsBusinessDateActorCase];
   request: {
-    actorUserId: string;
-    targetUserId?: string;
-    body: Record<string, unknown>;
+    habitId: string;
   };
 }
 
@@ -323,3 +349,33 @@ export const IF002_RED_CASES: If002CaseDefinition[] = [
     },
   },
 ];
+
+export const IF002_CHECKINS_BUSINESS_DATE_RED_CASES: readonly If002CheckinsBusinessDateRedCase[] = [
+  {
+    traceId: "IF-002/CHECKINS/AC-010/FR-010/business-date-by-timezone-cutoff",
+    endpoint: "/api/checkins",
+    method: "POST",
+    requirementId: "FR-010",
+    acceptanceId: "AC-010",
+    nowUtc: "2026-03-01T18:00:00Z",
+    actors: [
+      {
+        actorLabel: "USER-A",
+        actorUserId: "user-red-001",
+        timezone: "Asia/Tokyo",
+        dayCutoffTime: "03:00",
+        expectedLogDate: "2026-03-02",
+      },
+      {
+        actorLabel: "USER-B",
+        actorUserId: "user-red-002",
+        timezone: "UTC",
+        dayCutoffTime: "03:00",
+        expectedLogDate: "2026-03-01",
+      },
+    ],
+    request: {
+      habitId: "habit-red-001",
+    },
+  },
+] as const;

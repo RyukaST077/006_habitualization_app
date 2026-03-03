@@ -36,3 +36,6 @@
 ## 5. 備考
 - `FR-020` により締め時刻変更は「変更以降」のみ適用。過去再計算しない。
 - 退会時は `account_status='disabled'` を先に反映し、BAT-004で完全削除する。
+- `chk_profiles_cutoff` は `day_cutoff_time` の範囲制約。
+- `day_cutoff_time` の下限は `00:00:00`（含む）。
+- `day_cutoff_time` の上限は `23:59:00`（含む）。
