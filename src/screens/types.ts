@@ -11,7 +11,8 @@ export const SCREEN_IDS = [
 
 export type ScreenId = (typeof SCREEN_IDS)[number];
 
+export type HabitLifecycleStatus = "active" | "archived";
+
 export type ScreenContainerProps = {
   screenId: ScreenId;
 };
-

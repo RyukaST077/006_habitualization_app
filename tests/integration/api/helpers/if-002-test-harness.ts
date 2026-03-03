@@ -1,6 +1,10 @@
 import { expect } from "vitest";
 
-import type { If002CaseDefinition, If002RequirementId } from "../fixtures/if-002-cases";
+import type {
+  If002CaseDefinition,
+  If002HabitLifecycleCase,
+  If002RequirementId,
+} from "../fixtures/if-002-cases";
 import type { If002ErrorScenario } from "../fixtures/if-002-error-scenarios";
 import type { If002InvalidPayloadCase } from "../fixtures/if-002-invalid-payloads";
 import {
@@ -19,7 +23,11 @@ export interface If002ErrorResponse {
 
 export interface If002PlannedResult {
   status: number;
-  body: If002ErrorResponse;
+  body: If002ErrorResponse & {
+    habit?: {
+      status?: string;
+    };
+  };
 }
 
 export interface If002TestHarness {
@@ -34,8 +42,11 @@ export interface If002TestHarness {
     expected: { status: number; code: string; requirementId: If002RequirementId },
   ): void;
   runPlannedCase(testCase: If002CaseDefinition): Promise<If002PlannedResult>;
+  runHabitLifecycleCase(testCase: If002HabitLifecycleCase): Promise<If002PlannedResult>;
   runInvalidPayloadCase(testCase: If002InvalidPayloadCase): Promise<If002PlannedResult>;
   runErrorScenarioCase(testCase: If002ErrorScenario): Promise<If002PlannedResult>;
+  assertForbiddenError(payload: unknown, requirementId: If002RequirementId): void;
+  assertHabitStatus(payload: unknown, expectedStatus: "active" | "archived"): void;
 }
 
 export function createIf002TestHarness(): If002TestHarness {
@@ -79,11 +90,31 @@ export function createIf002TestHarness(): If002TestHarness {
     async runPlannedCase(testCase: If002CaseDefinition): Promise<If002PlannedResult> {
       return runPlannedCaseImpl(testCase);
     },
+    async runHabitLifecycleCase(testCase: If002HabitLifecycleCase): Promise<If002PlannedResult> {
+      return runPlannedCaseImpl({
+        traceId: testCase.traceId,
+        endpoint: testCase.endpoint,
+        method: testCase.method,
+        requirementId: testCase.requirementId,
+        expectedMessage: "habit lifecycle scenario",
+        request: testCase.request,
+      });
+    },
     async runInvalidPayloadCase(testCase: If002InvalidPayloadCase): Promise<If002PlannedResult> {
       return runInvalidPayloadCaseImpl(testCase);
     },
     async runErrorScenarioCase(testCase: If002ErrorScenario): Promise<If002PlannedResult> {
       return runErrorScenarioCaseImpl(testCase);
+    },
+    assertForbiddenError(payload: unknown, requirementId: If002RequirementId): void {
+      assertErrorEnvelope(payload, { code: "FORBIDDEN", requirementId });
+    },
+    assertHabitStatus(payload: unknown, expectedStatus: "active" | "archived"): void {
+      expect(payload).toBeTypeOf("object");
+      expect(payload).not.toBeNull();
+
+      const response = payload as If002PlannedResult["body"];
+      expect(response.habit?.status).toBe(expectedStatus);
     },
   };
 }

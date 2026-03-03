@@ -4,8 +4,34 @@ export type If002ErrorCode =
   | "FORBIDDEN"
   | "DOMAIN_CONFLICT"
   | "INTERNAL_ERROR";
-export type If002RequirementId = "FR-011" | "FR-012" | "FR-013" | "FR-021" | "FR-025";
+export type If002RequirementId =
+  | "FR-006"
+  | "FR-007"
+  | "FR-008"
+  | "FR-009"
+  | "FR-011"
+  | "FR-012"
+  | "FR-013"
+  | "FR-021"
+  | "FR-025";
 export type If002Perspective = "DTO_REQUIRED" | "DTO_TYPE_RANGE" | "AUTHZ_SELF_ONLY" | "DOMAIN_STATE" | "SYSTEM";
+export type If002HabitLifecycleAcceptanceId = "AC-006" | "AC-007" | "AC-008" | "AC-009";
+
+export interface If002HabitLifecycleCase {
+  traceId: string;
+  endpoint: "/api/habits" | "/api/habits/{id}" | "/api/habits/{id}/archive" | "/api/habits/{id}/resume";
+  method: "POST" | "PATCH";
+  requirementId: If002RequirementId;
+  acceptanceId: If002HabitLifecycleAcceptanceId;
+  expectedStatus: 200 | 201 | 403;
+  expectedCode?: "FORBIDDEN" | "VALIDATION_ERROR";
+  expectedHabitStatus?: "active" | "archived";
+  request: {
+    actorUserId: string;
+    targetUserId?: string;
+    body: Record<string, unknown>;
+  };
+}
 
 export interface If002CaseDefinition {
   traceId: string;
@@ -39,6 +65,62 @@ export const IF002_REQUIRED_REQUIREMENT_IDS: If002RequirementId[] = [
 ];
 
 export const IF002_REQUIRED_ERROR_STATUSES = [400, 403, 409, 500] as const;
+
+export const IF002_HABIT_LIFECYCLE_RED_CASES: If002HabitLifecycleCase[] = [
+  {
+    traceId: "IF-002/HABITS/AC-006/FR-006/create-active-with-required-fields",
+    endpoint: "/api/habits",
+    method: "POST",
+    requirementId: "FR-006",
+    acceptanceId: "AC-006",
+    expectedStatus: 201,
+    expectedHabitStatus: "active",
+    request: {
+      actorUserId: "user-red-001",
+      body: { name: "Morning Run", display_order: 10 },
+    },
+  },
+  {
+    traceId: "IF-002/HABITS/AC-007/FR-025/update-other-user-forbidden",
+    endpoint: "/api/habits/{id}",
+    method: "PATCH",
+    requirementId: "FR-025",
+    acceptanceId: "AC-007",
+    expectedStatus: 403,
+    expectedCode: "FORBIDDEN",
+    request: {
+      actorUserId: "user-red-001",
+      targetUserId: "user-red-002",
+      body: { habit_id: "habit-user-red-002", name: "rename by other user", version: 2 },
+    },
+  },
+  {
+    traceId: "IF-002/HABITS/AC-008/FR-008/archive-status-transition",
+    endpoint: "/api/habits/{id}/archive",
+    method: "POST",
+    requirementId: "FR-008",
+    acceptanceId: "AC-008",
+    expectedStatus: 200,
+    expectedHabitStatus: "archived",
+    request: {
+      actorUserId: "user-red-001",
+      body: { habit_id: "habit-red-001", version: 1 },
+    },
+  },
+  {
+    traceId: "IF-002/HABITS/AC-009/FR-009/resume-status-transition",
+    endpoint: "/api/habits/{id}/resume",
+    method: "POST",
+    requirementId: "FR-009",
+    acceptanceId: "AC-009",
+    expectedStatus: 200,
+    expectedHabitStatus: "active",
+    request: {
+      actorUserId: "user-red-001",
+      body: { habit_id: "habit-archived-001", version: 3 },
+    },
+  },
+];
 
 export const IF002_RED_CASES: If002CaseDefinition[] = [
   {

@@ -4,7 +4,8 @@ export type RepositoryCategory = "CRUD" | "Tx" | "競合";
 export type RepositoryConflictCode =
   | "OPTIMISTIC_LOCK_CONFLICT"
   | "CHECKIN_CONFLICT"
-  | "POLICY_VERSION_CONFLICT";
+  | "POLICY_VERSION_CONFLICT"
+  | "FORBIDDEN";
 
 export interface RepositoryRedCase {
   repositoryId: RepositoryId;
@@ -33,8 +34,29 @@ export const REPOSITORY_RED_CASES: RepositoryRedCase[] = [
     repositoryId: "M-102",
     method: "createHabit",
     category: "CRUD",
-    traceId: "M-102/CRUD/createHabit",
+    traceId: "M-102/CRUD/createHabit/FR-006",
     expectedFailure: "NOT_IMPLEMENTED",
+  },
+  {
+    repositoryId: "M-102",
+    method: "createHabit",
+    category: "CRUD",
+    traceId: "M-102/CRUD/createHabit/chk_habits_name_len",
+    expectedFailure: "NOT_IMPLEMENTED",
+  },
+  {
+    repositoryId: "M-102",
+    method: "setHabitStatus",
+    category: "CRUD",
+    traceId: "M-102/CRUD/setHabitStatus/chk_habits_status/archived_at",
+    expectedFailure: "NOT_IMPLEMENTED",
+  },
+  {
+    repositoryId: "M-102",
+    method: "updateHabit",
+    category: "CRUD",
+    traceId: "M-102/CRUD/updateHabit/RLS/FORBIDDEN/FR-007",
+    expectedFailure: "FORBIDDEN",
   },
   {
     repositoryId: "M-102",
@@ -79,4 +101,5 @@ export const REPOSITORY_CONFLICT_CODES: RepositoryConflictCode[] = [
   "OPTIMISTIC_LOCK_CONFLICT",
   "CHECKIN_CONFLICT",
   "POLICY_VERSION_CONFLICT",
+  "FORBIDDEN",
 ];

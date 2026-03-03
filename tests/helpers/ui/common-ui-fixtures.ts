@@ -19,6 +19,24 @@ export type CommonUiErrorInput = {
   code: CommonUiErrorCode;
 };
 
+export type Scr003HabitNameBoundaryCase = {
+  label: "1文字" | "80文字" | "81文字";
+  length: 1 | 80 | 81;
+  valid: boolean;
+};
+
+export type Scr003DisplayOrderBoundaryCase = {
+  label: "display_order=0" | "display_order=1" | "display_order=9999" | "display_order=10000";
+  value: 0 | 1 | 9999 | 10000;
+  valid: boolean;
+};
+
+export type Scr004StatusButtonVisibility = {
+  status: "active" | "archived";
+  archiveVisible: boolean;
+  resumeVisible: boolean;
+};
+
 const T034_AUTH_UI_IMPLEMENTATION_STATE = "implemented" as const;
 
 export const COMMON_UI_DISPLAY_ITEMS = {
@@ -100,6 +118,24 @@ export const SCR001_AUTH_FAILURE_EXPECTATION = {
   errorMessageContains: "認証失敗",
   retryActionLabel: "再試行",
 } as const;
+
+export const SCR003_HABIT_NAME_BOUNDARY_CASES: readonly Scr003HabitNameBoundaryCase[] = [
+  { label: "1文字", length: 1, valid: true },
+  { label: "80文字", length: 80, valid: true },
+  { label: "81文字", length: 81, valid: false },
+] as const;
+
+export const SCR003_DISPLAY_ORDER_BOUNDARY_CASES: readonly Scr003DisplayOrderBoundaryCase[] = [
+  { label: "display_order=0", value: 0, valid: false },
+  { label: "display_order=1", value: 1, valid: true },
+  { label: "display_order=9999", value: 9999, valid: true },
+  { label: "display_order=10000", value: 10000, valid: false },
+] as const;
+
+export const SCR004_STATUS_BUTTON_VISIBILITY: readonly Scr004StatusButtonVisibility[] = [
+  { status: "active", archiveVisible: true, resumeVisible: false },
+  { status: "archived", archiveVisible: false, resumeVisible: true },
+] as const;
 
 export function createCommonUiErrorInput(status: CommonUiErrorStatus): CommonUiErrorInput {
   return {

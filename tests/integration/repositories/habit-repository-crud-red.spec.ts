@@ -1,42 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { HabitRepository } from "../../../src/server/infrastructure/repositories/HabitRepository";
-import { createSupabaseRepositoryClient } from "../../../src/server/infrastructure/repositories/supabase-repository-client";
-import { createRepositorySeedBundle } from "./fixtures/repository-seed";
-
-function createHabitRepository() {
-  const seed = createRepositorySeedBundle();
-  const now = new Date().toISOString();
-  const client = createSupabaseRepositoryClient({
-    habits: seed.habits.map((habit, index) => ({
-      habitId: habit.habitId,
-      userId: habit.userId,
-      name: habit.name,
-      note: null,
-      displayOrder: (index + 1) * 10,
-      status: habit.status,
-      version: habit.version,
-      createdAt: now,
-      updatedAt: now,
-    })),
-    habitLogs: seed.checkins.map((checkin) => ({
-      habitId: checkin.habitId,
-      userId: checkin.userId,
-      logDate: checkin.checkinDate,
-      checkedInAt: now,
-    })),
-  });
-
-  return {
-    repository: new HabitRepository(client),
-    userId: seed.profile.userId,
-    habitId: seed.habits[0]!.habitId,
-  };
-}
+import { createHabitRepositoryFixture } from "./helpers/repository-test-harness";
 
 describe("T-025 PR-002 M-102 habit repository CRUD", () => {
   it("M-102/CRUD/listHabits: actorの習慣のみ取得", async () => {
-    const { repository, userId } = createHabitRepository();
+    const { repository, userId } = createHabitRepositoryFixture();
 
     const habits = await repository.listHabits(userId);
 
@@ -44,8 +12,8 @@ describe("T-025 PR-002 M-102 habit repository CRUD", () => {
     expect(habits.every((habit) => habit.userId === userId)).toBe(true);
   });
 
-  it("M-102/CRUD/createHabit: active初期状態で作成", async () => {
-    const { repository, userId } = createHabitRepository();
+  it("M-102/CRUD/createHabit FR-006: active初期状態で作成", async () => {
+    const { repository, userId } = createHabitRepositoryFixture();
 
     const created = await repository.createHabit(userId, "read", 50);
 
@@ -54,8 +22,8 @@ describe("T-025 PR-002 M-102 habit repository CRUD", () => {
     expect(created.habitId.length).toBeGreaterThan(0);
   });
 
-  it("M-102/CRUD/updateHabit: version一致で更新し、本人境界外は拒否", async () => {
-    const { repository, userId, habitId } = createHabitRepository();
+  it("M-102/CRUD/updateHabit FR-007: version一致で更新し、本人境界外は拒否", async () => {
+    const { repository, userId, habitId } = createHabitRepositoryFixture();
 
     const list = await repository.listHabits(userId);
     const target = list.find((habit) => habit.habitId === habitId);
@@ -76,8 +44,8 @@ describe("T-025 PR-002 M-102 habit repository CRUD", () => {
     });
   });
 
-  it("M-102/CRUD/setHabitStatus: active/archived を切替できる", async () => {
-    const { repository, userId, habitId } = createHabitRepository();
+  it("M-102/CRUD/setHabitStatus FR-008/FR-009: active/archived を切替できる", async () => {
+    const { repository, userId, habitId } = createHabitRepositoryFixture();
 
     const archived = await repository.setHabitStatus(userId, habitId, "archived");
     expect(archived.status).toBe("archived");
@@ -87,7 +55,7 @@ describe("T-025 PR-002 M-102 habit repository CRUD", () => {
   });
 
   it("M-102/CRUD/upsertCheckin: archived習慣拒否・冪等・unique競合", async () => {
-    const { repository, userId, habitId } = createHabitRepository();
+    const { repository, userId, habitId } = createHabitRepositoryFixture();
 
     await repository.setHabitStatus(userId, habitId, "archived");
     await expect(
@@ -111,7 +79,7 @@ describe("T-025 PR-002 M-102 habit repository CRUD", () => {
   });
 
   it("M-102/CRUD/deleteCheckin: 対象日のcheckinを削除できる", async () => {
-    const { repository, userId, habitId } = createHabitRepository();
+    const { repository, userId, habitId } = createHabitRepositoryFixture();
 
     await repository.upsertCheckin(userId, habitId, "2026-02-21", "2026-02-21T09:00:00.000Z");
     const deleted = await repository.deleteCheckin(userId, habitId, "2026-02-21");
@@ -122,7 +90,7 @@ describe("T-025 PR-002 M-102 habit repository CRUD", () => {
   });
 
   it("M-102/CRUD/findLogsByDateRange: archived含有フラグで絞り込み", async () => {
-    const { repository, userId, habitId } = createHabitRepository();
+    const { repository, userId, habitId } = createHabitRepositoryFixture();
 
     await repository.upsertCheckin(userId, habitId, "2026-02-18", "2026-02-18T09:00:00.000Z");
     await repository.upsertCheckin(userId, habitId, "2026-02-19", "2026-02-19T09:00:00.000Z");
