@@ -86,6 +86,9 @@ function resolveRequirementId(
   if (responseCode === "FORBIDDEN") {
     return FORBIDDEN_REQUIREMENT_ID;
   }
+  if (responseCode === "DOMAIN_CONFLICT" && fallbackRequirementId.trim().length > 0) {
+    return fallbackRequirementId.trim();
+  }
 
   return appRequirementId.trim() || fallbackRequirementId.trim() || DEFAULT_REQUIREMENT_ID;
 }

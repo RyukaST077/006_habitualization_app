@@ -38,4 +38,17 @@ describe("T-014 PR-003 error presentation integration tests", () => {
     expect(presentation.status).toBe(403);
     expect(presentation.visibleTraceId).toBeNull();
   });
+
+  it("409 DOMAIN_CONFLICT のみ再開導線(SCR-004)を表示し、403/500は表示しない", () => {
+    const conflict = resolveErrorPresentation(409, "DOMAIN_CONFLICT", "SCR002-CHECKIN-409");
+    const forbidden = resolveErrorPresentation(403, "FORBIDDEN", "SCR002-CHECKIN-403");
+    const internal = resolveErrorPresentation(500, "INTERNAL_ERROR", "SCR002-CHECKIN-500");
+
+    expect(conflict.recoveryAction).toEqual({
+      label: "再開してチェックインする",
+      targetScreenId: "SCR-004",
+    });
+    expect(forbidden.recoveryAction).toBeNull();
+    expect(internal.recoveryAction).toBeNull();
+  });
 });

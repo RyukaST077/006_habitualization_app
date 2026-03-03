@@ -25,6 +25,11 @@ import type {
   UserPolicyConsent,
 } from "./types";
 
+export interface HabitCheckinUpsertResult {
+  log: HabitLog;
+  idempotent: boolean;
+}
+
 export interface UserRepositoryContract {
   findProfile(userId: string): Promise<Profile | null>;
   updateProfileSettings(userId: string, timezone: string, cutoff: string, version: number): Promise<Profile>;
@@ -42,7 +47,12 @@ export interface HabitRepositoryContract {
   createHabit(userId: string, name: string, displayOrder: number): Promise<Habit>;
   updateHabit(userId: string, habitId: string, payload: HabitUpdatePayload): Promise<Habit>;
   setHabitStatus(userId: string, habitId: string, status: HabitStatus): Promise<Habit>;
-  upsertCheckin(userId: string, habitId: string, logDate: string, checkedInAt: string): Promise<HabitLog>;
+  upsertCheckin(
+    userId: string,
+    habitId: string,
+    logDate: string,
+    checkedInAt: string,
+  ): Promise<HabitCheckinUpsertResult>;
   deleteCheckin(userId: string, habitId: string, logDate: string): Promise<boolean>;
   findLogsByDateRange(
     userId: string,

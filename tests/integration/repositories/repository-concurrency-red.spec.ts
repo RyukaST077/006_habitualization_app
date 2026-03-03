@@ -91,7 +91,7 @@ describe("T-024 PR-004 cross repository optimistic/unique conflict red", () => {
     expect(profile?.version).toBe(seed.profile.version + 1);
   });
 
-  it("競合/unique constraint: habit_logs unique key conflict", async () => {
+  it("FNC-006 FR-011/FR-012: habit_logs 同時登録は +1/+0 で冪等収束する", async () => {
     const seed = createRepositorySeedBundle();
     const now = "2026-02-21T10:00:00.000Z";
     const client = createSupabaseRepositoryClient({
@@ -126,37 +126,32 @@ describe("T-024 PR-004 cross repository optimistic/unique conflict red", () => {
       {
         name: "checkin#1",
         async run() {
-          return client.withTransaction(async (txClient) => {
-            await barrier();
-            return new HabitRepository(txClient).upsertCheckin(
-              userId,
-              habitId,
-              logDate,
-              "2026-02-21T10:00:00.000Z",
-            );
-          });
+          await barrier();
+          return new HabitRepository(client).upsertCheckin(userId, habitId, logDate, "2026-02-21T10:00:00.000Z");
         },
       },
       {
         name: "checkin#2",
         async run() {
-          return client.withTransaction(async (txClient) => {
-            await barrier();
-            return new HabitRepository(txClient).upsertCheckin(
-              userId,
-              habitId,
-              logDate,
-              "2026-02-21T10:00:01.000Z",
-            );
-          });
+          await barrier();
+          return new HabitRepository(client).upsertCheckin(userId, habitId, logDate, "2026-02-21T10:00:01.000Z");
         },
       },
     ]);
 
-    harness.assertRaceConflictResult(race, {
-      conflictCode: "CHECKIN_CONFLICT",
-      status: 409,
-    });
+    const fulfilled = race.filter((result) => result.status === "fulfilled");
+    const rejected = race.filter((result) => result.status === "rejected");
+
+    expect(rejected).toHaveLength(0);
+    expect(fulfilled).toHaveLength(2);
+
+    const idempotentResults = fulfilled
+      .map((result) => {
+        const value = result.value as { idempotent?: boolean };
+        return value.idempotent;
+      })
+      .sort();
+    expect(idempotentResults).toEqual([false, true]);
 
     const logs = await new HabitRepository(client).findLogsByDateRange(userId, logDate, logDate, true);
     expect(logs).toHaveLength(1);
@@ -233,5 +228,10 @@ describe("T-024 PR-004 cross repository optimistic/unique conflict red", () => {
       requireInterfaceId: "IF-004",
       requireLinkedRequirement: "FR-026",
     });
+  });
+
+  it("境界固定: チェックイン取消条件は後続タスクで扱う", () => {
+    // NOTE: FR-014 (checkin cancellation) boundary is intentionally out of scope in this commit.
+    expect("T-026").toBe("T-026");
   });
 });

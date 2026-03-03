@@ -54,7 +54,7 @@ describe("T-025 PR-002 M-102 habit repository CRUD", () => {
     expect(restored.status).toBe("active");
   });
 
-  it("M-102/CRUD/upsertCheckin: archived習慣拒否・冪等・unique競合", async () => {
+  it("M-102/CRUD/upsertCheckin: archived習慣拒否・同日重複は状態不変の冪等成功", async () => {
     const { repository, userId, habitId } = createHabitRepositoryFixture();
 
     await repository.setHabitStatus(userId, habitId, "archived");
@@ -67,15 +67,21 @@ describe("T-025 PR-002 M-102 habit repository CRUD", () => {
 
     await repository.setHabitStatus(userId, habitId, "active");
     const first = await repository.upsertCheckin(userId, habitId, "2026-02-20", "2026-02-20T10:00:00.000Z");
-    const second = await repository.upsertCheckin(userId, habitId, "2026-02-20", "2026-02-20T10:00:00.000Z");
-    expect(second).toEqual(first);
+    expect(first.idempotent).toBe(false);
+    expect(first.log.logDate).toBe("2026-02-20");
+    expect(first.log.checkedInAt).toBe("2026-02-20T10:00:00.000Z");
 
-    await expect(
-      repository.upsertCheckin(userId, habitId, "2026-02-20", "2026-02-20T11:00:00.000Z"),
-    ).rejects.toMatchObject({
-      code: "CHECKIN_CONFLICT",
-      status: 409,
-    });
+    const second = await repository.upsertCheckin(userId, habitId, "2026-02-20", "2026-02-20T10:00:00.000Z");
+    expect(second.idempotent).toBe(true);
+    expect(second.log).toEqual(first.log);
+
+    const third = await repository.upsertCheckin(userId, habitId, "2026-02-20", "2026-02-20T11:00:00.000Z");
+    expect(third.idempotent).toBe(true);
+    expect(third.log).toEqual(first.log);
+
+    const logs = await repository.findLogsByDateRange(userId, "2026-02-20", "2026-02-20", true);
+    expect(logs).toHaveLength(1);
+    expect(logs[0]).toEqual(first.log);
   });
 
   it("M-102/CRUD/deleteCheckin: 対象日のcheckinを削除できる", async () => {

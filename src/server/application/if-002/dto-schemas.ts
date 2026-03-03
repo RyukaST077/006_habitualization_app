@@ -16,6 +16,9 @@ const POLICY_VERSION_MAX_LENGTH = 20;
 const CONSENT_REQUIREMENT_ID = "FR-005";
 const HABIT_CREATE_REQUIREMENT_ID = "FR-006";
 const HABIT_UPDATE_REQUIREMENT_ID = "FR-007";
+const CHECKIN_REGISTER_REQUIREMENT_ID = "FR-011";
+const CHECKIN_IDEMPOTENT_REQUIREMENT_ID = "FR-012";
+const YYYY_MM_DD_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 function isObjectRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -85,6 +88,22 @@ export function validateHabitUpdateDto(payload: unknown): ValidationResult {
     if (displayOrderError) {
       return displayOrderError;
     }
+  }
+
+  return null;
+}
+
+export function validateCheckinDto(payload: unknown): ValidationResult {
+  if (!isObjectRecord(payload)) {
+    return { message: "habit_id is required", requirement_id: CHECKIN_REGISTER_REQUIREMENT_ID };
+  }
+
+  if (typeof payload.habit_id !== "string" || payload.habit_id.length === 0) {
+    return { message: "habit_id is required", requirement_id: CHECKIN_REGISTER_REQUIREMENT_ID };
+  }
+
+  if (typeof payload.log_date !== "string" || !YYYY_MM_DD_PATTERN.test(payload.log_date)) {
+    return { message: "log_date must be yyyy-mm-dd", requirement_id: CHECKIN_IDEMPOTENT_REQUIREMENT_ID };
   }
 
   return null;

@@ -11,6 +11,10 @@ export type ErrorPresentation = {
   status: ErrorStatus;
   code: CommonErrorCode;
   message: string;
+  recoveryAction: {
+    label: string;
+    targetScreenId: "SCR-004";
+  } | null;
   statusLabel: string;
   traceIdLabel: "trace_id";
   visibleTraceId: string | null;
@@ -32,11 +36,18 @@ export function resolveErrorPresentation(
   traceId = "INTERNAL_ERROR"
 ): ErrorPresentation {
   const shouldShowTraceId = status === TRACE_ID_VISIBLE_STATUS && code === "INTERNAL_ERROR";
+  const showResumeAction = status === 409 && code === "DOMAIN_CONFLICT";
 
   return {
     status,
     code,
     message: PUBLIC_MESSAGES[code],
+    recoveryAction: showResumeAction
+      ? {
+          label: "再開してチェックインする",
+          targetScreenId: "SCR-004",
+        }
+      : null,
     statusLabel: String(status),
     traceIdLabel: "trace_id",
     visibleTraceId: shouldShowTraceId ? `trace_id:${traceId}` : null,

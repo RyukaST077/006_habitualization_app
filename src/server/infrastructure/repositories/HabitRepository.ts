@@ -1,4 +1,4 @@
-import type { HabitRepositoryContract } from "../../domain/repositories/contracts";
+import type { HabitCheckinUpsertResult, HabitRepositoryContract } from "../../domain/repositories/contracts";
 import { createRepositoryError } from "../../domain/repositories/errors";
 import type {
   Habit,
@@ -164,7 +164,7 @@ export class HabitRepository implements HabitRepositoryContract {
     habitId: string,
     logDate: string,
     checkedInAt: string,
-  ): Promise<HabitLog> {
+  ): Promise<HabitCheckinUpsertResult> {
     const habit = this.client.habits.get(habitId);
     if (habit === undefined) {
       throw createRepositoryError("REPOSITORY_ERROR", `habit not found: ${habitId}`);
@@ -177,10 +177,13 @@ export class HabitRepository implements HabitRepositoryContract {
     const key = buildHabitLogKeyForRepository(habitId, logDate);
     const existing = this.client.habitLogs.get(key);
     if (existing !== undefined) {
-      if (existing.userId === userId && existing.checkedInAt === checkedInAt) {
-        return cloneRepositoryValue(existing);
+      if (existing.userId !== userId) {
+        throw createRepositoryError("FORBIDDEN", "checkin ownership mismatch");
       }
-      throw createRepositoryError("CHECKIN_CONFLICT", "duplicate habit/date checkin");
+      return {
+        log: cloneRepositoryValue(existing),
+        idempotent: true,
+      };
     }
 
     const created: HabitLog = {
@@ -190,7 +193,10 @@ export class HabitRepository implements HabitRepositoryContract {
       checkedInAt,
     };
     this.client.habitLogs.set(key, created);
-    return cloneRepositoryValue(created);
+    return {
+      log: cloneRepositoryValue(created),
+      idempotent: false,
+    };
   }
 
   public async deleteCheckin(userId: string, habitId: string, logDate: string): Promise<boolean> {

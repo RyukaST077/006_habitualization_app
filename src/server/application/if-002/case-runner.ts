@@ -1,5 +1,6 @@
 import { assertIf002SelfOnlyAccess } from "./authorization";
 import {
+  validateCheckinDto,
   validateHabitCreateDto,
   validateHabitUpdateDto,
   validatePolicyConsentsDto,
@@ -7,11 +8,15 @@ import {
 } from "./dto-schemas";
 import { createIf002HandledError, mapIf002Error } from "./error-mapper";
 import { createValidationErrorResult, type If002ErrorResult } from "./error-response";
+import { CheckinService } from "../checkin/CheckinService";
 import { AuditLogService } from "../audit/AuditLogService";
 import { normalizeTraceId } from "../common/trace-id";
 import { resolveLogDate } from "../../domain/time/BusinessDateService";
 import type { OpsRepositoryContract } from "../../domain/repositories/contracts";
 import type { AuditLogRecord, AuditLogRecordInput } from "../../domain/repositories/types";
+import { HabitRepository } from "../../infrastructure/repositories/HabitRepository";
+import { UserRepository } from "../../infrastructure/repositories/UserRepository";
+import { createSupabaseRepositoryClient } from "../../infrastructure/repositories/supabase-repository-client";
 
 interface If002RunnerRequest {
   actorUserId: string;
@@ -66,6 +71,67 @@ const HABIT_SUCCESS_DEFINITIONS: Record<HabitSuccessKey, HabitSuccessDefinition>
   "POST /api/habits/{id}/resume": { status: 200, habitStatus: "active" },
 };
 
+const if002CheckinClient = createSupabaseRepositoryClient({
+  profiles: [
+    {
+      userId: "user-red-001",
+      displayName: "Red Tester A",
+      timezone: "Asia/Tokyo",
+      dayCutoffTime: "04:00",
+      accountStatus: "active",
+      version: 1,
+    },
+    {
+      userId: "user-red-002",
+      displayName: "Red Tester B",
+      timezone: "UTC",
+      dayCutoffTime: "04:00",
+      accountStatus: "active",
+      version: 1,
+    },
+  ],
+  habits: [
+    {
+      habitId: "habit-red-001",
+      userId: "user-red-001",
+      name: "walk",
+      note: null,
+      displayOrder: 10,
+      status: "active",
+      version: 1,
+      createdAt: "2026-03-01T00:00:00.000Z",
+      updatedAt: "2026-03-01T00:00:00.000Z",
+    },
+    {
+      habitId: "habit-archived-001",
+      userId: "user-red-001",
+      name: "journal",
+      note: null,
+      displayOrder: 20,
+      status: "archived",
+      archivedAt: "2026-02-20T00:00:00.000Z",
+      version: 2,
+      createdAt: "2026-03-01T00:00:00.000Z",
+      updatedAt: "2026-03-01T00:00:00.000Z",
+    },
+    {
+      habitId: "habit-user-red-002",
+      userId: "user-red-002",
+      name: "read",
+      note: null,
+      displayOrder: 10,
+      status: "active",
+      version: 1,
+      createdAt: "2026-03-01T00:00:00.000Z",
+      updatedAt: "2026-03-01T00:00:00.000Z",
+    },
+  ],
+});
+const if002CheckinService = new CheckinService(
+  new UserRepository(if002CheckinClient),
+  new HabitRepository(if002CheckinClient),
+);
+
 let if002AuditSequence = 0;
 const if002AuditLogService = new AuditLogService({
   async insertAuditLog(auditRecord: AuditLogRecordInput): Promise<AuditLogRecord> {
@@ -94,18 +160,6 @@ const if002AuditLogService = new AuditLogService({
 
 function isForceThrowRequested(body: Record<string, unknown>): boolean {
   return body.force_throw === true;
-}
-
-function validateCheckinDto(payload: Record<string, unknown>): { message: string; requirement_id: string } | null {
-  if (typeof payload.habit_id !== "string" || payload.habit_id.length === 0) {
-    return { message: "habit_id is required", requirement_id: "FR-011" };
-  }
-
-  if (typeof payload.log_date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(payload.log_date)) {
-    return { message: "log_date must be yyyy-mm-dd", requirement_id: "FR-012" };
-  }
-
-  return null;
 }
 
 function maybeCreateDtoErrorResult(testCase: If002RunnerCase): If002ErrorResult | null {
@@ -213,23 +267,14 @@ async function runWithErrorMapping(testCase: {
 
     maybeThrowConsentDomainError(testCase);
 
+    const checkinSuccessResult = await resolveCheckinSuccessResult(testCase);
+    if (checkinSuccessResult) {
+      return checkinSuccessResult;
+    }
+
     const habitSuccessResult = resolveHabitSuccessResult(testCase);
     if (habitSuccessResult) {
       return habitSuccessResult;
-    }
-
-    if (testCase.endpoint === "/api/checkins" && testCase.request.body.habit_id === "habit-archived-001") {
-      throw createIf002HandledError(
-        "DOMAIN_CONFLICT",
-        "archived habit cannot be checked in",
-        testCase.requirementId,
-        testCase.traceId,
-      );
-    }
-
-    const checkinSuccessResult = resolveCheckinSuccessResult(testCase);
-    if (checkinSuccessResult) {
-      return checkinSuccessResult;
     }
 
     throw new Error("unexpected error");
@@ -256,20 +301,33 @@ function resolveHabitSuccessResult(testCase: {
   return null;
 }
 
-function resolveCheckinSuccessResult(testCase: {
+async function resolveCheckinSuccessResult(testCase: {
   traceId: string;
   method: "POST" | "PATCH" | "DELETE";
+  requirementId: string;
   endpoint: string;
   request: If002RunnerRequest;
-}): If002ErrorResult | null {
+}): Promise<If002ErrorResult | null> {
   if (testCase.endpoint !== "/api/checkins" || testCase.method !== "POST") {
     return null;
   }
 
-  const businessDateInput = parseCheckinBusinessDateInput(testCase.request.body, testCase.traceId);
-  const logDate = resolveCheckinLogDateWithValidationMapping(businessDateInput, testCase.traceId);
+  const businessDateInput = parseCheckinBusinessDateInputIfPresent(testCase.request.body);
+  if (businessDateInput) {
+    const logDate = resolveCheckinLogDateWithValidationMapping(businessDateInput, testCase.traceId);
+    return createCheckinSuccessResult(logDate, false, testCase.traceId, FR010_REQUIREMENT_ID);
+  }
 
-  return createCheckinSuccessResult(logDate, testCase.traceId);
+  const habitId = testCase.request.body.habit_id as string;
+  const nowUtc = resolveCheckinNowUtc(testCase.request.body);
+  const result = await if002CheckinService.registerCheckin(
+    testCase.request.actorUserId,
+    habitId,
+    nowUtc,
+    normalizeTraceId(testCase.traceId),
+  );
+
+  return createCheckinSuccessResult(result.logDate, result.idempotent, testCase.traceId, testCase.requirementId);
 }
 
 interface CheckinBusinessDateInput {
@@ -278,24 +336,27 @@ interface CheckinBusinessDateInput {
   dayCutoffTime: string;
 }
 
-function parseCheckinBusinessDateInput(
-  payload: Record<string, unknown>,
-  traceId: string,
-): CheckinBusinessDateInput {
+function parseCheckinBusinessDateInputIfPresent(payload: Record<string, unknown>): CheckinBusinessDateInput | null {
   const nowUtc = payload.now_utc;
   const timezone = payload.timezone;
   const dayCutoffTime = payload.day_cutoff_time;
 
+  if (nowUtc === undefined && timezone === undefined && dayCutoffTime === undefined) {
+    return null;
+  }
+
   if (typeof nowUtc !== "string" || typeof timezone !== "string" || typeof dayCutoffTime !== "string") {
-    throw createIf002HandledError(
-      "VALIDATION_ERROR",
-      "now_utc, timezone, and day_cutoff_time are required",
-      FR010_REQUIREMENT_ID,
-      traceId,
-    );
+    return null;
   }
 
   return { nowUtc, timezone, dayCutoffTime };
+}
+
+function resolveCheckinNowUtc(payload: Record<string, unknown>): string {
+  if (typeof payload.now_utc === "string") {
+    return payload.now_utc;
+  }
+  return `${payload.log_date as string}T12:00:00.000Z`;
 }
 
 function resolveCheckinLogDateWithValidationMapping(input: CheckinBusinessDateInput, traceId: string): string {
@@ -313,15 +374,21 @@ function resolveCheckinLogDateWithValidationMapping(input: CheckinBusinessDateIn
   }
 }
 
-function createCheckinSuccessResult(logDate: string, traceId: string): If002ErrorResult {
+function createCheckinSuccessResult(
+  logDate: string,
+  idempotent: boolean,
+  traceId: string,
+  requirementId: string,
+): If002ErrorResult {
   return {
     status: 201,
     body: {
       code: "SUCCESS",
-      message: "checkin accepted with business date resolved by timezone/cutoff",
+      message: "checkin succeeded",
       trace_id: normalizeTraceId(traceId),
-      requirement_id: FR010_REQUIREMENT_ID,
+      requirement_id: requirementId,
       checkin: {
+        idempotent,
         log_date: logDate,
       },
     } as If002ErrorResult["body"],
