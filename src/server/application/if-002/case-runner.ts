@@ -9,6 +9,7 @@ import { createIf002HandledError, mapIf002Error } from "./error-mapper";
 import { createValidationErrorResult, type If002ErrorResult } from "./error-response";
 import { AuditLogService } from "../audit/AuditLogService";
 import { normalizeTraceId } from "../common/trace-id";
+import { resolveLogDate } from "../../domain/time/BusinessDateService";
 import type { OpsRepositoryContract } from "../../domain/repositories/contracts";
 import type { AuditLogRecord, AuditLogRecordInput } from "../../domain/repositories/types";
 
@@ -37,6 +38,7 @@ interface If002RunnerErrorScenario {
 
 const FR025_REQUIREMENT_ID = "FR-025";
 const FR005_REQUIREMENT_ID = "FR-005";
+const FR010_REQUIREMENT_ID = "FR-010";
 const IF002_AUDIT_ACTION = "if-002.error";
 const POLICY_CONSENT_REJECT_AUDIT_ACTION = "POLICY_CONSENT_REJECT";
 const CONSENT_ENDPOINT = "/api/policies/consents";
@@ -225,6 +227,11 @@ async function runWithErrorMapping(testCase: {
       );
     }
 
+    const checkinSuccessResult = resolveCheckinSuccessResult(testCase);
+    if (checkinSuccessResult) {
+      return checkinSuccessResult;
+    }
+
     throw new Error("unexpected error");
   } catch (error: unknown) {
     const mapped = mapIf002Error(error, testCase.traceId, testCase.requirementId);
@@ -247,6 +254,56 @@ function resolveHabitSuccessResult(testCase: {
   }
 
   return null;
+}
+
+function resolveCheckinSuccessResult(testCase: {
+  traceId: string;
+  method: "POST" | "PATCH" | "DELETE";
+  endpoint: string;
+  request: If002RunnerRequest;
+}): If002ErrorResult | null {
+  if (testCase.endpoint !== "/api/checkins" || testCase.method !== "POST") {
+    return null;
+  }
+
+  const nowUtc = testCase.request.body.now_utc;
+  const timezone = testCase.request.body.timezone;
+  const dayCutoffTime = testCase.request.body.day_cutoff_time;
+
+  if (typeof nowUtc !== "string" || typeof timezone !== "string" || typeof dayCutoffTime !== "string") {
+    throw createIf002HandledError(
+      "VALIDATION_ERROR",
+      "now_utc, timezone, and day_cutoff_time are required",
+      FR010_REQUIREMENT_ID,
+      testCase.traceId,
+    );
+  }
+
+  try {
+    const logDate = resolveLogDate(nowUtc, timezone, dayCutoffTime);
+
+    return {
+      status: 201,
+      body: {
+        code: "SUCCESS",
+        message: "checkin accepted with business date resolved by timezone/cutoff",
+        trace_id: normalizeTraceId(testCase.traceId),
+        requirement_id: FR010_REQUIREMENT_ID,
+        checkin: {
+          log_date: logDate,
+        },
+      } as If002ErrorResult["body"],
+    };
+  } catch (error: unknown) {
+    const businessDateErrorCode =
+      typeof error === "object" && error !== null && "code" in error ? (error.code as string) : "";
+
+    if (businessDateErrorCode === "INVALID_TIMEZONE" || businessDateErrorCode === "INVALID_CUTOFF_TIME") {
+      throw createIf002HandledError("VALIDATION_ERROR", (error as Error).message, FR010_REQUIREMENT_ID, testCase.traceId);
+    }
+
+    throw error;
+  }
 }
 
 function createHabitSuccessResult(

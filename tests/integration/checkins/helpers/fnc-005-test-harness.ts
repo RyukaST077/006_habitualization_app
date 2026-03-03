@@ -7,7 +7,7 @@ import type {
   Fnc005TestCaseId,
 } from "../fixtures/fnc-005-cases";
 
-const T043_IMPLEMENTATION_STATE = "pending" as const;
+const T043_IMPLEMENTATION_STATE = "implemented" as const;
 
 export interface Fnc005TestHarness {
   assertRequirementTrace(
