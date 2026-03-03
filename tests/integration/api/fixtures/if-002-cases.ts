@@ -1,4 +1,6 @@
 export type If002Method = "POST" | "PATCH" | "DELETE";
+export type HabitStatus = "active" | "archived";
+export type HabitStatusTransitionAction = "archive" | "resume";
 export type If002ErrorCode =
   | "VALIDATION_ERROR"
   | "FORBIDDEN"
@@ -16,6 +18,15 @@ export type If002RequirementId =
   | "FR-025";
 export type If002Perspective = "DTO_REQUIRED" | "DTO_TYPE_RANGE" | "AUTHZ_SELF_ONLY" | "DOMAIN_STATE" | "SYSTEM";
 export type If002HabitLifecycleAcceptanceId = "AC-006" | "AC-007" | "AC-008" | "AC-009";
+export type If002HabitTransitionRequirementId = "FR-008" | "FR-009";
+
+export interface HabitStatusTransitionVocabulary {
+  action: HabitStatusTransitionAction;
+  fromStatus: HabitStatus;
+  toStatus: HabitStatus;
+  requirementId: If002HabitTransitionRequirementId;
+  acceptanceId: "AC-008" | "AC-009";
+}
 
 export interface If002HabitLifecycleCase {
   traceId: string;
@@ -29,6 +40,18 @@ export interface If002HabitLifecycleCase {
   request: {
     actorUserId: string;
     targetUserId?: string;
+    body: Record<string, unknown>;
+  };
+  transition?: HabitStatusTransitionVocabulary;
+}
+
+export interface If002HabitStatusTransitionCase extends HabitStatusTransitionVocabulary {
+  traceId: string;
+  endpoint: "/api/habits/{id}/archive" | "/api/habits/{id}/resume";
+  method: "POST";
+  expectedStatus: 200;
+  request: {
+    actorUserId: string;
     body: Record<string, unknown>;
   };
 }
@@ -66,6 +89,48 @@ export const IF002_REQUIRED_REQUIREMENT_IDS: If002RequirementId[] = [
 
 export const IF002_REQUIRED_ERROR_STATUSES = [400, 403, 409, 500] as const;
 
+export const IF002_HABIT_STATUS_TRANSITION_VOCABULARY: readonly HabitStatusTransitionVocabulary[] = [
+  {
+    action: "archive",
+    fromStatus: "active",
+    toStatus: "archived",
+    requirementId: "FR-008",
+    acceptanceId: "AC-008",
+  },
+  {
+    action: "resume",
+    fromStatus: "archived",
+    toStatus: "active",
+    requirementId: "FR-009",
+    acceptanceId: "AC-009",
+  },
+] as const;
+
+export const IF002_HABIT_STATUS_TRANSITION_CASES: readonly If002HabitStatusTransitionCase[] = [
+  {
+    traceId: "IF-002/HABITS/AC-008/FR-008/archive-status-transition",
+    endpoint: "/api/habits/{id}/archive",
+    method: "POST",
+    expectedStatus: 200,
+    request: {
+      actorUserId: "user-red-001",
+      body: { habit_id: "habit-red-001", version: 1 },
+    },
+    ...IF002_HABIT_STATUS_TRANSITION_VOCABULARY[0],
+  },
+  {
+    traceId: "IF-002/HABITS/AC-009/FR-009/resume-status-transition",
+    endpoint: "/api/habits/{id}/resume",
+    method: "POST",
+    expectedStatus: 200,
+    request: {
+      actorUserId: "user-red-001",
+      body: { habit_id: "habit-archived-001", version: 3 },
+    },
+    ...IF002_HABIT_STATUS_TRANSITION_VOCABULARY[1],
+  },
+] as const;
+
 export const IF002_HABIT_LIFECYCLE_RED_CASES: If002HabitLifecycleCase[] = [
   {
     traceId: "IF-002/HABITS/AC-006/FR-006/create-active-with-required-fields",
@@ -94,32 +159,23 @@ export const IF002_HABIT_LIFECYCLE_RED_CASES: If002HabitLifecycleCase[] = [
       body: { habit_id: "habit-user-red-002", name: "rename by other user", version: 2 },
     },
   },
-  {
-    traceId: "IF-002/HABITS/AC-008/FR-008/archive-status-transition",
-    endpoint: "/api/habits/{id}/archive",
-    method: "POST",
-    requirementId: "FR-008",
-    acceptanceId: "AC-008",
-    expectedStatus: 200,
-    expectedHabitStatus: "archived",
-    request: {
-      actorUserId: "user-red-001",
-      body: { habit_id: "habit-red-001", version: 1 },
+  ...IF002_HABIT_STATUS_TRANSITION_CASES.map((testCase) => ({
+    traceId: testCase.traceId,
+    endpoint: testCase.endpoint,
+    method: testCase.method,
+    requirementId: testCase.requirementId,
+    acceptanceId: testCase.acceptanceId,
+    expectedStatus: testCase.expectedStatus,
+    expectedHabitStatus: testCase.toStatus,
+    request: testCase.request,
+    transition: {
+      action: testCase.action,
+      fromStatus: testCase.fromStatus,
+      toStatus: testCase.toStatus,
+      requirementId: testCase.requirementId,
+      acceptanceId: testCase.acceptanceId,
     },
-  },
-  {
-    traceId: "IF-002/HABITS/AC-009/FR-009/resume-status-transition",
-    endpoint: "/api/habits/{id}/resume",
-    method: "POST",
-    requirementId: "FR-009",
-    acceptanceId: "AC-009",
-    expectedStatus: 200,
-    expectedHabitStatus: "active",
-    request: {
-      actorUserId: "user-red-001",
-      body: { habit_id: "habit-archived-001", version: 3 },
-    },
-  },
+  })),
 ];
 
 export const IF002_RED_CASES: If002CaseDefinition[] = [

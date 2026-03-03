@@ -24,6 +24,18 @@ export interface UserDailyActivity {
 }
 
 export type HabitStatus = "active" | "archived";
+export type HabitStatusTransitionKind = "archive" | "resume";
+export type HabitStatusTransitionAuditAction = "HABIT_ARCHIVE" | "HABIT_RESUME";
+export type HabitStatusTransitionRequirementId = "FR-008" | "FR-009";
+
+export interface HabitStatusTransition {
+  toStatus: HabitStatus;
+  auditAction: HabitStatusTransitionAuditAction;
+  requirementId: HabitStatusTransitionRequirementId;
+  traceLabel: HabitStatusTransitionKind;
+}
+
+export type HabitStatusTransitionMap = Record<HabitStatusTransitionKind, HabitStatusTransition>;
 
 export interface Habit {
   habitId: HabitId;

@@ -1,3 +1,8 @@
+import {
+  IF002_HABIT_STATUS_TRANSITION_VOCABULARY,
+  type HabitStatusTransitionVocabulary,
+} from "../../api/fixtures/if-002-cases";
+
 export type RepositoryId = "M-101" | "M-102" | "M-103" | "M-104";
 export type RepositoryCategory = "CRUD" | "Tx" | "競合";
 
@@ -14,6 +19,24 @@ export interface RepositoryRedCase {
   traceId: string;
   expectedFailure: RepositoryConflictCode | "NOT_IMPLEMENTED";
 }
+
+export interface RepositoryHabitStatusTransitionCase extends HabitStatusTransitionVocabulary {
+  repositoryId: "M-102";
+  method: "setHabitStatus";
+  category: "CRUD";
+  traceId: string;
+  expectedFailure: "NOT_IMPLEMENTED";
+}
+
+export const REPOSITORY_HABIT_STATUS_TRANSITION_CASES: readonly RepositoryHabitStatusTransitionCase[] =
+  IF002_HABIT_STATUS_TRANSITION_VOCABULARY.map((transition) => ({
+    repositoryId: "M-102",
+    method: "setHabitStatus",
+    category: "CRUD",
+    traceId: `M-102/CRUD/setHabitStatus/${transition.action}/${transition.fromStatus}-to-${transition.toStatus}`,
+    expectedFailure: "NOT_IMPLEMENTED",
+    ...transition,
+  }));
 
 export const REPOSITORY_RED_CASES: RepositoryRedCase[] = [
   {
@@ -46,11 +69,12 @@ export const REPOSITORY_RED_CASES: RepositoryRedCase[] = [
   },
   {
     repositoryId: "M-102",
-    method: "setHabitStatus",
+    method: "createHabit",
     category: "CRUD",
-    traceId: "M-102/CRUD/setHabitStatus/chk_habits_status/archived_at",
+    traceId: "M-102/CRUD/createHabit/chk_habits_status",
     expectedFailure: "NOT_IMPLEMENTED",
   },
+  ...REPOSITORY_HABIT_STATUS_TRANSITION_CASES,
   {
     repositoryId: "M-102",
     method: "updateHabit",

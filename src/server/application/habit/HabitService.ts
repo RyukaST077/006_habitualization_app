@@ -3,13 +3,14 @@ import { randomUUID } from "node:crypto";
 import { createAppError, isAppError } from "../common/AppError";
 import { normalizeTraceId } from "../common/trace-id";
 import { AuthorizationPolicyError, AuthorizationPolicyService } from "../authz/AuthorizationPolicyService";
+import { resolveHabitStatusTransition } from "./habit-status-transition";
 import type {
   HabitAuditLogPort,
   HabitAuthorizationPolicyPort,
   HabitRepositoryContract,
 } from "../../domain/repositories/contracts";
 import { RepositoryDomainError } from "../../domain/repositories/errors";
-import type { Habit, HabitUpdatePayload } from "../../domain/repositories/types";
+import type { Habit, HabitStatusTransitionKind, HabitUpdatePayload } from "../../domain/repositories/types";
 
 const NAME_MIN = 1;
 const NAME_MAX = 80;
@@ -108,24 +109,27 @@ export class HabitService {
   }
 
   public async archiveHabit(userId: string, habitId: string, traceId: string = createTraceId("archive")): Promise<Habit> {
-    try {
-      this.authorizationPolicy.assertSelf(userId, userId);
-      const habit = await this.habitRepository.setHabitStatus(userId, habitId, "archived");
-      await this.recordHabitAudit("HABIT_ARCHIVE", userId, habit.habitId, traceId);
-      return habit;
-    } catch (error: unknown) {
-      throw this.mapError(error, "FR-008", traceId);
-    }
+    return this.executeStatusTransition("archive", userId, habitId, traceId);
   }
 
   public async resumeHabit(userId: string, habitId: string, traceId: string = createTraceId("resume")): Promise<Habit> {
+    return this.executeStatusTransition("resume", userId, habitId, traceId);
+  }
+
+  private async executeStatusTransition(
+    transitionKind: HabitStatusTransitionKind,
+    userId: string,
+    habitId: string,
+    traceId: string,
+  ): Promise<Habit> {
+    const transition = resolveHabitStatusTransition(transitionKind);
     try {
       this.authorizationPolicy.assertSelf(userId, userId);
-      const habit = await this.habitRepository.setHabitStatus(userId, habitId, "active");
-      await this.recordHabitAudit("HABIT_RESUME", userId, habit.habitId, traceId);
+      const habit = await this.habitRepository.setHabitStatus(userId, habitId, transition.toStatus);
+      await this.recordHabitAudit(transition.auditAction, userId, habit.habitId, traceId);
       return habit;
     } catch (error: unknown) {
-      throw this.mapError(error, "FR-009", traceId);
+      throw this.mapError(error, transition.requirementId, traceId);
     }
   }
 

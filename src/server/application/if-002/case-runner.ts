@@ -45,6 +45,24 @@ const POLICY_CURRENT_VERSIONS: Record<"terms" | "privacy", string> = {
   terms: "v1.0",
   privacy: "v1.0",
 };
+type HabitSuccessKey =
+  | "POST /api/habits"
+  | "PATCH /api/habits/{id}"
+  | "POST /api/habits/{id}/archive"
+  | "POST /api/habits/{id}/resume";
+type HabitSuccessStatus = "active" | "archived";
+
+interface HabitSuccessDefinition {
+  status: 200 | 201;
+  habitStatus: HabitSuccessStatus;
+}
+
+const HABIT_SUCCESS_DEFINITIONS: Record<HabitSuccessKey, HabitSuccessDefinition> = {
+  "POST /api/habits": { status: 201, habitStatus: "active" },
+  "PATCH /api/habits/{id}": { status: 200, habitStatus: "active" },
+  "POST /api/habits/{id}/archive": { status: 200, habitStatus: "archived" },
+  "POST /api/habits/{id}/resume": { status: 200, habitStatus: "active" },
+};
 
 let if002AuditSequence = 0;
 const if002AuditLogService = new AuditLogService({
@@ -222,40 +240,29 @@ function resolveHabitSuccessResult(testCase: {
   requirementId: string;
   endpoint: string;
 }): If002ErrorResult | null {
-  if (testCase.endpoint === "/api/habits" && testCase.method === "POST") {
-    return createHabitSuccessResult(201, "active", testCase.traceId, testCase.requirementId);
-  }
-
-  if (testCase.endpoint === "/api/habits/{id}" && testCase.method === "PATCH") {
-    return createHabitSuccessResult(200, "active", testCase.traceId, testCase.requirementId);
-  }
-
-  if (testCase.endpoint === "/api/habits/{id}/archive" && testCase.method === "POST") {
-    return createHabitSuccessResult(200, "archived", testCase.traceId, testCase.requirementId);
-  }
-
-  if (testCase.endpoint === "/api/habits/{id}/resume" && testCase.method === "POST") {
-    return createHabitSuccessResult(200, "active", testCase.traceId, testCase.requirementId);
+  const key = `${testCase.method} ${testCase.endpoint}` as HabitSuccessKey;
+  const definition = HABIT_SUCCESS_DEFINITIONS[key];
+  if (definition) {
+    return createHabitSuccessResult(definition, testCase.traceId, testCase.requirementId);
   }
 
   return null;
 }
 
 function createHabitSuccessResult(
-  status: 200 | 201,
-  habitStatus: "active" | "archived",
+  definition: HabitSuccessDefinition,
   traceId: string,
   requirementId: string,
 ): If002ErrorResult {
   return {
-    status,
+    status: definition.status,
     body: {
       code: "SUCCESS",
       message: "habit operation succeeded",
       trace_id: normalizeTraceId(traceId),
       requirement_id: requirementId,
       habit: {
-        status: habitStatus,
+        status: definition.habitStatus,
       },
     } as If002ErrorResult["body"],
   };

@@ -7,6 +7,8 @@ import {
   type If001SessionState,
 } from "./app/policy-consent-entry";
 import { SCR008PolicyConsentPage, type PolicyConsentAuditTrace } from "./screens/SCR-008PolicyConsentPage";
+import { SCR003HabitCreatePage } from "./screens/SCR-003HabitCreatePage";
+import { SCR004HabitEditPage } from "./screens/SCR-004HabitEditPage";
 import type { If001StartApiErrorResponse, If001StartApiSuccessResponse } from "./server/application/if-001/contracts";
 
 export function bootstrapApp() {
@@ -38,6 +40,15 @@ function renderAppShell() {
   }
   if (window.location.pathname === ROUTE_MAP["SCR-002"]) {
     renderSimpleRoutePage(root, app, "SCR-002 Home", "認証後の到達先です。");
+    return;
+  }
+  if (window.location.pathname === ROUTE_MAP["SCR-003"]) {
+    renderHabitCreatePage(root, app);
+    return;
+  }
+  const editMatch = window.location.pathname.match(/^\/habits\/([^/]+)\/edit$/);
+  if (editMatch) {
+    renderHabitEditPage(root, app, decodeURIComponent(editMatch[1]));
     return;
   }
   if (window.location.pathname === ROUTE_MAP["SCR-008"]) {
@@ -156,6 +167,145 @@ function renderSimpleRoutePage(root: HTMLDivElement, app: ReturnType<typeof boot
     <p>${description}</p>
     <p><a href="/login">/login に戻る</a></p>
   </main>`;
+}
+
+function renderHabitCreatePage(root: HTMLDivElement, app: ReturnType<typeof bootstrapApp>) {
+  const page = SCR003HabitCreatePage({ screenId: "SCR-003" });
+  const defaultUserId = getOrCreateLocalUserId();
+  root.innerHTML = `<main style="font-family: sans-serif; max-width: 720px; margin: 32px auto; padding: 16px;">
+    <h1>${app.name}</h1>
+    <h2>SCR-003 Habit Create</h2>
+    <p>習慣作成フォーム</p>
+    <ul>
+      <li>name: ${page.ui.validation.name.minLength}〜${page.ui.validation.name.maxLength} 文字</li>
+      <li>display_order: ${page.ui.validation.display_order.min}〜${page.ui.validation.display_order.max}</li>
+    </ul>
+    <form id="habit-create-form" style="display: grid; gap: 8px; margin: 12px 0;">
+      <label>userId <input id="habit-user-id" required value="${defaultUserId}" /></label>
+      <label>name <input id="habit-name" required maxlength="${page.ui.validation.name.maxLength}" /></label>
+      <label>display_order <input id="habit-display-order" required type="number" min="${page.ui.validation.display_order.min}" max="${page.ui.validation.display_order.max}" value="1" /></label>
+      <button id="habit-create-submit" type="submit">作成</button>
+    </form>
+    <pre id="habit-create-status" style="white-space: pre-wrap;"></pre>
+    <h3>Habits</h3>
+    <button id="habit-refresh" type="button">一覧を更新</button>
+    <ul id="habit-list" style="margin-top: 8px;"></ul>
+    <p><a href="/home">/home に戻る</a></p>
+  </main>`;
+
+  const userIdInput = root.querySelector<HTMLInputElement>("#habit-user-id");
+  const nameInput = root.querySelector<HTMLInputElement>("#habit-name");
+  const displayOrderInput = root.querySelector<HTMLInputElement>("#habit-display-order");
+  const status = root.querySelector<HTMLPreElement>("#habit-create-status");
+  const form = root.querySelector<HTMLFormElement>("#habit-create-form");
+  const refreshButton = root.querySelector<HTMLButtonElement>("#habit-refresh");
+  const list = root.querySelector<HTMLUListElement>("#habit-list");
+  if (!userIdInput || !nameInput || !displayOrderInput || !status || !form || !refreshButton || !list) {
+    return;
+  }
+
+  const renderList = async () => {
+    const userId = userIdInput.value.trim();
+    if (!userId) {
+      list.innerHTML = "";
+      return;
+    }
+    try {
+      const response = await fetch(`/api/habits?userId=${encodeURIComponent(userId)}`);
+      const payload = (await response.json()) as { habits?: Array<{ habitId: string; name: string; status: string; displayOrder: number }> };
+      const habits = payload.habits ?? [];
+      list.innerHTML = habits
+        .map(
+          (habit) =>
+            `<li>${escapeHtml(habit.name)} (#${escapeHtml(habit.habitId)}) - ${escapeHtml(habit.status)} - display_order=${habit.displayOrder}</li>`,
+        )
+        .join("");
+      if (habits.length === 0) {
+        list.innerHTML = "<li>データなし</li>";
+      }
+    } catch (error: unknown) {
+      list.innerHTML = `<li>一覧取得失敗: ${escapeHtml(error instanceof Error ? error.message : "unknown error")}</li>`;
+    }
+  };
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const userId = userIdInput.value.trim();
+    const name = nameInput.value.trim();
+    const displayOrder = Number.parseInt(displayOrderInput.value, 10);
+    status.textContent = "作成中...";
+    try {
+      const response = await fetch("/api/habits", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          userId,
+          name,
+          display_order: displayOrder,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        status.textContent = `作成失敗: status=${response.status}\n${JSON.stringify(payload, null, 2)}`;
+        return;
+      }
+      status.textContent = `作成成功\n${JSON.stringify(payload, null, 2)}`;
+      nameInput.value = "";
+      await renderList();
+    } catch (error: unknown) {
+      status.textContent = `作成失敗: ${error instanceof Error ? error.message : "unknown error"}`;
+    }
+  });
+
+  refreshButton.addEventListener("click", () => {
+    void renderList();
+  });
+  void renderList();
+}
+
+function renderHabitEditPage(root: HTMLDivElement, app: ReturnType<typeof bootstrapApp>, habitId: string) {
+  const page = SCR004HabitEditPage({ screenId: "SCR-004", params: { habitId, status: "active" } });
+  root.innerHTML = `<main style="font-family: sans-serif; max-width: 720px; margin: 32px auto; padding: 16px;">
+    <h1>${app.name}</h1>
+    <h2>SCR-004 Habit Edit</h2>
+    <p>habitId: ${page.params.habitId}</p>
+    <p>status: ${page.ui.status}</p>
+    <ul>
+      <li>archive button visible: ${page.ui.buttons.archive.visible}</li>
+      <li>resume button visible: ${page.ui.buttons.resume.visible}</li>
+    </ul>
+    <p><a href="/home">/home に戻る</a></p>
+  </main>`;
+}
+
+function escapeHtml(text: string): string {
+  return text
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function getOrCreateLocalUserId(): string {
+  const key = "habit-local-user-id";
+  try {
+    const existing = window.localStorage.getItem(key);
+    if (existing) {
+      return existing;
+    }
+    const generated =
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `00000000-0000-4000-8000-${Date.now().toString().slice(-12).padStart(12, "0")}`;
+    window.localStorage.setItem(key, generated);
+    return generated;
+  } catch {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+      return crypto.randomUUID();
+    }
+    return "00000000-0000-4000-8000-000000000001";
+  }
 }
 
 function renderLoginPage(root: HTMLDivElement, app: ReturnType<typeof bootstrapApp>) {

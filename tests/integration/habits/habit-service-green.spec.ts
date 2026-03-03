@@ -114,6 +114,24 @@ describe("T-040 PR-002 M-003 HabitService green tests", () => {
     });
   });
 
+  it("archiveHabit/resumeHabit: 他者操作を FORBIDDEN へマップする", async () => {
+    const { repository, otherUserId, habitId } = createHabitRepositoryFixture();
+    const capture = createAuditCapture();
+    const service = new HabitService(repository, capture.auditLogPort);
+
+    await expect(service.archiveHabit(otherUserId, habitId, "trace-pr002-archive-forbidden")).rejects.toMatchObject({
+      code: "FORBIDDEN",
+      requirementId: "FR-008",
+      traceId: "trace-pr002-archive-forbidden",
+    });
+    await expect(service.resumeHabit(otherUserId, habitId, "trace-pr002-resume-forbidden")).rejects.toMatchObject({
+      code: "FORBIDDEN",
+      requirementId: "FR-009",
+      traceId: "trace-pr002-resume-forbidden",
+    });
+    expect(capture.records).toHaveLength(0);
+  });
+
   it("create/update: 入力不正を INVALID_HABIT_INPUT で拒否する", async () => {
     const { repository, userId, habitId, client } = createHabitRepositoryFixture();
     const capture = createAuditCapture();

@@ -24,6 +24,13 @@ import {
   type PolicySettingRow,
 } from "./src/server/application/if-001/session-state-utils";
 import { buildPolicyConsentRowsToInsert } from "./src/server/application/if-002/policy-consent-utils";
+import {
+  mapHabitRowToResponse,
+  validateCreateHabitBody,
+  validateListHabitsQuery,
+  type HabitRow,
+  isUuidLike,
+} from "./src/server/application/if-002/habits-http";
 
 function parseRequestBody(req: IncomingMessage): Promise<unknown> {
   return new Promise((resolve, reject) => {
@@ -110,10 +117,6 @@ async function ensureSupabaseProfileExists(userId: string): Promise<void> {
   }
 }
 
-function isUuidLike(value: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
-}
-
 const authGateway: SupabaseAuthGatewayContract = {
   async buildGoogleOAuthUrl(redirectTo: string): Promise<string> {
     const supabaseUrl = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -171,6 +174,50 @@ const auditLogService: AuthSessionAuditLogPort = {
 const authSessionService = new AuthSessionService(authGateway, consentStatusPort, auditLogService);
 const startHandler = createIf001StartHandler({ authSessionService });
 const callbackHandler = createIf001CallbackHandler({ authSessionService });
+
+function respondJson(res: { statusCode: number; setHeader: (name: string, value: string) => void; end: (chunk?: string) => void }, status: number, body: unknown): void {
+  res.statusCode = status;
+  res.setHeader("content-type", "application/json; charset=utf-8");
+  res.end(JSON.stringify(body));
+}
+
+async function listSupabaseHabits(userId: string): Promise<HabitRow[]> {
+  return fetchSupabaseRest<HabitRow[]>(
+    `habits?select=id,user_id,name,display_order,status,archived_at,created_at,updated_at,version&user_id=eq.${encodeURIComponent(
+      userId,
+    )}&deleted_at=is.null&order=display_order.asc`,
+  );
+}
+
+async function createSupabaseHabit(userId: string, name: string, displayOrder: number): Promise<HabitRow> {
+  const { baseUrl, serviceRoleKey } = getSupabaseConfig();
+  const response = await fetch(`${baseUrl}/rest/v1/habits`, {
+    method: "POST",
+    headers: {
+      apikey: serviceRoleKey,
+      authorization: `Bearer ${serviceRoleKey}`,
+      "content-type": "application/json",
+      prefer: "return=representation",
+    },
+    body: JSON.stringify([
+      {
+        user_id: userId,
+        name,
+        display_order: displayOrder,
+      },
+    ]),
+  });
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`supabase habits insert error: ${response.status} ${detail}`);
+  }
+  const rows = (await response.json()) as HabitRow[];
+  const row = rows[0];
+  if (!row) {
+    throw new Error("supabase habits insert returned no rows");
+  }
+  return row;
+}
 
 function normalizeCallbackResponse(
   response: If001CallbackDecisionResult | If001ConsentDeclineLogoutResult,
@@ -347,6 +394,47 @@ export default defineConfig(({ mode }) => {
                   detail: error instanceof Error ? error.message : "unknown",
                 }),
               );
+              return;
+            }
+          }
+
+          if (isTargetRequest(req, "GET", "/api/habits")) {
+            try {
+              const requestUrl = new URL(req.url ?? "", "http://localhost");
+              const listValidation = validateListHabitsQuery(requestUrl.searchParams.get("userId"));
+              if (!listValidation.ok) {
+                respondJson(res, 400, { code: "VALIDATION_ERROR", message: listValidation.message });
+                return;
+              }
+              const habits = await listSupabaseHabits(listValidation.userId);
+              respondJson(res, 200, {
+                habits: habits.map(mapHabitRowToResponse),
+              });
+              return;
+            } catch (error: unknown) {
+              console.error("[if-002] list habits failed", error);
+              respondJson(res, 500, { code: "INTERNAL_ERROR", message: "failed to list habits" });
+              return;
+            }
+          }
+
+          if (isTargetRequest(req, "POST", "/api/habits")) {
+            try {
+              const body = await parseRequestBody(req);
+              const createValidation = validateCreateHabitBody(body);
+              if (!createValidation.ok) {
+                respondJson(res, 400, { code: "VALIDATION_ERROR", message: createValidation.message });
+                return;
+              }
+              await ensureSupabaseProfileExists(createValidation.userId);
+              const created = await createSupabaseHabit(createValidation.userId, createValidation.name, createValidation.displayOrder);
+              respondJson(res, 201, {
+                habit: mapHabitRowToResponse(created),
+              });
+              return;
+            } catch (error: unknown) {
+              console.error("[if-002] create habit failed", error);
+              respondJson(res, 500, { code: "INTERNAL_ERROR", message: "failed to create habit" });
               return;
             }
           }

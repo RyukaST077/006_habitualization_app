@@ -5,6 +5,10 @@ import {
   snapshotHabitRecord,
 } from "./helpers/repository-test-harness";
 
+function readArchivedAt(value: unknown): string | null | undefined {
+  return (value as { archived_at?: string | null }).archived_at;
+}
+
 describe("T-039 PR-004 M-102 habit lifecycle constraints (Red)", () => {
   it("M-102/CRUD/createHabit+setHabitStatus: chk_habits_name_len / chk_habits_status を満たさない入力を拒否する", async () => {
     const { repository, userId, habitId } = createHabitRepositoryFixture();
@@ -20,14 +24,16 @@ describe("T-039 PR-004 M-102 habit lifecycle constraints (Red)", () => {
     });
   });
 
-  it("M-102/CRUD/setHabitStatus: status=archived 更新時に archived_at が設定される", async () => {
+  it("M-102/CRUD/setHabitStatus: archived_at を遷移状態に応じて更新する", async () => {
     const { repository, userId, habitId } = createHabitRepositoryFixture();
 
     const archived = await repository.setHabitStatus(userId, habitId, "archived");
-    const archivedAt = (archived as unknown as { archived_at?: string | null }).archived_at;
+    const resumed = await repository.setHabitStatus(userId, habitId, "active");
 
     expect(archived.status).toBe("archived");
-    expect(archivedAt).toEqual(expect.any(String));
+    expect(readArchivedAt(archived)).toEqual(expect.any(String));
+    expect(resumed.status).toBe("active");
+    expect(readArchivedAt(resumed)).toBeNull();
   });
 
   it("M-102/CRUD/updateHabit: 他人習慣更新は RLS/FORBIDDEN で拒否し DB不変", async () => {

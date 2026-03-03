@@ -1,6 +1,12 @@
 import type { HabitRepositoryContract } from "../../domain/repositories/contracts";
 import { createRepositoryError } from "../../domain/repositories/errors";
-import type { Habit, HabitLog, HabitStatus, HabitUpdatePayload } from "../../domain/repositories/types";
+import type {
+  Habit,
+  HabitLog,
+  HabitStatus,
+  HabitStatusPersistence,
+  HabitUpdatePayload,
+} from "../../domain/repositories/types";
 import {
   assertRepositoryOwnership,
   buildHabitLogKeyForRepository,
@@ -35,6 +41,13 @@ function assertHabitStatus(status: HabitStatus): void {
     return;
   }
   throw createConstraintError("chk_habits_status violated", "chk_habits_status");
+}
+
+function toHabitStatusPersistence(status: HabitStatus, now: string): HabitStatusPersistence {
+  return {
+    status,
+    archived_at: status === "archived" ? now : null,
+  };
 }
 
 function listDateRange(fromDate: string, toDate: string): string[] {
@@ -127,13 +140,14 @@ export class HabitRepository implements HabitRepositoryContract {
       throw createRepositoryError("REPOSITORY_ERROR", `habit not found: ${habitId}`);
     }
     assertRepositoryOwnership(current.userId, userId, "RLS policy denied habit update");
+
     const now = this.client.now();
-    const archivedAt = status === "archived" ? now : null;
+    const persistence = toHabitStatusPersistence(status, now);
 
     const updated: Habit = {
       ...current,
-      status,
-      archivedAt,
+      status: persistence.status,
+      archivedAt: persistence.archived_at,
       version: current.version + 1,
       updatedAt: now,
     };
@@ -141,7 +155,7 @@ export class HabitRepository implements HabitRepositoryContract {
     this.client.habits.set(habitId, updated);
     return cloneRepositoryValue({
       ...updated,
-      archived_at: archivedAt,
+      archived_at: persistence.archived_at,
     } as Habit);
   }
 

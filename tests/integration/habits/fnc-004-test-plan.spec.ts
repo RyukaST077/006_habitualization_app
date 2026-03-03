@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { IF002_HABIT_STATUS_TRANSITION_CASES } from "../api/fixtures/if-002-cases";
+import { REPOSITORY_HABIT_STATUS_TRANSITION_CASES } from "../repositories/fixtures/repository-cases";
 import {
   FNC004_RED_CASES,
   FNC004_REQUIRED_ACCEPTANCE_IDS,
@@ -11,9 +13,11 @@ import {
 import { createFnc004TestHarness } from "./helpers/fnc-004-test-harness";
 
 const FNC004_SUITE_COMMAND = "npm run test -- tests/integration/habits/fnc-004-test-plan.spec.ts";
+const FNC004_STATUS_REGRESSION_COMMAND =
+  "npm run test -- tests/integration/habits/habit-service-green.spec.ts tests/integration/repositories/habit-repository-lifecycle-red.spec.ts tests/integration/api/if-002-habits-status-red.spec.ts";
 const FNC004_QUALITY_GATE_COMMAND = "npm run lint && npm run typecheck";
 
-describe("T-040 PR-006 FNC-004 habit lifecycle green regression plan", () => {
+describe("T-041 PR-003 FNC-004 habit lifecycle regression plan", () => {
   const harness = createFnc004TestHarness();
 
   it("FR-006..009 と AC-006..009 のトレーサビリティを固定する", () => {
@@ -36,12 +40,23 @@ describe("T-040 PR-006 FNC-004 habit lifecycle green regression plan", () => {
     harness.assertTbl002Constraints(FNC004_RED_CASES, FNC004_REQUIRED_TBL002_CONSTRAINT_IDS);
   });
 
+  it("状態遷移観点を API/Repository 回帰テスト導線へ接続する", () => {
+    harness.assertTransitionRegressionTraceability(
+      FNC004_RED_CASES,
+      IF002_HABIT_STATUS_TRANSITION_CASES,
+      REPOSITORY_HABIT_STATUS_TRANSITION_CASES,
+    );
+  });
+
   it.each(FNC004_RED_CASES)("$traceId: Red planning case を保持する", (testCase) => {
     harness.assertRedPlanningCase(testCase);
   });
 
   it("受け入れ検証コマンドを固定する", () => {
     expect(FNC004_SUITE_COMMAND).toBe("npm run test -- tests/integration/habits/fnc-004-test-plan.spec.ts");
+    expect(FNC004_STATUS_REGRESSION_COMMAND).toBe(
+      "npm run test -- tests/integration/habits/habit-service-green.spec.ts tests/integration/repositories/habit-repository-lifecycle-red.spec.ts tests/integration/api/if-002-habits-status-red.spec.ts",
+    );
     expect(FNC004_QUALITY_GATE_COMMAND).toBe("npm run lint && npm run typecheck");
   });
 

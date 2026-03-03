@@ -1,5 +1,7 @@
 import { expect } from "vitest";
 
+import type { If002HabitStatusTransitionCase } from "../../api/fixtures/if-002-cases";
+import type { RepositoryHabitStatusTransitionCase } from "../../repositories/fixtures/repository-cases";
 import type {
   Fnc004AcceptanceId,
   Fnc004CaseDefinition,
@@ -28,6 +30,11 @@ export interface Fnc004TestHarness {
   assertTbl002Constraints(
     cases: readonly Fnc004CaseDefinition[],
     requiredConstraintIds: readonly Fnc004Tbl002ConstraintId[],
+  ): void;
+  assertTransitionRegressionTraceability(
+    cases: readonly Fnc004CaseDefinition[],
+    apiTransitionCases: readonly If002HabitStatusTransitionCase[],
+    repositoryTransitionCases: readonly RepositoryHabitStatusTransitionCase[],
   ): void;
   assertRedPlanningCase(testCase: Fnc004CaseDefinition): void;
   getT040ImplementationState(): typeof T040_IMPLEMENTATION_STATE;
@@ -116,6 +123,48 @@ export function createFnc004TestHarness(): Fnc004TestHarness {
       );
       expect(rlsCase).toBeDefined();
       expect(rlsCase?.notes).toContain("auth.uid() = user_id");
+    },
+    assertTransitionRegressionTraceability(
+      cases: readonly Fnc004CaseDefinition[],
+      apiTransitionCases: readonly If002HabitStatusTransitionCase[],
+      repositoryTransitionCases: readonly RepositoryHabitStatusTransitionCase[],
+    ): void {
+      const planTransitions = cases
+        .filter(
+          (testCase) =>
+            (testCase.acceptanceId === "AC-008" || testCase.acceptanceId === "AC-009") &&
+            testCase.statusTransition !== undefined,
+        )
+        .map((testCase) => ({
+          action: testCase.operation,
+          fromStatus: testCase.statusTransition![0],
+          toStatus: testCase.statusTransition![1],
+          requirementId: testCase.requirementId,
+          acceptanceId: testCase.acceptanceId,
+        }));
+
+      const planVocabulary = new Set(
+        planTransitions.map(
+          (transition) =>
+            `${transition.action}:${transition.fromStatus}->${transition.toStatus}:${transition.requirementId}:${transition.acceptanceId}`,
+        ),
+      );
+      const apiVocabulary = new Set(
+        apiTransitionCases.map(
+          (transition) =>
+            `${transition.action}:${transition.fromStatus}->${transition.toStatus}:${transition.requirementId}:${transition.acceptanceId}`,
+        ),
+      );
+      const repositoryVocabulary = new Set(
+        repositoryTransitionCases.map(
+          (transition) =>
+            `${transition.action}:${transition.fromStatus}->${transition.toStatus}:${transition.requirementId}:${transition.acceptanceId}`,
+        ),
+      );
+
+      expect(planVocabulary.size).toBeGreaterThan(0);
+      expect(apiVocabulary).toEqual(planVocabulary);
+      expect(repositoryVocabulary).toEqual(planVocabulary);
     },
     assertRedPlanningCase(testCase: Fnc004CaseDefinition): void {
       expect(testCase.traceId).toContain("T-039");
