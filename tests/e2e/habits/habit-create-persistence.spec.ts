@@ -13,7 +13,6 @@ test.describe("TC-AUTO-E2E-HABITS-001 習慣作成の永続化", () => {
 
     await test.step("習慣を作成する", async () => {
       await page.getByRole("textbox", { name: "name" }).fill(createdName);
-      await page.getByRole("spinbutton", { name: "display_order" }).fill("10");
       await page.getByRole("button", { name: "作成" }).click();
 
       await expect(page.getByText("作成成功")).toBeVisible();

@@ -171,19 +171,16 @@ function renderSimpleRoutePage(root: HTMLDivElement, app: ReturnType<typeof boot
 
 function renderHabitCreatePage(root: HTMLDivElement, app: ReturnType<typeof bootstrapApp>) {
   const page = SCR003HabitCreatePage({ screenId: "SCR-003" });
-  const defaultUserId = getOrCreateLocalUserId();
+  const userId = resolveHabitFormUserId();
   root.innerHTML = `<main style="font-family: sans-serif; max-width: 720px; margin: 32px auto; padding: 16px;">
     <h1>${app.name}</h1>
     <h2>SCR-003 Habit Create</h2>
     <p>習慣作成フォーム</p>
     <ul>
       <li>name: ${page.ui.validation.name.minLength}〜${page.ui.validation.name.maxLength} 文字</li>
-      <li>display_order: ${page.ui.validation.display_order.min}〜${page.ui.validation.display_order.max}</li>
     </ul>
     <form id="habit-create-form" style="display: grid; gap: 8px; margin: 12px 0;">
-      <label>userId <input id="habit-user-id" required value="${defaultUserId}" /></label>
       <label>name <input id="habit-name" required maxlength="${page.ui.validation.name.maxLength}" /></label>
-      <label>display_order <input id="habit-display-order" required type="number" min="${page.ui.validation.display_order.min}" max="${page.ui.validation.display_order.max}" value="1" /></label>
       <button id="habit-create-submit" type="submit">作成</button>
     </form>
     <pre id="habit-create-status" style="white-space: pre-wrap;"></pre>
@@ -193,19 +190,17 @@ function renderHabitCreatePage(root: HTMLDivElement, app: ReturnType<typeof boot
     <p><a href="/home">/home に戻る</a></p>
   </main>`;
 
-  const userIdInput = root.querySelector<HTMLInputElement>("#habit-user-id");
   const nameInput = root.querySelector<HTMLInputElement>("#habit-name");
-  const displayOrderInput = root.querySelector<HTMLInputElement>("#habit-display-order");
   const status = root.querySelector<HTMLPreElement>("#habit-create-status");
   const form = root.querySelector<HTMLFormElement>("#habit-create-form");
   const refreshButton = root.querySelector<HTMLButtonElement>("#habit-refresh");
   const list = root.querySelector<HTMLUListElement>("#habit-list");
-  if (!userIdInput || !nameInput || !displayOrderInput || !status || !form || !refreshButton || !list) {
+  if (!nameInput || !status || !form || !refreshButton || !list) {
     return;
   }
+  let currentHabits: Array<{ habitId: string; name: string; status: string; displayOrder: number }> = [];
 
   const renderList = async () => {
-    const userId = userIdInput.value.trim();
     if (!userId) {
       list.innerHTML = "";
       return;
@@ -214,6 +209,7 @@ function renderHabitCreatePage(root: HTMLDivElement, app: ReturnType<typeof boot
       const response = await fetch(`/api/habits?userId=${encodeURIComponent(userId)}`);
       const payload = (await response.json()) as { habits?: Array<{ habitId: string; name: string; status: string; displayOrder: number }> };
       const habits = payload.habits ?? [];
+      currentHabits = habits;
       list.innerHTML = habits
         .map(
           (habit) =>
@@ -230,9 +226,16 @@ function renderHabitCreatePage(root: HTMLDivElement, app: ReturnType<typeof boot
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const userId = userIdInput.value.trim();
     const name = nameInput.value.trim();
-    const displayOrder = Number.parseInt(displayOrderInput.value, 10);
+    const displayOrder = resolveNextDisplayOrder(
+      currentHabits,
+      page.ui.validation.display_order.min,
+      page.ui.validation.display_order.max,
+    );
+    if (displayOrder === null) {
+      status.textContent = `作成失敗: 表示順の上限 (${page.ui.validation.display_order.max}) に達しています。`;
+      return;
+    }
     status.textContent = "作成中...";
     try {
       const response = await fetch("/api/habits", {
@@ -261,6 +264,18 @@ function renderHabitCreatePage(root: HTMLDivElement, app: ReturnType<typeof boot
     void renderList();
   });
   void renderList();
+}
+
+function resolveNextDisplayOrder(
+  habits: Array<{ displayOrder: number }>,
+  min: number,
+  max: number,
+): number | null {
+  const next = habits.reduce((largest, habit) => Math.max(largest, habit.displayOrder), min - 1) + 1;
+  if (next > max) {
+    return null;
+  }
+  return Math.max(min, next);
 }
 
 function renderHabitEditPage(root: HTMLDivElement, app: ReturnType<typeof bootstrapApp>, habitId: string) {
@@ -306,6 +321,14 @@ function getOrCreateLocalUserId(): string {
     }
     return "00000000-0000-4000-8000-000000000001";
   }
+}
+
+function resolveHabitFormUserId(): string {
+  const authenticatedUserId = readSessionStorage(CALLBACK_USER_ID_STORAGE_KEY);
+  if (authenticatedUserId) {
+    return authenticatedUserId;
+  }
+  return getOrCreateLocalUserId();
 }
 
 function renderLoginPage(root: HTMLDivElement, app: ReturnType<typeof bootstrapApp>) {
