@@ -266,44 +266,66 @@ function resolveCheckinSuccessResult(testCase: {
     return null;
   }
 
-  const nowUtc = testCase.request.body.now_utc;
-  const timezone = testCase.request.body.timezone;
-  const dayCutoffTime = testCase.request.body.day_cutoff_time;
+  const businessDateInput = parseCheckinBusinessDateInput(testCase.request.body, testCase.traceId);
+  const logDate = resolveCheckinLogDateWithValidationMapping(businessDateInput, testCase.traceId);
+
+  return createCheckinSuccessResult(logDate, testCase.traceId);
+}
+
+interface CheckinBusinessDateInput {
+  nowUtc: string;
+  timezone: string;
+  dayCutoffTime: string;
+}
+
+function parseCheckinBusinessDateInput(
+  payload: Record<string, unknown>,
+  traceId: string,
+): CheckinBusinessDateInput {
+  const nowUtc = payload.now_utc;
+  const timezone = payload.timezone;
+  const dayCutoffTime = payload.day_cutoff_time;
 
   if (typeof nowUtc !== "string" || typeof timezone !== "string" || typeof dayCutoffTime !== "string") {
     throw createIf002HandledError(
       "VALIDATION_ERROR",
       "now_utc, timezone, and day_cutoff_time are required",
       FR010_REQUIREMENT_ID,
-      testCase.traceId,
+      traceId,
     );
   }
 
-  try {
-    const logDate = resolveLogDate(nowUtc, timezone, dayCutoffTime);
+  return { nowUtc, timezone, dayCutoffTime };
+}
 
-    return {
-      status: 201,
-      body: {
-        code: "SUCCESS",
-        message: "checkin accepted with business date resolved by timezone/cutoff",
-        trace_id: normalizeTraceId(testCase.traceId),
-        requirement_id: FR010_REQUIREMENT_ID,
-        checkin: {
-          log_date: logDate,
-        },
-      } as If002ErrorResult["body"],
-    };
+function resolveCheckinLogDateWithValidationMapping(input: CheckinBusinessDateInput, traceId: string): string {
+  try {
+    return resolveLogDate(input.nowUtc, input.timezone, input.dayCutoffTime);
   } catch (error: unknown) {
     const businessDateErrorCode =
       typeof error === "object" && error !== null && "code" in error ? (error.code as string) : "";
 
     if (businessDateErrorCode === "INVALID_TIMEZONE" || businessDateErrorCode === "INVALID_CUTOFF_TIME") {
-      throw createIf002HandledError("VALIDATION_ERROR", (error as Error).message, FR010_REQUIREMENT_ID, testCase.traceId);
+      throw createIf002HandledError("VALIDATION_ERROR", (error as Error).message, FR010_REQUIREMENT_ID, traceId);
     }
 
     throw error;
   }
+}
+
+function createCheckinSuccessResult(logDate: string, traceId: string): If002ErrorResult {
+  return {
+    status: 201,
+    body: {
+      code: "SUCCESS",
+      message: "checkin accepted with business date resolved by timezone/cutoff",
+      trace_id: normalizeTraceId(traceId),
+      requirement_id: FR010_REQUIREMENT_ID,
+      checkin: {
+        log_date: logDate,
+      },
+    } as If002ErrorResult["body"],
+  };
 }
 
 function createHabitSuccessResult(

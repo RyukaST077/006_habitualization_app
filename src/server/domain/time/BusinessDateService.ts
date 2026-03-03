@@ -1,4 +1,11 @@
 const HH_MM_PATTERN = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+type LocalDateTimeParts = {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+};
 
 class BusinessDateServiceError extends Error {
   code: "INVALID_TIMEZONE" | "INVALID_CUTOFF_TIME";
@@ -27,10 +34,7 @@ const parseCutoffMinutes = (cutoffTime: string): number => {
   return hours * 60 + minutes;
 };
 
-const toLocalDateTimeParts = (
-  nowUtc: string,
-  timezone: string,
-): { year: number; month: number; day: number; hour: number; minute: number } => {
+const toLocalDateTimeParts = (nowUtc: string, timezone: string): LocalDateTimeParts => {
   const formatter = new Intl.DateTimeFormat("en-US", {
     timeZone: timezone,
     year: "numeric",
@@ -56,6 +60,8 @@ const toLocalDateTimeParts = (
   };
 };
 
+const toTotalMinutes = (hour: number, minute: number): number => hour * 60 + minute;
+
 const toYmd = (year: number, month: number, day: number): string => {
   const yyyy = String(year).padStart(4, "0");
   const mm = String(month).padStart(2, "0");
@@ -69,18 +75,33 @@ const shiftDate = (year: number, month: number, day: number, diffDays: number): 
   return toYmd(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate());
 };
 
-export function resolveLogDate(nowUtc: string, timezone: string, cutoffTime: string): string {
-  validateTimezone(timezone);
-  const cutoffMinutes = parseCutoffMinutes(cutoffTime);
+const resolveDateShiftDays = (localMinutes: number, cutoffMinutes: number): 0 | -1 =>
+  localMinutes < cutoffMinutes ? -1 : 0;
 
-  const local = toLocalDateTimeParts(nowUtc, timezone);
-  const localMinutes = local.hour * 60 + local.minute;
-
-  if (localMinutes < cutoffMinutes) {
-    return shiftDate(local.year, local.month, local.day, -1);
+const resolveDateFromLocal = (local: LocalDateTimeParts, cutoffMinutes: number): string => {
+  const localMinutes = toTotalMinutes(local.hour, local.minute);
+  const shiftDays = resolveDateShiftDays(localMinutes, cutoffMinutes);
+  if (shiftDays === -1) {
+    return shiftDate(local.year, local.month, local.day, shiftDays);
   }
 
   return toYmd(local.year, local.month, local.day);
+};
+
+const buildResolveContext = (
+  nowUtc: string,
+  timezone: string,
+  cutoffTime: string,
+): { local: LocalDateTimeParts; cutoffMinutes: number } => {
+  validateTimezone(timezone);
+  const cutoffMinutes = parseCutoffMinutes(cutoffTime);
+  const local = toLocalDateTimeParts(nowUtc, timezone);
+  return { local, cutoffMinutes };
+};
+
+export function resolveLogDate(nowUtc: string, timezone: string, cutoffTime: string): string {
+  const { local, cutoffMinutes } = buildResolveContext(nowUtc, timezone, cutoffTime);
+  return resolveDateFromLocal(local, cutoffMinutes);
 }
 
 export default {
