@@ -37,6 +37,9 @@ export type Scr004StatusButtonVisibility = {
   resumeVisible: boolean;
 };
 
+export type Scr001TraceabilityId = "FR-001" | "SCR-001" | "IF-001";
+export type Scr001ConsentState = "unknown" | "agreed";
+
 const T034_AUTH_UI_IMPLEMENTATION_STATE = "implemented" as const;
 
 export const COMMON_UI_DISPLAY_ITEMS = {
@@ -110,13 +113,45 @@ export const COMMON_UI_BREAKPOINT_CASES: readonly {
 
 export const SCR001_LOGIN_BUTTON_LOADING_EXPECTATION = {
   label: "Googleでログイン",
-  loading: true,
-  disabled: true,
+  ariaLabel: "Googleでログイン",
+  executeKey: "Enter",
+  initial: {
+    loading: false,
+    disabled: false,
+  },
+  pending: {
+    loading: true,
+    disabled: true,
+  },
+  settled: {
+    loading: false,
+    disabled: false,
+  },
 } as const;
 
 export const SCR001_AUTH_FAILURE_EXPECTATION = {
   errorMessageContains: "認証失敗",
   retryActionLabel: "再試行",
+} as const;
+
+export const SCR001_TRACEABILITY_IDS: readonly Scr001TraceabilityId[] = [
+  "FR-001",
+  "SCR-001",
+  "IF-001",
+] as const;
+
+export const SCR001_AUTHENTICATED_REDIRECT_CASES: readonly {
+  consentState: Scr001ConsentState;
+  expectedPath: "/policy-consent" | "/home";
+}[] = [
+  { consentState: "unknown", expectedPath: "/policy-consent" },
+  { consentState: "agreed", expectedPath: "/home" },
+] as const;
+
+export const SCR001_A11Y_ENTER_KEY_EXPECTATION = {
+  executeKey: "Enter",
+  ignoreKey: "Space",
+  ariaLabel: "Googleでログイン",
 } as const;
 
 export const SCR003_HABIT_NAME_BOUNDARY_CASES: readonly Scr003HabitNameBoundaryCase[] = [

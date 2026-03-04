@@ -99,6 +99,10 @@ export function resolveAuthConsentRedirect(
   return startPath;
 }
 
+export function resolveLoginArrivalRedirect(authState: AuthState, consentState: ConsentState): string {
+  return resolveAuthConsentRedirect(ROUTE_MAP["SCR-001"], authState, consentState);
+}
+
 export function resolveHomeNavigationRedirect(targetScreenId: HomeNavigationTarget): string {
   return ROUTE_MAP[targetScreenId];
 }

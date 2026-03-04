@@ -1,16 +1,20 @@
+/// <reference lib="dom" />
+
 import { createAppShell } from "./App";
 import { ROUTE_MAP } from "./app/route-map";
-import { resolveAuthConsentRedirect } from "./app/router";
+import { resolveAuthConsentRedirect, resolveLoginArrivalRedirect } from "./app/router";
 import {
   resolvePolicyConsentEntryRoute,
   type If001CallbackRoute,
   type If001SessionState,
 } from "./app/policy-consent-entry";
+import { SCR001LoginPage } from "./screens/SCR-001LoginPage";
 import { SCR008PolicyConsentPage, type PolicyConsentAuditTrace } from "./screens/SCR-008PolicyConsentPage";
 import { SCR003HabitCreatePage } from "./screens/SCR-003HabitCreatePage";
 import { SCR004HabitEditPage } from "./screens/SCR-004HabitEditPage";
 import { SCR002HomePage, type CheckinResolution } from "./screens/SCR-002HomePage";
 import type { If001StartApiErrorResponse, If001StartApiSuccessResponse } from "./server/application/if-001/contracts";
+import type { CommonErrorCode, ErrorPresentation, ErrorStatus } from "./ui/error-presentation";
 
 export function bootstrapApp() {
   return createAppShell();
@@ -68,7 +72,7 @@ function renderAppShell() {
 
 type If001SessionStateResponse = If001SessionState;
 
-async function renderLoginOrRedirect(root: HTMLDivElement, app: ReturnType<typeof bootstrapApp>): Promise<void> {
+export async function renderLoginOrRedirect(root: HTMLDivElement, app: ReturnType<typeof bootstrapApp>): Promise<void> {
   const accessToken = readSessionStorage(CALLBACK_ACCESS_TOKEN_STORAGE_KEY);
   if (!accessToken) {
     renderLoginPage(root, app);
@@ -87,7 +91,7 @@ async function renderLoginOrRedirect(root: HTMLDivElement, app: ReturnType<typeo
       if (data.userId) {
         writeSessionStorage(CALLBACK_USER_ID_STORAGE_KEY, data.userId);
       }
-      const nextPath = resolveAuthConsentRedirect(ROUTE_MAP["SCR-001"], data.authState, data.consentState);
+      const nextPath = resolveLoginArrivalRedirect(data.authState, data.consentState);
       window.location.replace(nextPath);
       return;
     }
@@ -559,49 +563,158 @@ function resolveHabitFormUserId(): string {
   return getOrCreateLocalUserId();
 }
 
+type LoginStartRuntimeSuccess = {
+  kind: "success";
+  authUrl: string;
+  traceId: string;
+  auditAction: "LOGIN_START";
+};
+
+type LoginStartRuntimeError = {
+  kind: "error";
+  error: ErrorPresentation;
+  traceId: string;
+  route: "SCR-001";
+};
+
+export type LoginStartRuntimeResult = LoginStartRuntimeSuccess | LoginStartRuntimeError;
+
+function isErrorStatus(value: number): value is ErrorStatus {
+  return value === 400 || value === 401 || value === 403 || value === 409 || value === 500;
+}
+
+function mapStartApiError(
+  status: number,
+  code: unknown,
+): { status: ErrorStatus; code: CommonErrorCode } {
+  if (status === 400 && code === "INVALID_REDIRECT") {
+    return { status: 400, code: "VALIDATION_ERROR" };
+  }
+  if (status === 401 && code === "AUTH_FAILED") {
+    return { status: 401, code: "AUTH_FAILED" };
+  }
+  if (status === 500 && code === "AUTH_PROVIDER_ERROR") {
+    return { status: 500, code: "INTERNAL_ERROR" };
+  }
+  return { status: 500, code: "INTERNAL_ERROR" };
+}
+
+export async function requestLoginStartRuntime(
+  fetchFn: typeof fetch,
+  resolveError: (status: ErrorStatus, code: CommonErrorCode, traceId?: string) => ErrorPresentation,
+): Promise<LoginStartRuntimeResult> {
+  try {
+    const response = await fetchFn("/api/auth/google/start", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: "Bearer dev-session",
+      },
+      body: JSON.stringify({ redirectTo: "/auth/callback" }),
+    });
+
+    const payload = (await response.json()) as If001StartApiSuccessResponse["body"] | If001StartApiErrorResponse["body"];
+    if (response.ok && "auth_url" in payload) {
+      return {
+        kind: "success",
+        authUrl: payload.auth_url,
+        traceId: payload.trace_id,
+        auditAction: payload.audit_action,
+      };
+    }
+
+    const rawStatus = isErrorStatus(response.status) ? response.status : 500;
+    const traceId = "trace_id" in payload && typeof payload.trace_id === "string" ? payload.trace_id : "INTERNAL_ERROR";
+    const mapped = mapStartApiError(rawStatus, "code" in payload ? payload.code : undefined);
+    return {
+      kind: "error",
+      error: resolveError(mapped.status, mapped.code, traceId),
+      traceId,
+      route: "SCR-001",
+    };
+  } catch {
+    const traceId = "INTERNAL_ERROR";
+    return {
+      kind: "error",
+      error: resolveError(500, "INTERNAL_ERROR", traceId),
+      traceId,
+      route: "SCR-001",
+    };
+  }
+}
+
 function renderLoginPage(root: HTMLDivElement, app: ReturnType<typeof bootstrapApp>) {
   root.innerHTML = `<main style="font-family: sans-serif; max-width: 720px; margin: 32px auto; padding: 16px;">
     <h1>${app.name}</h1>
     <h2>SCR-001 Login</h2>
     <p>Google認証の開始API（IF-001）を呼び出します。</p>
     <button id="login-start-button" type="button">Googleでログイン</button>
+    <button id="login-retry-button" type="button" hidden>再試行</button>
+    <p id="login-error-alert" role="alert" aria-live="assertive" style="min-height: 1.4em;"></p>
     <pre id="login-status" style="margin-top: 16px; white-space: pre-wrap;"></pre>
   </main>`;
 
   const button = root.querySelector<HTMLButtonElement>("#login-start-button");
+  const retryButton = root.querySelector<HTMLButtonElement>("#login-retry-button");
+  const errorAlert = root.querySelector<HTMLParagraphElement>("#login-error-alert");
   const status = root.querySelector<HTMLPreElement>("#login-status");
-  if (!button || !status) {
+  if (!button || !retryButton || !errorAlert || !status) {
     return;
   }
 
-  button.disabled = false;
-  button.addEventListener("click", async () => {
-    button.disabled = true;
+  const handleStartAuth = async () => {
     status.textContent = "認証開始APIを呼び出し中...";
-    try {
-      const response = await fetch("/api/auth/google/start", {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          authorization: "Bearer dev-session",
-        },
-        body: JSON.stringify({ redirectTo: "/auth/callback" }),
-      });
-
-      const data = (await response.json()) as If001StartApiSuccessResponse["body"] | If001StartApiErrorResponse["body"];
-      if (response.ok && "auth_url" in data) {
-        status.textContent = `成功\ntrace_id: ${data.trace_id}\naudit_action: ${data.audit_action}\nGoogleへ遷移します...`;
-        window.location.assign(data.auth_url);
-      } else if ("code" in data) {
-        status.textContent = `失敗\ncode: ${data.code}\ntrace_id: ${data.trace_id}\nroute: ${data.route}`;
-      } else {
-        status.textContent = "失敗: 予期しないレスポンス";
-      }
-    } catch (error: unknown) {
-      status.textContent = `失敗: ${error instanceof Error ? error.message : "unknown error"}`;
-    } finally {
-      button.disabled = false;
+    errorAlert.textContent = "";
+    retryButton.hidden = true;
+    const result = await requestLoginStartRuntime(fetch, page.actions.resolveError);
+    if (result.kind === "success") {
+      status.textContent = `成功\ntrace_id: ${result.traceId}\naudit_action: ${result.auditAction}\nGoogleへ遷移します...`;
+      window.location.assign(result.authUrl);
+      return;
     }
+    errorAlert.textContent = result.error.message;
+    status.textContent = `失敗\ntrace_id: ${result.traceId}\nroute: ${result.route}`;
+    retryButton.hidden = false;
+  };
+  const page = SCR001LoginPage({
+    screenId: "SCR-001",
+    handlers: {
+      onStartAuth: handleStartAuth,
+      onRetryAuth: handleStartAuth,
+    },
+  });
+
+  const syncUiState = () => {
+    button.textContent = page.ui.loginButton.label;
+    button.ariaLabel = page.ui.loginButton.ariaLabel;
+    button.disabled = page.ui.loginButton.disabled;
+    retryButton.disabled = page.ui.loginButton.disabled;
+  };
+
+  const runAndSync = (task: Promise<void>) => {
+    syncUiState();
+    void task.finally(() => {
+      syncUiState();
+    });
+  };
+
+  syncUiState();
+
+  button.addEventListener("click", () => {
+    runAndSync(page.actions.startAuth());
+  });
+  retryButton.addEventListener("click", () => {
+    runAndSync(page.actions.retryAuth());
+  });
+  button.addEventListener("keydown", (event) => {
+    if (event.key !== page.ui.loginButton.executeKey) {
+      return;
+    }
+    if (page.ui.loginButton.disabled) {
+      return;
+    }
+    event.preventDefault();
+    runAndSync(page.actions.startAuth());
   });
 }
 
@@ -865,4 +978,6 @@ async function submitPolicyConsentDecision(
   }
 }
 
-renderAppShell();
+if (typeof window !== "undefined" && typeof document !== "undefined") {
+  renderAppShell();
+}

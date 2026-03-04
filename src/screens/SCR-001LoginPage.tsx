@@ -6,8 +6,8 @@ import {
 import type { CommonErrorCode, ErrorPresentation, ErrorStatus } from "../ui/error-presentation";
 
 export type LoginPageHandlers = {
-  onStartAuth?: () => void;
-  onRetryAuth?: () => void;
+  onStartAuth?: () => void | Promise<void>;
+  onRetryAuth?: () => void | Promise<void>;
 };
 
 export type LoginPageModel = {
@@ -16,13 +16,16 @@ export type LoginPageModel = {
   ui: {
     loginButton: {
       label: "Googleでログイン";
-      loading: true;
-      disabled: true;
+      ariaLabel: "Googleでログイン";
+      executeKey: "Enter";
+      readonly loading: boolean;
+      readonly disabled: boolean;
     };
   };
   actions: {
-    startAuth: () => void;
-    retryAuth: () => void;
+    startAuth: () => Promise<void>;
+    retryAuth: () => Promise<void>;
+    handleLoginButtonKeyDown: (key: string) => boolean;
     resolveError: (status: ErrorStatus, code: CommonErrorCode, traceId?: string) => ErrorPresentation;
   };
 };
@@ -32,6 +35,19 @@ export function SCR001LoginPage({
   handlers,
 }: ScreenContainerProps & { handlers?: LoginPageHandlers }): LoginPageModel {
   const commonUi = resolveCommonUiRouteViewModel("/login");
+  let isSubmitting = false;
+
+  async function runAuthAction(action: (() => void | Promise<void>) | undefined): Promise<void> {
+    if (isSubmitting) {
+      return;
+    }
+    isSubmitting = true;
+    try {
+      await action?.();
+    } finally {
+      isSubmitting = false;
+    }
+  }
 
   return {
     screenId,
@@ -39,13 +55,34 @@ export function SCR001LoginPage({
     ui: {
       loginButton: {
         label: "Googleでログイン",
-        loading: true,
-        disabled: true,
+        ariaLabel: "Googleでログイン",
+        executeKey: "Enter",
+        get loading() {
+          return isSubmitting;
+        },
+        get disabled() {
+          return isSubmitting;
+        },
       },
     },
     actions: {
-      startAuth: () => handlers?.onStartAuth?.(),
-      retryAuth: () => handlers?.onRetryAuth?.() ?? handlers?.onStartAuth?.(),
+      startAuth: () => {
+        return runAuthAction(handlers?.onStartAuth);
+      },
+      retryAuth: () => {
+        const retryAction = handlers?.onRetryAuth ?? handlers?.onStartAuth;
+        return runAuthAction(retryAction);
+      },
+      handleLoginButtonKeyDown: (key: string) => {
+        if (key !== "Enter") {
+          return false;
+        }
+        if (isSubmitting) {
+          return false;
+        }
+        void runAuthAction(handlers?.onStartAuth);
+        return true;
+      },
       resolveError: (status, code, traceId) => {
         return resolveCommonUiRouteViewModel("/login", { status, code, traceId }).error;
       },
