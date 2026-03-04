@@ -18,6 +18,7 @@ const HABIT_CREATE_REQUIREMENT_ID = "FR-006";
 const HABIT_UPDATE_REQUIREMENT_ID = "FR-007";
 const CHECKIN_REGISTER_REQUIREMENT_ID = "FR-011";
 const CHECKIN_IDEMPOTENT_REQUIREMENT_ID = "FR-012";
+const CHECKIN_CANCEL_REQUIREMENT_ID = "FR-014";
 const YYYY_MM_DD_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 function isObjectRecord(value: unknown): value is Record<string, unknown> {
@@ -104,6 +105,26 @@ export function validateCheckinDto(payload: unknown): ValidationResult {
 
   if (typeof payload.log_date !== "string" || !YYYY_MM_DD_PATTERN.test(payload.log_date)) {
     return { message: "log_date must be yyyy-mm-dd", requirement_id: CHECKIN_IDEMPOTENT_REQUIREMENT_ID };
+  }
+
+  return null;
+}
+
+export function validateCheckinCancelDto(payload: unknown): ValidationResult {
+  if (!isObjectRecord(payload)) {
+    return { message: "habit_id is required", requirement_id: CHECKIN_CANCEL_REQUIREMENT_ID };
+  }
+
+  if (typeof payload.habit_id !== "string" || payload.habit_id.length === 0) {
+    return { message: "habit_id is required", requirement_id: CHECKIN_CANCEL_REQUIREMENT_ID };
+  }
+
+  if (typeof payload.now_utc !== "string") {
+    return { message: "now_utc is required", requirement_id: CHECKIN_CANCEL_REQUIREMENT_ID };
+  }
+
+  if (Number.isNaN(new Date(payload.now_utc).getTime())) {
+    return { message: "now_utc must be iso-8601", requirement_id: CHECKIN_CANCEL_REQUIREMENT_ID };
   }
 
   return null;

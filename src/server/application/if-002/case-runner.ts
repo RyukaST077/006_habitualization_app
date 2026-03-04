@@ -1,5 +1,6 @@
 import { assertIf002SelfOnlyAccess } from "./authorization";
 import {
+  validateCheckinCancelDto,
   validateCheckinDto,
   validateHabitCreateDto,
   validateHabitUpdateDto,
@@ -44,6 +45,7 @@ interface If002RunnerErrorScenario {
 const FR025_REQUIREMENT_ID = "FR-025";
 const FR005_REQUIREMENT_ID = "FR-005";
 const FR010_REQUIREMENT_ID = "FR-010";
+const FR014_REQUIREMENT_ID = "FR-014";
 const IF002_AUDIT_ACTION = "if-002.error";
 const POLICY_CONSENT_REJECT_AUDIT_ACTION = "POLICY_CONSENT_REJECT";
 const CONSENT_ENDPOINT = "/api/policies/consents";
@@ -167,6 +169,11 @@ function maybeCreateDtoErrorResult(testCase: If002RunnerCase): If002ErrorResult 
 
   if (endpoint === "/api/checkins" && method === "POST") {
     const validationError = validateCheckinDto(request.body);
+    return validationError ? createValidationErrorResult(validationError, testCase.traceId) : null;
+  }
+
+  if (endpoint === "/api/checkins/{habitId}" && method === "DELETE") {
+    const validationError = validateCheckinCancelDto(request.body);
     return validationError ? createValidationErrorResult(validationError, testCase.traceId) : null;
   }
 
@@ -308,26 +315,39 @@ async function resolveCheckinSuccessResult(testCase: {
   endpoint: string;
   request: If002RunnerRequest;
 }): Promise<If002ErrorResult | null> {
-  if (testCase.endpoint !== "/api/checkins" || testCase.method !== "POST") {
-    return null;
+  if (testCase.endpoint === "/api/checkins" && testCase.method === "POST") {
+    const businessDateInput = parseCheckinBusinessDateInputIfPresent(testCase.request.body);
+    if (businessDateInput) {
+      const logDate = resolveCheckinLogDateWithValidationMapping(businessDateInput, testCase.traceId);
+      return createCheckinSuccessResult(logDate, false, testCase.traceId, FR010_REQUIREMENT_ID);
+    }
+
+    const habitId = testCase.request.body.habit_id as string;
+    const nowUtc = resolveCheckinNowUtc(testCase.request.body);
+    const result = await if002CheckinService.registerCheckin(
+      testCase.request.actorUserId,
+      habitId,
+      nowUtc,
+      normalizeTraceId(testCase.traceId),
+    );
+
+    return createCheckinSuccessResult(result.logDate, result.idempotent, testCase.traceId, testCase.requirementId);
   }
 
-  const businessDateInput = parseCheckinBusinessDateInputIfPresent(testCase.request.body);
-  if (businessDateInput) {
-    const logDate = resolveCheckinLogDateWithValidationMapping(businessDateInput, testCase.traceId);
-    return createCheckinSuccessResult(logDate, false, testCase.traceId, FR010_REQUIREMENT_ID);
+  if (testCase.endpoint === "/api/checkins/{habitId}" && testCase.method === "DELETE") {
+    const habitId = testCase.request.body.habit_id as string;
+    const nowUtc = testCase.request.body.now_utc as string;
+    const result = await if002CheckinService.cancelTodayCheckin(
+      testCase.request.actorUserId,
+      habitId,
+      nowUtc,
+      normalizeTraceId(testCase.traceId),
+    );
+
+    return createCheckinCancelSuccessResult(result.logDate, testCase.traceId, FR014_REQUIREMENT_ID);
   }
 
-  const habitId = testCase.request.body.habit_id as string;
-  const nowUtc = resolveCheckinNowUtc(testCase.request.body);
-  const result = await if002CheckinService.registerCheckin(
-    testCase.request.actorUserId,
-    habitId,
-    nowUtc,
-    normalizeTraceId(testCase.traceId),
-  );
-
-  return createCheckinSuccessResult(result.logDate, result.idempotent, testCase.traceId, testCase.requirementId);
+  return null;
 }
 
 interface CheckinBusinessDateInput {
@@ -389,6 +409,22 @@ function createCheckinSuccessResult(
       requirement_id: requirementId,
       checkin: {
         idempotent,
+        log_date: logDate,
+      },
+    } as If002ErrorResult["body"],
+  };
+}
+
+function createCheckinCancelSuccessResult(logDate: string, traceId: string, requirementId: string): If002ErrorResult {
+  return {
+    status: 200,
+    body: {
+      code: "SUCCESS",
+      message: "checkin cancellation succeeded",
+      trace_id: normalizeTraceId(traceId),
+      requirement_id: requirementId,
+      checkin: {
+        canceled: true,
         log_date: logDate,
       },
     } as If002ErrorResult["body"],

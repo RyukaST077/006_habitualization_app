@@ -10,12 +10,17 @@ import type {
 } from "../../domain/repositories/contracts";
 import { RepositoryDomainError } from "../../domain/repositories/errors";
 import { resolveLogDate } from "../../domain/time/BusinessDateService";
-import type { CheckinResult } from "./types";
+import type { CheckinCancelResult, CheckinResult } from "./types";
 
 const REGISTER_CHECKIN_REQUIREMENT_ID = "FR-011";
+const CANCEL_CHECKIN_REQUIREMENT_ID = "FR-014";
 
 function createTraceId(): string {
   return normalizeTraceId(`checkin-register-${randomUUID()}`);
+}
+
+function createCancelTraceId(): string {
+  return normalizeTraceId(`checkin-cancel-${randomUUID()}`);
 }
 
 function normalizeCutoffTime(dayCutoffTime: string): string {
@@ -74,11 +79,49 @@ export class CheckinService {
         idempotent: upsertResult.idempotent,
       };
     } catch (error: unknown) {
-      throw this.mapError(error, traceId);
+      throw this.mapRegisterError(error, traceId);
     }
   }
 
-  private mapError(error: unknown, traceId: string) {
+  public async cancelTodayCheckin(
+    userId: string,
+    habitId: string,
+    nowUtc: string,
+    traceId: string = createCancelTraceId(),
+  ): Promise<CheckinCancelResult> {
+    try {
+      this.authorizationPolicy.assertSelf(userId, userId);
+      const profile = await this.userRepository.findProfile(userId);
+      if (profile === null) {
+        throw createAppError({
+          code: "FORBIDDEN",
+          message: "profile not found",
+          requirementId: CANCEL_CHECKIN_REQUIREMENT_ID,
+          traceId,
+        });
+      }
+
+      const logDate = resolveLogDate(nowUtc, profile.timezone, normalizeCutoffTime(profile.dayCutoffTime));
+      const deleted = await this.habitRepository.deleteCheckin(userId, habitId, logDate);
+      if (!deleted) {
+        throw createAppError({
+          code: "CHECKIN_CANCEL_NOT_ALLOWED",
+          message: "checkin cancellation is allowed only for today",
+          requirementId: CANCEL_CHECKIN_REQUIREMENT_ID,
+          traceId,
+        });
+      }
+
+      return {
+        logDate,
+        canceled: true,
+      };
+    } catch (error: unknown) {
+      throw this.mapCancelError(error, traceId);
+    }
+  }
+
+  private mapRegisterError(error: unknown, traceId: string) {
     if (isAppError(error)) {
       return error;
     }
@@ -103,6 +146,27 @@ export class CheckinService {
       code: "INTERNAL_ERROR",
       message: "checkin registration failed",
       requirementId: REGISTER_CHECKIN_REQUIREMENT_ID,
+      traceId,
+    });
+  }
+
+  private mapCancelError(error: unknown, traceId: string) {
+    if (isAppError(error)) {
+      return error;
+    }
+    if (isForbiddenLikeError(error)) {
+      return createAppError({
+        code: "FORBIDDEN",
+        message: "checkin cancellation access denied",
+        requirementId: CANCEL_CHECKIN_REQUIREMENT_ID,
+        traceId,
+      });
+    }
+
+    return createAppError({
+      code: "INTERNAL_ERROR",
+      message: "checkin cancellation failed",
+      requirementId: CANCEL_CHECKIN_REQUIREMENT_ID,
       traceId,
     });
   }

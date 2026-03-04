@@ -201,9 +201,10 @@ export class HabitRepository implements HabitRepositoryContract {
 
   public async deleteCheckin(userId: string, habitId: string, logDate: string): Promise<boolean> {
     const habit = this.client.habits.get(habitId);
-    if (habit !== undefined) {
-      assertRepositoryOwnership(habit.userId, userId, "habit ownership mismatch");
+    if (habit === undefined) {
+      return false;
     }
+    assertRepositoryOwnership(habit.userId, userId, "habit ownership mismatch");
 
     const key = buildHabitLogKeyForRepository(habitId, logDate);
     const existing = this.client.habitLogs.get(key);

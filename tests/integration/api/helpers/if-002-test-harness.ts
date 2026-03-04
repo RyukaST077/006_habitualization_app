@@ -30,6 +30,7 @@ export interface If002PlannedResult {
     checkin?: {
       log_date?: string;
       idempotent?: boolean;
+      canceled?: boolean;
     };
   };
 }
@@ -53,6 +54,7 @@ export interface If002TestHarness {
   assertHabitStatus(payload: unknown, expectedStatus: "active" | "archived"): void;
   assertCheckinLogDate(payload: unknown, expectedLogDate: string): void;
   assertCheckinIdempotent(payload: unknown, expectedIdempotent: boolean): void;
+  assertCheckinCanceled(payload: unknown, expectedCanceled: boolean): void;
 }
 
 export function createIf002TestHarness(): If002TestHarness {
@@ -135,6 +137,13 @@ export function createIf002TestHarness(): If002TestHarness {
 
       const response = payload as If002PlannedResult["body"];
       expect(response.checkin?.idempotent).toBe(expectedIdempotent);
+    },
+    assertCheckinCanceled(payload: unknown, expectedCanceled: boolean): void {
+      expect(payload).toBeTypeOf("object");
+      expect(payload).not.toBeNull();
+
+      const response = payload as If002PlannedResult["body"];
+      expect(response.checkin?.canceled).toBe(expectedCanceled);
     },
   };
 }

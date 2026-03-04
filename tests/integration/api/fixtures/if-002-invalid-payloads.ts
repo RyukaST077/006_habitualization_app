@@ -2,7 +2,7 @@ import type { If002Method, If002RequirementId } from "./if-002-cases";
 
 export interface If002InvalidPayloadCase {
   traceId: string;
-  endpoint: "/api/habits" | "/api/habits/{id}" | "/api/settings/profile";
+  endpoint: "/api/habits" | "/api/habits/{id}" | "/api/settings/profile" | "/api/checkins/{habitId}";
   method: If002Method;
   requirementId: If002RequirementId;
   expectedStatus: 400;
@@ -18,6 +18,7 @@ export const IF002_DTO_TARGET_ENDPOINTS = [
   "/api/habits",
   "/api/habits/{id}",
   "/api/settings/profile",
+  "/api/checkins/{habitId}",
 ] as const;
 
 export const IF002_INVALID_PAYLOAD_CASES: If002InvalidPayloadCase[] = [
@@ -136,6 +137,45 @@ export const IF002_INVALID_PAYLOAD_CASES: If002InvalidPayloadCase[] = [
     request: {
       actorUserId: "user-red-001",
       body: { timezone: "Asia/Tokyo", day_cutoff_time: "9:00" },
+    },
+  },
+  {
+    traceId: "IF-002/DTO/FR-014/checkins/cancel-habit-id-required",
+    endpoint: "/api/checkins/{habitId}",
+    method: "DELETE",
+    requirementId: "FR-014",
+    expectedStatus: 400,
+    expectedCode: "VALIDATION_ERROR",
+    expectedMessage: "habit_id is required",
+    request: {
+      actorUserId: "user-red-001",
+      body: { now_utc: "2026-03-12T12:00:00.000Z" },
+    },
+  },
+  {
+    traceId: "IF-002/DTO/FR-014/checkins/cancel-now-utc-required",
+    endpoint: "/api/checkins/{habitId}",
+    method: "DELETE",
+    requirementId: "FR-014",
+    expectedStatus: 400,
+    expectedCode: "VALIDATION_ERROR",
+    expectedMessage: "now_utc is required",
+    request: {
+      actorUserId: "user-red-001",
+      body: { habit_id: "habit-red-001" },
+    },
+  },
+  {
+    traceId: "IF-002/DTO/FR-014/checkins/cancel-now-utc-format",
+    endpoint: "/api/checkins/{habitId}",
+    method: "DELETE",
+    requirementId: "FR-014",
+    expectedStatus: 400,
+    expectedCode: "VALIDATION_ERROR",
+    expectedMessage: "now_utc must be iso-8601",
+    request: {
+      actorUserId: "user-red-001",
+      body: { habit_id: "habit-red-001", now_utc: "not-iso" },
     },
   },
 ];

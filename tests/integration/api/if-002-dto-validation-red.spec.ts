@@ -7,7 +7,7 @@ import {
 import { createIf002TestHarness } from "./helpers/if-002-test-harness";
 
 describe("T-026 PR-002 IF-002 DTO validation red tests", () => {
-  it("IF-002: DTO検証対象の3エンドポイントを含む", () => {
+  it("IF-002: DTO検証対象エンドポイントをすべて含む", () => {
     const covered = new Set(IF002_INVALID_PAYLOAD_CASES.map((testCase) => testCase.endpoint));
 
     IF002_DTO_TARGET_ENDPOINTS.forEach((endpoint) => {
@@ -35,6 +35,17 @@ describe("T-026 PR-002 IF-002 DTO validation red tests", () => {
     expect(settingsCases.some((testCase) => testCase.request.body.timezone === "Mars/Olympus")).toBe(true);
     expect(settingsCases.some((testCase) => testCase.request.body.day_cutoff_time === "24:00")).toBe(true);
     expect(settingsCases.some((testCase) => testCase.request.body.day_cutoff_time === "9:00")).toBe(true);
+  });
+
+  it("IF-002: チェックイン取消DTOで必須/形式エラーケースを持つ", () => {
+    const cancelCases = IF002_INVALID_PAYLOAD_CASES.filter(
+      (testCase) => testCase.endpoint === "/api/checkins/{habitId}" && testCase.method === "DELETE",
+    );
+
+    expect(cancelCases.length).toBeGreaterThanOrEqual(3);
+    expect(cancelCases.some((testCase) => testCase.expectedMessage === "habit_id is required")).toBe(true);
+    expect(cancelCases.some((testCase) => testCase.expectedMessage === "now_utc is required")).toBe(true);
+    expect(cancelCases.some((testCase) => testCase.expectedMessage === "now_utc must be iso-8601")).toBe(true);
   });
 
   it.each(IF002_INVALID_PAYLOAD_CASES)("$traceId: 400 VALIDATION_ERROR + trace_id を期待する", (testCase) => {

@@ -47,4 +47,20 @@ describe("IF-002 error mapper", () => {
     expect(mapped.body.code).toBe("INTERNAL_ERROR");
     expect(mapped.body.requirement_id).toBe("FR-011");
   });
+
+  it("CHECKIN_CANCEL_NOT_ALLOWED は DOMAIN_CONFLICT(409) に写像する", () => {
+    const error = createIf002HandledError(
+      "CHECKIN_CANCEL_NOT_ALLOWED",
+      "checkin cancellation is allowed only for today",
+      "FR-014",
+      "trace-cancel-not-allowed",
+    );
+
+    const mapped = mapIf002Error(error, "trace-fallback", "FR-014");
+
+    expect(mapped.status).toBe(409);
+    expect(mapped.body.code).toBe("DOMAIN_CONFLICT");
+    expect(mapped.body.requirement_id).toBe("FR-014");
+    expect(mapped.body.trace_id).toContain("trace-cancel-not-allowed");
+  });
 });

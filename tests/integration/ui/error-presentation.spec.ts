@@ -51,4 +51,26 @@ describe("T-014 PR-003 error presentation integration tests", () => {
     expect(forbidden.recoveryAction).toBeNull();
     expect(internal.recoveryAction).toBeNull();
   });
+
+  it("409 DOMAIN_CONFLICT は理由未指定時に既定文言を維持する", () => {
+    const conflict = resolveErrorPresentation(409, "DOMAIN_CONFLICT", "SCR002-CHECKIN-409-DEFAULT");
+
+    expect(conflict.message).toBe("現在の状態ではこの操作を完了できません");
+    expect(conflict.recoveryAction).toEqual({
+      label: "再開してチェックインする",
+      targetScreenId: "SCR-004",
+    });
+  });
+
+  it("409 DOMAIN_CONFLICT かつ取消条件違反時は専用文言を表示する", () => {
+    const conflict = resolveErrorPresentation(409, "DOMAIN_CONFLICT", "SCR002-CANCEL-409", {
+      domainConflictReason: "CHECKIN_CANCEL_NOT_ALLOWED",
+    });
+
+    expect(conflict.message).toBe("当日分以外のチェックインは取り消せません");
+    expect(conflict.recoveryAction).toEqual({
+      label: "再開してチェックインする",
+      targetScreenId: "SCR-004",
+    });
+  });
 });

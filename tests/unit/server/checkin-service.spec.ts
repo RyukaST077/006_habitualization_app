@@ -32,6 +32,7 @@ function createUserRepository(profile: Profile | null): UserRepositoryContract {
 
 function createHabitRepository(
   upsertImpl: HabitRepositoryContract["upsertCheckin"],
+  deleteImpl: HabitRepositoryContract["deleteCheckin"] = async () => false,
 ): HabitRepositoryContract {
   return {
     listHabits: vi.fn(async () => [] as Habit[]),
@@ -43,7 +44,7 @@ function createHabitRepository(
       throw new Error("not implemented");
     }),
     upsertCheckin: vi.fn(upsertImpl),
-    deleteCheckin: vi.fn(async () => false),
+    deleteCheckin: vi.fn(deleteImpl),
     findLogsByDateRange: vi.fn(async () => [] as HabitLog[]),
   };
 }
@@ -125,5 +126,109 @@ describe("CheckinService", () => {
         requirementId: "FR-011",
         traceId: "trace-004",
       });
+  });
+
+  it("cancelTodayCheckin: 当日ログは取消成功する", async () => {
+    const userRepository = createUserRepository(createProfile({ timezone: "UTC", dayCutoffTime: "04:00:00" }));
+    const habitRepository = createHabitRepository(
+      async () => {
+        throw new Error("should not be called");
+      },
+      async () => true,
+    );
+    const service = new CheckinService(userRepository, habitRepository, createAuthorizationPolicy());
+
+    const result = await service.cancelTodayCheckin(
+      "user-red-001",
+      "habit-red-001",
+      "2026-03-01T18:00:00.000Z",
+      "trace-cancel-001",
+    );
+
+    expect(result).toEqual({
+      logDate: "2026-03-01",
+      canceled: true,
+    });
+    expect(habitRepository.deleteCheckin).toHaveBeenCalledWith("user-red-001", "habit-red-001", "2026-03-01");
+  });
+
+  it("cancelTodayCheckin: 当日外は CHECKIN_CANCEL_NOT_ALLOWED を返す", async () => {
+    const userRepository = createUserRepository(createProfile({ timezone: "UTC", dayCutoffTime: "04:00:00" }));
+    const habitRepository = createHabitRepository(
+      async () => {
+        throw new Error("should not be called");
+      },
+      async () => false,
+    );
+    const service = new CheckinService(userRepository, habitRepository, createAuthorizationPolicy());
+
+    await expect(
+      service.cancelTodayCheckin("user-red-001", "habit-red-001", "2026-03-01T18:00:00.000Z", "trace-cancel-002"),
+    ).rejects.toMatchObject({
+      code: "CHECKIN_CANCEL_NOT_ALLOWED",
+      requirementId: "FR-014",
+      traceId: "trace-cancel-002",
+    });
+  });
+
+  it("cancelTodayCheckin: 他ユーザーのログ取消は FORBIDDEN で拒否する", async () => {
+    const userRepository = createUserRepository(createProfile({ timezone: "UTC", dayCutoffTime: "04:00:00" }));
+    const habitRepository = createHabitRepository(
+      async () => {
+        throw new Error("should not be called");
+      },
+      async () => {
+        throw createRepositoryError("FORBIDDEN", "ownership mismatch");
+      },
+    );
+    const service = new CheckinService(userRepository, habitRepository, createAuthorizationPolicy());
+
+    await expect(
+      service.cancelTodayCheckin("user-red-001", "habit-red-001", "2026-03-01T18:00:00.000Z", "trace-cancel-003"),
+    ).rejects.toMatchObject({
+      code: "FORBIDDEN",
+      requirementId: "FR-014",
+      traceId: "trace-cancel-003",
+    });
+  });
+
+  it("cancelTodayCheckin: profile 未存在時は FORBIDDEN を返す", async () => {
+    const userRepository = createUserRepository(null);
+    const habitRepository = createHabitRepository(
+      async () => {
+        throw new Error("should not be called");
+      },
+      async () => true,
+    );
+    const service = new CheckinService(userRepository, habitRepository, createAuthorizationPolicy());
+
+    await expect(
+      service.cancelTodayCheckin("user-red-001", "habit-red-001", "2026-03-01T18:00:00.000Z", "trace-cancel-004"),
+    ).rejects.toMatchObject({
+      code: "FORBIDDEN",
+      requirementId: "FR-014",
+      traceId: "trace-cancel-004",
+    });
+  });
+
+  it("cancelTodayCheckin: 想定外例外は INTERNAL_ERROR に写像する", async () => {
+    const userRepository = createUserRepository(createProfile({ timezone: "UTC", dayCutoffTime: "04:00:00" }));
+    const habitRepository = createHabitRepository(
+      async () => {
+        throw new Error("should not be called");
+      },
+      async () => {
+        throw new Error("unexpected");
+      },
+    );
+    const service = new CheckinService(userRepository, habitRepository, createAuthorizationPolicy());
+
+    await expect(
+      service.cancelTodayCheckin("user-red-001", "habit-red-001", "2026-03-01T18:00:00.000Z", "trace-cancel-005"),
+    ).rejects.toMatchObject({
+      code: "INTERNAL_ERROR",
+      requirementId: "FR-014",
+      traceId: "trace-cancel-005",
+    });
   });
 });

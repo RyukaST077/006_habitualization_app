@@ -15,6 +15,7 @@ export type If002RequirementId =
   | "FR-011"
   | "FR-012"
   | "FR-013"
+  | "FR-014"
   | "FR-021"
   | "FR-025";
 export type If002Perspective = "DTO_REQUIRED" | "DTO_TYPE_RANGE" | "AUTHZ_SELF_ONLY" | "DOMAIN_STATE" | "SYSTEM";

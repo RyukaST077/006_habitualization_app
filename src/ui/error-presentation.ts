@@ -21,6 +21,11 @@ export type ErrorPresentation = {
   internalDetail: null;
 };
 
+export type DomainConflictReason = "CHECKIN_CANCEL_NOT_ALLOWED";
+export type ErrorPresentationContext = {
+  domainConflictReason?: DomainConflictReason;
+};
+
 const PUBLIC_MESSAGES: Readonly<Record<CommonErrorCode, string>> = {
   VALIDATION_ERROR: "入力内容を確認してください",
   AUTH_FAILED: "認証失敗。再試行してください",
@@ -28,20 +33,28 @@ const PUBLIC_MESSAGES: Readonly<Record<CommonErrorCode, string>> = {
   DOMAIN_CONFLICT: "現在の状態ではこの操作を完了できません",
   INTERNAL_ERROR: "システムエラーが発生しました",
 };
+const DOMAIN_CONFLICT_REASON_MESSAGES: Readonly<Record<DomainConflictReason, string>> = {
+  CHECKIN_CANCEL_NOT_ALLOWED: "当日分以外のチェックインは取り消せません",
+};
 const TRACE_ID_VISIBLE_STATUS: ErrorStatus = 500;
 
 export function resolveErrorPresentation(
   status: ErrorStatus,
   code: CommonErrorCode,
-  traceId = "INTERNAL_ERROR"
+  traceId = "INTERNAL_ERROR",
+  context?: ErrorPresentationContext
 ): ErrorPresentation {
   const shouldShowTraceId = status === TRACE_ID_VISIBLE_STATUS && code === "INTERNAL_ERROR";
   const showResumeAction = status === 409 && code === "DOMAIN_CONFLICT";
+  const message =
+    status === 409 && code === "DOMAIN_CONFLICT" && context?.domainConflictReason
+      ? DOMAIN_CONFLICT_REASON_MESSAGES[context.domainConflictReason]
+      : PUBLIC_MESSAGES[code];
 
   return {
     status,
     code,
-    message: PUBLIC_MESSAGES[code],
+    message,
     recoveryAction: showResumeAction
       ? {
           label: "再開してチェックインする",
