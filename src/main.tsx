@@ -9,6 +9,7 @@ import {
 import { SCR008PolicyConsentPage, type PolicyConsentAuditTrace } from "./screens/SCR-008PolicyConsentPage";
 import { SCR003HabitCreatePage } from "./screens/SCR-003HabitCreatePage";
 import { SCR004HabitEditPage } from "./screens/SCR-004HabitEditPage";
+import { SCR002HomePage, type CheckinResolution } from "./screens/SCR-002HomePage";
 import type { If001StartApiErrorResponse, If001StartApiSuccessResponse } from "./server/application/if-001/contracts";
 
 export function bootstrapApp() {
@@ -39,7 +40,7 @@ function renderAppShell() {
     return;
   }
   if (window.location.pathname === ROUTE_MAP["SCR-002"]) {
-    renderSimpleRoutePage(root, app, "SCR-002 Home", "認証後の到達先です。");
+    renderHomePage(root, app);
     return;
   }
   if (window.location.pathname === ROUTE_MAP["SCR-003"]) {
@@ -167,6 +168,233 @@ function renderSimpleRoutePage(root: HTMLDivElement, app: ReturnType<typeof boot
     <p>${description}</p>
     <p><a href="/login">/login に戻る</a></p>
   </main>`;
+}
+
+type HabitSummary = {
+  habitId: string;
+  name: string;
+  status: string;
+  displayOrder: number;
+  lastCheckinLogDate?: string | null;
+};
+
+type If002CancelSuccessPayload = {
+  checkin?: {
+    log_date?: string | null;
+    canceled?: boolean;
+  };
+};
+
+type If002CancelErrorPayload = {
+  code?: string;
+  trace_id?: string;
+};
+
+function asErrorStatus(status: number): 400 | 401 | 403 | 409 | 500 {
+  if (status === 400 || status === 401 || status === 403 || status === 409) {
+    return status;
+  }
+  return 500;
+}
+
+function asErrorCode(code: unknown): "VALIDATION_ERROR" | "AUTH_FAILED" | "FORBIDDEN" | "DOMAIN_CONFLICT" | "INTERNAL_ERROR" {
+  if (
+    code === "VALIDATION_ERROR"
+    || code === "AUTH_FAILED"
+    || code === "FORBIDDEN"
+    || code === "DOMAIN_CONFLICT"
+    || code === "INTERNAL_ERROR"
+  ) {
+    return code;
+  }
+  return "INTERNAL_ERROR";
+}
+
+function inferDomainConflictReason(
+  status: number,
+  code: unknown,
+): "CHECKIN_CANCEL_NOT_ALLOWED" | undefined {
+  if (status === 409 && code === "DOMAIN_CONFLICT") {
+    return "CHECKIN_CANCEL_NOT_ALLOWED";
+  }
+  return undefined;
+}
+
+async function requestCancelCheckin(
+  userId: string,
+  habitId: string,
+  nowUtc: string,
+): Promise<CheckinResolution> {
+  try {
+    const response = await fetch(`/api/checkins/${encodeURIComponent(habitId)}`, {
+      method: "DELETE",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        userId,
+        habit_id: habitId,
+        now_utc: nowUtc,
+      }),
+    });
+
+    let payload: If002CancelSuccessPayload | If002CancelErrorPayload | null = null;
+    try {
+      payload = (await response.json()) as If002CancelSuccessPayload | If002CancelErrorPayload;
+    } catch {
+      payload = null;
+    }
+
+    if (response.ok) {
+      const successPayload = payload as If002CancelSuccessPayload | null;
+      return {
+        kind: "success",
+        logDate: typeof successPayload?.checkin?.log_date === "string" ? successPayload.checkin.log_date : null,
+        idempotent: false,
+      };
+    }
+
+    const errorPayload = payload as If002CancelErrorPayload | null;
+    const mappedCode = asErrorCode(errorPayload?.code);
+    return {
+      kind: "error",
+      status: asErrorStatus(response.status),
+      code: mappedCode,
+      traceId: typeof errorPayload?.trace_id === "string" ? errorPayload.trace_id : undefined,
+      domainConflictReason: inferDomainConflictReason(response.status, mappedCode),
+    };
+  } catch {
+    return {
+      kind: "error",
+      status: 500,
+      code: "INTERNAL_ERROR",
+    };
+  }
+}
+
+function renderHomePage(root: HTMLDivElement, app: ReturnType<typeof bootstrapApp>) {
+  const userId = resolveHabitFormUserId();
+  const page = SCR002HomePage({
+    screenId: "SCR-002",
+    handlers: {
+      onNavigateTo: (target) => window.location.assign(target),
+      onCancelCheckin: async ({ habitId, nowUtc }) => requestCancelCheckin(userId, habitId, nowUtc),
+    },
+  });
+
+  root.innerHTML = `<main style="font-family: sans-serif; max-width: 720px; margin: 32px auto; padding: 16px;">
+    <h1>${app.name}</h1>
+    <h2>SCR-002 Home</h2>
+    <p>当日チェックイン取消（FR-014）</p>
+    <form id="cancel-checkin-form" style="display: grid; gap: 8px; margin: 12px 0;">
+      <label>habit_id <input id="cancel-habit-id" required placeholder="habit-red-001" /></label>
+      <label>now_utc <input id="cancel-now-utc" required /></label>
+      <button id="cancel-checkin-submit" type="submit">当日チェックインを取り消す</button>
+    </form>
+    <pre id="cancel-checkin-status" style="white-space: pre-wrap;"></pre>
+    <div id="cancel-checkin-error" style="color: #b00020; margin-top: 8px;"></div>
+    <h3>Habits</h3>
+    <button id="home-refresh" type="button">一覧を更新</button>
+    <ul id="home-habit-list" style="margin-top: 8px;"></ul>
+    <p><a href="/habits/new">習慣を作成</a></p>
+  </main>`;
+
+  const form = root.querySelector<HTMLFormElement>("#cancel-checkin-form");
+  const habitIdInput = root.querySelector<HTMLInputElement>("#cancel-habit-id");
+  const nowUtcInput = root.querySelector<HTMLInputElement>("#cancel-now-utc");
+  const submitButton = root.querySelector<HTMLButtonElement>("#cancel-checkin-submit");
+  const status = root.querySelector<HTMLPreElement>("#cancel-checkin-status");
+  const errorContainer = root.querySelector<HTMLDivElement>("#cancel-checkin-error");
+  const refreshButton = root.querySelector<HTMLButtonElement>("#home-refresh");
+  const list = root.querySelector<HTMLUListElement>("#home-habit-list");
+  if (!form || !habitIdInput || !nowUtcInput || !submitButton || !status || !errorContainer || !refreshButton || !list) {
+    return;
+  }
+
+  nowUtcInput.value = new Date().toISOString();
+
+  let habits: HabitSummary[] = [];
+
+  const renderHabitList = async () => {
+    try {
+      const response = await fetch(`/api/habits?userId=${encodeURIComponent(userId)}`);
+      const payload = (await response.json()) as { habits?: HabitSummary[] };
+      habits = payload.habits ?? [];
+      list.innerHTML = habits
+        .map((habit) => {
+          const statusText = `${escapeHtml(habit.status)} / display_order=${habit.displayOrder}`;
+          const checkinText = habit.lastCheckinLogDate ? `last_checkin=${escapeHtml(habit.lastCheckinLogDate)}` : "last_checkin=none";
+          return `<li>
+            <strong>${escapeHtml(habit.name)}</strong> (#${escapeHtml(habit.habitId)})
+            <br/>
+            <small>${statusText}, ${checkinText}</small>
+            <br/>
+            <button type="button" data-habit-id="${escapeHtml(habit.habitId)}">この習慣を取消対象に設定</button>
+          </li>`;
+        })
+        .join("");
+
+      if (habits.length === 0) {
+        list.innerHTML = "<li>データなし</li>";
+      }
+    } catch (error: unknown) {
+      list.innerHTML = `<li>一覧取得失敗: ${escapeHtml(error instanceof Error ? error.message : "unknown error")}</li>`;
+    }
+  };
+
+  const syncSubmitState = () => {
+    submitButton.disabled = page.ui.cancelCheckin.isSubmitting;
+    submitButton.textContent = page.ui.cancelCheckin.isSubmitting
+      ? "取消中..."
+      : "当日チェックインを取り消す";
+  };
+
+  list.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLButtonElement)) {
+      return;
+    }
+    const selectedHabitId = target.dataset.habitId;
+    if (!selectedHabitId) {
+      return;
+    }
+    habitIdInput.value = selectedHabitId;
+  });
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const habitId = habitIdInput.value.trim();
+    const nowUtc = nowUtcInput.value.trim() || new Date().toISOString();
+    if (habitId.length === 0) {
+      status.textContent = "取消失敗: habit_id を入力してください";
+      return;
+    }
+
+    syncSubmitState();
+    status.textContent = "取消実行中...";
+    errorContainer.textContent = "";
+
+    const result = await page.actions.cancelTodayCheckin({ habitId, nowUtc });
+    syncSubmitState();
+    if (result === null) {
+      status.textContent = "取消失敗: 実行中のため再実行できません";
+      return;
+    }
+
+    if (result.error) {
+      status.textContent = `取消失敗: status=${result.error.status} code=${result.error.code}`;
+      errorContainer.textContent = result.error.message;
+      return;
+    }
+
+    status.textContent = `取消成功: log_date=${result.lastCheckinLogDate ?? "null"}`;
+    await renderHabitList();
+  });
+
+  refreshButton.addEventListener("click", () => {
+    void renderHabitList();
+  });
+
+  syncSubmitState();
+  void renderHabitList();
 }
 
 function renderHabitCreatePage(root: HTMLDivElement, app: ReturnType<typeof bootstrapApp>) {
