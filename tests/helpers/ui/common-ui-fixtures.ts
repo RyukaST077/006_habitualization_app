@@ -39,6 +39,17 @@ export type Scr004StatusButtonVisibility = {
 
 export type Scr001TraceabilityId = "FR-001" | "SCR-001" | "IF-001";
 export type Scr001ConsentState = "unknown" | "agreed";
+export type Scr008RequirementId = "FR-003" | "FR-004" | "FR-005";
+export type Scr008TraceCaseId = "TC-IT-FR-003-003" | "TC-ST-FR-004-004" | "TC-IT-FR-005-001";
+export type Scr008ConsentState = "unknown" | "agreed";
+
+export type Scr008UiRequirementTraceCase = {
+  traceId: string;
+  testCaseId: Scr008TraceCaseId;
+  requirementId: Scr008RequirementId;
+  screenId: "SCR-008";
+  title: string;
+};
 
 const T034_AUTH_UI_IMPLEMENTATION_STATE = "implemented" as const;
 
@@ -152,6 +163,77 @@ export const SCR001_A11Y_ENTER_KEY_EXPECTATION = {
   executeKey: "Enter",
   ignoreKey: "Space",
   ariaLabel: "Googleでログイン",
+} as const;
+
+export const SCR008_TRACEABILITY_IDS = ["FR-003", "FR-004", "FR-005", "SCR-008"] as const;
+
+export const SCR008_UI_REQUIREMENT_TRACE_CASES: readonly Scr008UiRequirementTraceCase[] = [
+  {
+    traceId: "T-051/C-001/TC-IT-FR-003-003/FR-003/SCR-008",
+    testCaseId: "TC-IT-FR-003-003",
+    requirementId: "FR-003",
+    screenId: "SCR-008",
+    title: "同意済み到達時は /home へリダイレクトする",
+  },
+  {
+    traceId: "T-051/C-001/TC-ST-FR-004-004/FR-004/SCR-008",
+    testCaseId: "TC-ST-FR-004-004",
+    requirementId: "FR-004",
+    screenId: "SCR-008",
+    title: "拒否時は /login へ戻す導線を保持する",
+  },
+  {
+    traceId: "T-051/C-001/TC-IT-FR-005-001/FR-005/SCR-008",
+    testCaseId: "TC-IT-FR-005-001",
+    requirementId: "FR-005",
+    screenId: "SCR-008",
+    title: "同意送信時に履歴登録導線を保持する",
+  },
+] as const;
+
+export const SCR008_DUAL_CHECK_REQUIRED_EXPECTATION = {
+  screenId: "SCR-008",
+  requirementId: "FR-004",
+  requiredChecks: ["terms", "privacy"] as const,
+  disabledWhenEitherUnchecked: true,
+  enabledWhenBothChecked: true,
+} as const;
+
+export const SCR008_POLICY_CONSENT_TRACE_EXPECTATION = {
+  requirementId: "FR-026",
+  policyTypes: ["terms", "privacy"] as const,
+  acceptAction: "POLICY_CONSENT_ACCEPT",
+  rejectAction: "POLICY_CONSENT_REJECT",
+} as const;
+
+export const SCR008_REJECT_FLOW_EXPECTATION = {
+  screenId: "SCR-008",
+  requirementId: "FR-004",
+  fromPath: "/policy-consent",
+  consentState: "rejected",
+  expectedPath: "/login",
+} as const;
+
+export const SCR008_ACCEPT_FLOW_EXPECTATION = {
+  screenId: "SCR-008",
+  requirementId: "FR-005",
+  fromPath: "/policy-consent",
+  consentState: "agreed",
+  expectedPath: "/home",
+} as const;
+
+export const SCR008_CONSENT_ENTRY_REDIRECT_CASES: readonly {
+  consentState: Scr008ConsentState;
+  expectedPath: "/policy-consent" | "/home";
+}[] = [
+  { consentState: "unknown", expectedPath: "/policy-consent" },
+  { consentState: "agreed", expectedPath: "/home" },
+] as const;
+
+export const SCR008_A11Y_KEYBOARD_EXPECTATION = {
+  toggleKey: "Space",
+  submitKey: "Enter",
+  ignoreKey: "Escape",
 } as const;
 
 export const SCR003_HABIT_NAME_BOUNDARY_CASES: readonly Scr003HabitNameBoundaryCase[] = [

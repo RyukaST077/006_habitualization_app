@@ -79,15 +79,18 @@ export function SCR008PolicyConsentPage({
       setPrivacyChecked: (checked: boolean) => {
         consentState.privacy = checked;
       },
-      accept: () => {
+      accept: (): any => {
         if (!isAcceptEnabled()) {
           return false;
         }
-        handlers?.onAccept?.(createTrace(POLICY_CONSENT_ACCEPT));
-        return true;
+        const trace = createTrace(POLICY_CONSENT_ACCEPT);
+        handlers?.onAccept?.(trace);
+        return trace;
       },
-      reject: () => {
-        handlers?.onReject?.(createTrace(POLICY_CONSENT_REJECT));
+      reject: (): any => {
+        const trace = createTrace(POLICY_CONSENT_REJECT);
+        handlers?.onReject?.(trace);
+        return trace;
       },
     },
   };

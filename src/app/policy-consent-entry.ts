@@ -22,6 +22,8 @@ export function resolvePolicyConsentEntryRoute(
   if (fallbackCallbackRoute === "SCR-008") {
     return ROUTE_MAP["SCR-008"];
   }
+  if (fallbackCallbackRoute === "SCR-001") {
+    return ROUTE_MAP["SCR-001"];
+  }
   return ROUTE_MAP["SCR-001"];
 }
-

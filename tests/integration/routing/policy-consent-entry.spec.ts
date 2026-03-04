@@ -21,9 +21,23 @@ describe("Policy consent entry redirect tests", () => {
     expect(route).toBe("/policy-consent");
   });
 
+  it("セッション判定があれば fallback より優先して /home へ遷移する", () => {
+    const route = resolvePolicyConsentEntryRoute(
+      { authState: "authenticated", consentState: "agreed", userId: "user-001" },
+      "SCR-008",
+    );
+
+    expect(route).toBe("/home");
+  });
+
   it("fallback callback 判定で SCR-002 なら /home へ遷移する", () => {
     const route = resolvePolicyConsentEntryRoute(null, "SCR-002");
     expect(route).toBe("/home");
+  });
+
+  it("fallback callback 判定で SCR-001 は /login に遷移する", () => {
+    const route = resolvePolicyConsentEntryRoute(null, "SCR-001");
+    expect(route).toBe("/login");
   });
 
   it("未認証または判定不能なら /login に戻す", () => {

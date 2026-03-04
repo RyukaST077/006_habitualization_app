@@ -534,6 +534,18 @@ function escapeHtml(text: string): string {
     .replaceAll("'", "&#39;");
 }
 
+function toSafeHttpUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+      return parsed.toString();
+    }
+  } catch {
+    return "#";
+  }
+  return "#";
+}
+
 function getOrCreateLocalUserId(): string {
   const key = "habit-local-user-id";
   try {
@@ -732,6 +744,19 @@ type PolicyConsentInsertErrorResponse = {
   message?: string;
   detail?: string;
 };
+type PolicyType = "terms" | "privacy";
+type PolicyCurrentDocument = {
+  version: string;
+  url: string;
+};
+export type PolicyCurrentResponse = Record<PolicyType, PolicyCurrentDocument>;
+type PolicyConsentSubmissionPayload = {
+  userId: string;
+  consents: Array<{
+    policy_type: PolicyType;
+    policy_version: string;
+  }>;
+};
 
 function parseHashParams(hash: string): URLSearchParams {
   return new URLSearchParams(hash.startsWith("#") ? hash.slice(1) : hash);
@@ -758,6 +783,45 @@ function mapRouteIdToPath(route: If001CallbackApiResponse["route"]): string {
     return ROUTE_MAP["SCR-008"];
   }
   return ROUTE_MAP["SCR-001"];
+}
+
+function isPolicyCurrentDocument(value: unknown): value is PolicyCurrentDocument {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  const document = value as { version?: unknown; url?: unknown };
+  return typeof document.version === "string" && document.version.length > 0
+    && typeof document.url === "string" && document.url.length > 0;
+}
+
+export async function requestCurrentPoliciesRuntime(fetchFn: typeof fetch): Promise<PolicyCurrentResponse> {
+  const response = await fetchFn("/api/policies/current", {
+    method: "GET",
+  });
+  if (!response.ok) {
+    throw new Error(`policy current fetch failed (${response.status})`);
+  }
+  const payload = (await response.json()) as { terms?: unknown; privacy?: unknown };
+  if (!isPolicyCurrentDocument(payload.terms) || !isPolicyCurrentDocument(payload.privacy)) {
+    throw new Error("policy current payload is invalid");
+  }
+  return {
+    terms: payload.terms,
+    privacy: payload.privacy,
+  };
+}
+
+export function buildPolicyConsentSubmissionPayload(
+  userId: string,
+  policies: PolicyCurrentResponse,
+): PolicyConsentSubmissionPayload {
+  return {
+    userId,
+    consents: [
+      { policy_type: "terms", policy_version: policies.terms.version },
+      { policy_type: "privacy", policy_version: policies.privacy.version },
+    ],
+  };
 }
 
 async function renderAuthCallbackPage(root: HTMLDivElement, app: ReturnType<typeof bootstrapApp>) {
@@ -830,6 +894,16 @@ function readSessionStorage(key: string): string | null {
   }
 }
 
+function clearAuthSessionStorage(): void {
+  try {
+    window.sessionStorage.removeItem(CALLBACK_ACCESS_TOKEN_STORAGE_KEY);
+    window.sessionStorage.removeItem(CALLBACK_USER_ID_STORAGE_KEY);
+    window.sessionStorage.removeItem(POLICY_CONSENT_TRACE_STORAGE_KEY);
+  } catch {
+    return;
+  }
+}
+
 function writePolicyConsentTrace(trace: PolicyConsentAuditTrace): string {
   const traceId = `${trace.action.toLowerCase()}-${Date.now()}`;
   writeSessionStorage(
@@ -845,10 +919,32 @@ function writePolicyConsentTrace(trace: PolicyConsentAuditTrace): string {
 }
 
 async function renderPolicyConsentPage(root: HTMLDivElement, app: ReturnType<typeof bootstrapApp>) {
+  let policies: PolicyCurrentResponse;
+  try {
+    policies = await requestCurrentPoliciesRuntime(fetch);
+  } catch (error: unknown) {
+    root.innerHTML = `<main style="font-family: sans-serif; max-width: 720px; margin: 32px auto; padding: 16px;">
+      <h1>${app.name}</h1>
+      <h2>SCR-008 Policy Consent</h2>
+      <p>ポリシー情報の取得に失敗しました。</p>
+      <pre id="consent-status" style="margin-top: 16px; white-space: pre-wrap;">${
+        escapeHtml(error instanceof Error ? error.message : "unknown error")
+      }</pre>
+      <p><a href="${ROUTE_MAP["SCR-001"]}">/login に戻る</a></p>
+    </main>`;
+    return;
+  }
+
   root.innerHTML = `<main style="font-family: sans-serif; max-width: 720px; margin: 32px auto; padding: 16px;">
     <h1>${app.name}</h1>
     <h2>SCR-008 Policy Consent</h2>
     <p>利用規約とプライバシーポリシーの両方への同意が必要です。</p>
+    <p>利用規約: ${escapeHtml(policies.terms.version)} (<a href="${escapeHtml(
+      toSafeHttpUrl(policies.terms.url),
+    )}" target="_blank" rel="noreferrer noopener">${escapeHtml(policies.terms.url)}</a>)</p>
+    <p>プライバシーポリシー: ${escapeHtml(policies.privacy.version)} (<a href="${escapeHtml(
+      toSafeHttpUrl(policies.privacy.url),
+    )}" target="_blank" rel="noreferrer noopener">${escapeHtml(policies.privacy.url)}</a>)</p>
     <label style="display: block; margin-top: 12px;">
       <input id="consent-terms" type="checkbox" />
       利用規約に同意する
@@ -877,10 +973,10 @@ async function renderPolicyConsentPage(root: HTMLDivElement, app: ReturnType<typ
     screenId: "SCR-008",
     handlers: {
       onAccept: (trace) => {
-        void submitPolicyConsentDecision(status, acceptButton, rejectButton, "agreed", trace);
+        void submitPolicyConsentDecision(status, acceptButton, rejectButton, "agreed", trace, policies);
       },
       onReject: (trace) => {
-        void submitPolicyConsentDecision(status, acceptButton, rejectButton, "rejected", trace);
+        void submitPolicyConsentDecision(status, acceptButton, rejectButton, "rejected", trace, policies);
       },
     },
   });
@@ -919,6 +1015,7 @@ async function submitPolicyConsentDecision(
   rejectButton: HTMLButtonElement,
   consentState: "agreed" | "rejected",
   trace: PolicyConsentAuditTrace,
+  policies: PolicyCurrentResponse,
 ): Promise<void> {
   const userId = readSessionStorage(CALLBACK_USER_ID_STORAGE_KEY);
   if (!userId) {
@@ -936,7 +1033,7 @@ async function submitPolicyConsentDecision(
       const persistResponse = await fetch("/api/policies/consents", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ userId }),
+        body: JSON.stringify(buildPolicyConsentSubmissionPayload(userId, policies)),
       });
       if (!persistResponse.ok) {
         let detail = "";
@@ -969,6 +1066,9 @@ async function submitPolicyConsentDecision(
     }
 
     const nextPath = resolveAuthConsentRedirect(ROUTE_MAP["SCR-008"], "authenticated", consentState);
+    if (consentState === "rejected") {
+      clearAuthSessionStorage();
+    }
     status.textContent = `送信成功: ${trace.action}\n${nextPath} に遷移します。`;
     setTimeout(() => window.location.assign(nextPath), 250);
   } catch (error: unknown) {

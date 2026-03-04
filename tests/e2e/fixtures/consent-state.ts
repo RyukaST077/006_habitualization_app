@@ -9,6 +9,11 @@ export type ConsentFailureScenario = {
   traceIds: readonly string[];
 };
 
+export const T051_C004_COMPLETION_GATE_COMMANDS = [
+  "npm run test -- tests/integration/ui/scr-008-policy-consent-a11y-red.spec.ts tests/unit/screens/scr-008-policy-consent-page-red.spec.ts",
+  "npm run test -- tests/unit/screens/scr-008-policy-consent-page-red.spec.ts tests/integration/ui/scr-008-policy-consent-runtime-red.spec.ts tests/integration/routing/policy-consent-entry.spec.ts && npm run typecheck",
+] as const;
+
 export const CONSENT_FAILURE_SCENARIOS: readonly ConsentFailureScenario[] = [
   {
     id: "CS-001",
