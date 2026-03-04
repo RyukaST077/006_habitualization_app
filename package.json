@@ -7,7 +7,7 @@
     "dev": "vite",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit --pretty false",
-    "test": "mkdir -p coverage/v8/.tmp && vitest run --config vitest.config.ts --coverage",
+    "test": "COVERAGE_DIR=\"coverage/v8/run-$(date +%s)-$$\" && mkdir -p \"$COVERAGE_DIR/.tmp\" && VITEST_COVERAGE_DIR=\"$COVERAGE_DIR\" vitest run --config vitest.config.ts --coverage",
     "test:contracts:measure": "sh scripts/measure-contract-tests.sh",
     "build": "tsc -p tsconfig.json --noEmit --pretty false",
     "test:watch": "vitest --config vitest.config.ts",

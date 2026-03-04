@@ -14,6 +14,7 @@ import { SCR003HabitCreatePage } from "./screens/SCR-003HabitCreatePage";
 import { SCR004HabitEditPage } from "./screens/SCR-004HabitEditPage";
 import { SCR002HomePage, type CheckinResolution } from "./screens/SCR-002HomePage";
 import type { If001StartApiErrorResponse, If001StartApiSuccessResponse } from "./server/application/if-001/contracts";
+import { resolveErrorPresentation } from "./ui/error-presentation";
 import type { CommonErrorCode, ErrorPresentation, ErrorStatus } from "./ui/error-presentation";
 
 export function bootstrapApp() {
@@ -193,6 +194,38 @@ type If002CancelErrorPayload = {
   code?: string;
   trace_id?: string;
 };
+
+type If002HabitCreateSuccessPayload = {
+  habit?: {
+    habit_id?: string;
+    name?: string;
+    status?: string;
+    display_order?: number;
+  };
+};
+
+type If002HabitCreateErrorPayload = {
+  code?: string;
+  trace_id?: string;
+};
+
+export type HabitCreateRuntimeInput = {
+  userId: string;
+  name: string;
+  displayOrder: number;
+};
+
+type HabitCreateRuntimeSuccess = {
+  kind: "success";
+  habitId: string;
+};
+
+type HabitCreateRuntimeError = {
+  kind: "error";
+  error: ErrorPresentation;
+};
+
+export type HabitCreateRuntimeResult = HabitCreateRuntimeSuccess | HabitCreateRuntimeError;
 
 function asErrorStatus(status: number): 400 | 401 | 403 | 409 | 500 {
   if (status === 400 || status === 401 || status === 403 || status === 409) {
@@ -402,7 +435,14 @@ function renderHomePage(root: HTMLDivElement, app: ReturnType<typeof bootstrapAp
 }
 
 function renderHabitCreatePage(root: HTMLDivElement, app: ReturnType<typeof bootstrapApp>) {
-  const page = SCR003HabitCreatePage({ screenId: "SCR-003" });
+  const page = SCR003HabitCreatePage({
+    screenId: "SCR-003",
+    handlers: {
+      onCancel: () => {
+        window.location.assign(ROUTE_MAP["SCR-002"]);
+      },
+    },
+  });
   const userId = resolveHabitFormUserId();
   root.innerHTML = `<main style="font-family: sans-serif; max-width: 720px; margin: 32px auto; padding: 16px;">
     <h1>${app.name}</h1>
@@ -410,104 +450,193 @@ function renderHabitCreatePage(root: HTMLDivElement, app: ReturnType<typeof boot
     <p>習慣作成フォーム</p>
     <ul>
       <li>name: ${page.ui.validation.name.minLength}〜${page.ui.validation.name.maxLength} 文字</li>
+      <li>display_order: ${page.ui.validation.display_order.min}〜${page.ui.validation.display_order.max}</li>
     </ul>
     <form id="habit-create-form" style="display: grid; gap: 8px; margin: 12px 0;">
       <label>name <input id="habit-name" required maxlength="${page.ui.validation.name.maxLength}" /></label>
-      <button id="habit-create-submit" type="submit">作成</button>
+      <div id="habit-name-error" style="color: #b00020; min-height: 1.4em;"></div>
+      <label>
+        display_order
+        <input
+          id="habit-display-order"
+          type="number"
+          min="${page.ui.validation.display_order.min}"
+          max="${page.ui.validation.display_order.max}"
+          required
+        />
+      </label>
+      <div id="habit-display-order-error" style="color: #b00020; min-height: 1.4em;"></div>
+      <div style="display: flex; gap: 8px;">
+        <button id="habit-create-submit" type="submit">保存</button>
+        <button id="habit-create-cancel" type="button">キャンセル</button>
+      </div>
     </form>
     <pre id="habit-create-status" style="white-space: pre-wrap;"></pre>
-    <h3>Habits</h3>
-    <button id="habit-refresh" type="button">一覧を更新</button>
-    <ul id="habit-list" style="margin-top: 8px;"></ul>
+    <div id="habit-create-error" style="color: #b00020; min-height: 1.4em;"></div>
     <p><a href="/home">/home に戻る</a></p>
   </main>`;
 
   const nameInput = root.querySelector<HTMLInputElement>("#habit-name");
+  const displayOrderInput = root.querySelector<HTMLInputElement>("#habit-display-order");
+  const nameError = root.querySelector<HTMLDivElement>("#habit-name-error");
+  const displayOrderError = root.querySelector<HTMLDivElement>("#habit-display-order-error");
   const status = root.querySelector<HTMLPreElement>("#habit-create-status");
+  const errorContainer = root.querySelector<HTMLDivElement>("#habit-create-error");
   const form = root.querySelector<HTMLFormElement>("#habit-create-form");
-  const refreshButton = root.querySelector<HTMLButtonElement>("#habit-refresh");
-  const list = root.querySelector<HTMLUListElement>("#habit-list");
-  if (!nameInput || !status || !form || !refreshButton || !list) {
+  const submitButton = root.querySelector<HTMLButtonElement>("#habit-create-submit");
+  const cancelButton = root.querySelector<HTMLButtonElement>("#habit-create-cancel");
+  if (
+    !nameInput
+    || !displayOrderInput
+    || !nameError
+    || !displayOrderError
+    || !status
+    || !errorContainer
+    || !form
+    || !submitButton
+    || !cancelButton
+  ) {
     return;
   }
-  let currentHabits: Array<{ habitId: string; name: string; status: string; displayOrder: number }> = [];
+  displayOrderInput.value = String(page.ui.form.display_order);
 
-  const renderList = async () => {
-    if (!userId) {
-      list.innerHTML = "";
-      return;
-    }
-    try {
-      const response = await fetch(`/api/habits?userId=${encodeURIComponent(userId)}`);
-      const payload = (await response.json()) as { habits?: Array<{ habitId: string; name: string; status: string; displayOrder: number }> };
-      const habits = payload.habits ?? [];
-      currentHabits = habits;
-      list.innerHTML = habits
-        .map(
-          (habit) =>
-            `<li>${escapeHtml(habit.name)} (#${escapeHtml(habit.habitId)}) - ${escapeHtml(habit.status)} - display_order=${habit.displayOrder}</li>`,
-        )
-        .join("");
-      if (habits.length === 0) {
-        list.innerHTML = "<li>データなし</li>";
-      }
-    } catch (error: unknown) {
-      list.innerHTML = `<li>一覧取得失敗: ${escapeHtml(error instanceof Error ? error.message : "unknown error")}</li>`;
-    }
+  const syncSubmitState = () => {
+    submitButton.disabled = page.ui.saveButton.disabled;
+    submitButton.textContent = page.ui.saveButton.loading ? "保存中..." : page.ui.saveButton.label;
   };
+
+  const syncValidationErrors = () => {
+    nameError.textContent = page.ui.errors.name ?? "";
+    displayOrderError.textContent = page.ui.errors.display_order ?? "";
+  };
+
+  const parseDisplayOrderInput = (): number => {
+    const rawDisplayOrder = displayOrderInput.value.trim();
+    return rawDisplayOrder.length === 0 ? Number.NaN : Number(rawDisplayOrder);
+  };
+
+  nameInput.addEventListener("input", () => {
+    page.actions.setName(nameInput.value);
+    syncValidationErrors();
+  });
+
+  displayOrderInput.addEventListener("input", () => {
+    page.actions.setDisplayOrder(parseDisplayOrderInput());
+    syncValidationErrors();
+  });
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const name = nameInput.value.trim();
-    const displayOrder = resolveNextDisplayOrder(
-      currentHabits,
-      page.ui.validation.display_order.min,
-      page.ui.validation.display_order.max,
-    );
-    if (displayOrder === null) {
-      status.textContent = `作成失敗: 表示順の上限 (${page.ui.validation.display_order.max}) に達しています。`;
+    if (page.ui.isSaving) {
       return;
     }
-    status.textContent = "作成中...";
+
+    const name = nameInput.value.trim();
+    const displayOrder = parseDisplayOrderInput();
+    page.actions.setName(name);
+    page.actions.setDisplayOrder(displayOrder);
+    syncValidationErrors();
+
+    if (!page.actions.validate()) {
+      status.textContent = "保存失敗: 入力内容を確認してください";
+      return;
+    }
+
+    page.actions.setSaving(true);
+    syncSubmitState();
+    status.textContent = "保存中...";
+    errorContainer.textContent = "";
     try {
-      const response = await fetch("/api/habits", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          userId,
-          name,
-          display_order: displayOrder,
-        }),
+      const result = await requestHabitCreateRuntime(fetch, {
+        userId,
+        name,
+        displayOrder,
       });
-      const payload = await response.json();
-      if (!response.ok) {
-        status.textContent = `作成失敗: status=${response.status}\n${JSON.stringify(payload, null, 2)}`;
+      if (result.kind === "error") {
+        status.textContent = `保存失敗: status=${result.error.status} code=${result.error.code}`;
+        errorContainer.textContent = result.error.visibleTraceId
+          ? `${result.error.message} (${result.error.visibleTraceId})`
+          : result.error.message;
         return;
       }
-      status.textContent = `作成成功\n${JSON.stringify(payload, null, 2)}`;
-      nameInput.value = "";
-      await renderList();
-    } catch (error: unknown) {
-      status.textContent = `作成失敗: ${error instanceof Error ? error.message : "unknown error"}`;
+      status.textContent = `保存成功: ${result.habitId}`;
+      window.location.assign(ROUTE_MAP["SCR-002"]);
+    } finally {
+      page.actions.setSaving(false);
+      syncSubmitState();
     }
   });
 
-  refreshButton.addEventListener("click", () => {
-    void renderList();
+  cancelButton.addEventListener("click", () => {
+    page.actions.cancel();
   });
-  void renderList();
+
+  syncValidationErrors();
+  syncSubmitState();
 }
 
-function resolveNextDisplayOrder(
-  habits: Array<{ displayOrder: number }>,
-  min: number,
-  max: number,
-): number | null {
-  const next = habits.reduce((largest, habit) => Math.max(largest, habit.displayOrder), min - 1) + 1;
-  if (next > max) {
-    return null;
+function mapHabitCreateRuntimeError(
+  status: number,
+  code: unknown,
+): { status: ErrorStatus; code: CommonErrorCode } {
+  if (status === 400 && code === "VALIDATION_ERROR") {
+    return { status: 400, code: "VALIDATION_ERROR" };
   }
-  return Math.max(min, next);
+  if (status === 403 && code === "FORBIDDEN") {
+    return { status: 403, code: "FORBIDDEN" };
+  }
+  return { status: 500, code: "INTERNAL_ERROR" };
+}
+
+export async function requestHabitCreateRuntime(
+  fetchFn: typeof fetch,
+  input: HabitCreateRuntimeInput,
+): Promise<HabitCreateRuntimeResult> {
+  try {
+    const response = await fetchFn("/api/habits", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        userId: input.userId,
+        name: input.name,
+        display_order: input.displayOrder,
+      }),
+    });
+
+    let payload: If002HabitCreateSuccessPayload | If002HabitCreateErrorPayload | null = null;
+    try {
+      payload = (await response.json()) as If002HabitCreateSuccessPayload | If002HabitCreateErrorPayload;
+    } catch {
+      payload = null;
+    }
+
+    if (response.ok) {
+      const habitId =
+        payload !== null
+        && "habit" in payload
+        && typeof payload.habit?.habit_id === "string"
+          ? payload.habit.habit_id
+          : "unknown-habit-id";
+      return {
+        kind: "success",
+        habitId,
+      };
+    }
+
+    const rawTraceId =
+      payload !== null && "trace_id" in payload && typeof payload.trace_id === "string" ? payload.trace_id : "INTERNAL_ERROR";
+    const rawCode = payload !== null && "code" in payload ? payload.code : undefined;
+    const mapped = mapHabitCreateRuntimeError(response.status, rawCode);
+    return {
+      kind: "error",
+      error: resolveErrorPresentation(mapped.status, mapped.code, rawTraceId),
+    };
+  } catch {
+    return {
+      kind: "error",
+      error: resolveErrorPresentation(500, "INTERNAL_ERROR"),
+    };
+  }
 }
 
 function renderHabitEditPage(root: HTMLDivElement, app: ReturnType<typeof bootstrapApp>, habitId: string) {

@@ -26,9 +26,21 @@ export type Scr003HabitNameBoundaryCase = {
 };
 
 export type Scr003DisplayOrderBoundaryCase = {
-  label: "display_order=0" | "display_order=1" | "display_order=9999" | "display_order=10000";
+  label: "display_order=1" | "display_order=9999" | "display_order=範囲外(0)" | "display_order=範囲外(10000)";
   value: 0 | 1 | 9999 | 10000;
   valid: boolean;
+};
+
+export type Scr003TraceabilityId = "FR-006" | "AC-006" | "SCR-003";
+export type Scr003TraceCaseId = "TC-IT-FR-006-001" | "TC-IT-FR-006-002";
+
+export type Scr003UiRequirementTraceCase = {
+  traceId: string;
+  testCaseId: Scr003TraceCaseId;
+  requirementId: "FR-006";
+  acceptanceId: "AC-006";
+  screenId: "SCR-003";
+  title: string;
 };
 
 export type Scr004StatusButtonVisibility = {
@@ -236,6 +248,27 @@ export const SCR008_A11Y_KEYBOARD_EXPECTATION = {
   ignoreKey: "Escape",
 } as const;
 
+export const SCR003_TRACEABILITY_IDS: readonly Scr003TraceabilityId[] = ["FR-006", "AC-006", "SCR-003"] as const;
+
+export const SCR003_UI_REQUIREMENT_TRACE_CASES: readonly Scr003UiRequirementTraceCase[] = [
+  {
+    traceId: "T-052/C-001/TC-IT-FR-006-001/FR-006/AC-006/SCR-003/create-habit-success",
+    testCaseId: "TC-IT-FR-006-001",
+    requirementId: "FR-006",
+    acceptanceId: "AC-006",
+    screenId: "SCR-003",
+    title: "保存時に習慣作成API契約の成功経路を要求する",
+  },
+  {
+    traceId: "T-052/C-001/TC-IT-FR-006-002/FR-006/AC-006/SCR-003/name-display-order-boundary",
+    testCaseId: "TC-IT-FR-006-002",
+    requirementId: "FR-006",
+    acceptanceId: "AC-006",
+    screenId: "SCR-003",
+    title: "name/display_order 境界(1/80/81, 1/9999/範囲外)を要求する",
+  },
+] as const;
+
 export const SCR003_HABIT_NAME_BOUNDARY_CASES: readonly Scr003HabitNameBoundaryCase[] = [
   { label: "1文字", length: 1, valid: true },
   { label: "80文字", length: 80, valid: true },
@@ -243,10 +276,40 @@ export const SCR003_HABIT_NAME_BOUNDARY_CASES: readonly Scr003HabitNameBoundaryC
 ] as const;
 
 export const SCR003_DISPLAY_ORDER_BOUNDARY_CASES: readonly Scr003DisplayOrderBoundaryCase[] = [
-  { label: "display_order=0", value: 0, valid: false },
   { label: "display_order=1", value: 1, valid: true },
   { label: "display_order=9999", value: 9999, valid: true },
-  { label: "display_order=10000", value: 10000, valid: false },
+  { label: "display_order=範囲外(0)", value: 0, valid: false },
+  { label: "display_order=範囲外(10000)", value: 10000, valid: false },
+] as const;
+
+export const SCR003_SAVE_BUTTON_LOADING_EXPECTATION = {
+  screenId: "SCR-003",
+  requirementId: "FR-006",
+  acceptanceId: "AC-006",
+  label: "保存",
+  initial: {
+    disabled: false,
+  },
+  pending: {
+    disabled: true,
+  },
+  settled: {
+    disabled: false,
+  },
+} as const;
+
+export const SCR003_CANCEL_TRANSITION_EXPECTATION = {
+  screenId: "SCR-003",
+  requirementId: "FR-006",
+  acceptanceId: "AC-006",
+  fromPath: "/habits/new",
+  expectedPath: "/home",
+  shouldSubmitOnCancel: false,
+} as const;
+
+export const T052_C004_COMPLETION_GATE_COMMANDS = [
+  "npm run test -- tests/unit/screens/scr-003-habit-create-page-red.spec.ts tests/integration/ui/scr-003-habit-create-runtime-red.spec.ts",
+  "npm run test -- tests/unit/screens/scr-003-habit-create-page-red.spec.ts tests/integration/ui/scr-003-habit-create-runtime-red.spec.ts tests/integration/api/if-002-habits-create-update-red.spec.ts && npm run typecheck",
 ] as const;
 
 export const SCR004_STATUS_BUTTON_VISIBILITY: readonly Scr004StatusButtonVisibility[] = [

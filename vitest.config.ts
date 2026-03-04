@@ -4,6 +4,7 @@ import { defineConfig } from "vitest/config";
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   Object.assign(process.env, env);
+  const reportsDirectory = process.env.VITEST_COVERAGE_DIR ?? "coverage/v8";
 
   return {
     test: {
@@ -14,7 +15,7 @@ export default defineConfig(({ mode }) => {
       coverage: {
         provider: "v8",
         reporter: ["text", "lcov"],
-        reportsDirectory: "coverage/v8",
+        reportsDirectory,
         clean: false
       }
     }
