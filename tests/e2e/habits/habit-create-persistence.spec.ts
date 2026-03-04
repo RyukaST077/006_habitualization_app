@@ -13,16 +13,18 @@ test.describe("TC-AUTO-E2E-HABITS-001 習慣作成の永続化", () => {
 
     await test.step("習慣を作成する", async () => {
       await page.getByRole("textbox", { name: "name" }).fill(createdName);
-      await page.getByRole("button", { name: "作成" }).click();
+      await page.getByRole("button", { name: /保存|作成/ }).click();
 
-      await expect(page.getByText("作成成功")).toBeVisible();
-      await expect(page.locator("#habit-list")).toContainText(createdName);
+      await expect(page).toHaveURL(/\/home$/);
+      await expect(page.getByRole("heading", { name: "SCR-002 Home" })).toBeVisible();
+      await expect(page.locator("#home-habit-list")).toContainText(createdName);
     });
 
     await test.step("再読込後も作成済み習慣が残る", async () => {
       await page.reload();
-      await expect(page.getByRole("heading", { name: "SCR-003 Habit Create" })).toBeVisible();
-      await expect(page.locator("#habit-list")).toContainText(createdName);
+      await expect(page).toHaveURL(/\/home$/);
+      await expect(page.getByRole("heading", { name: "SCR-002 Home" })).toBeVisible();
+      await expect(page.locator("#home-habit-list")).toContainText(createdName);
     });
   });
 });

@@ -112,6 +112,53 @@ export type Scr004ConfirmationModalStateTransition = {
   };
 };
 
+export type Scr002TraceabilityId =
+  | "FR-011"
+  | "FR-012"
+  | "FR-013"
+  | "FR-014"
+  | "FR-015"
+  | "FR-016"
+  | "AC-011"
+  | "AC-012"
+  | "AC-013"
+  | "AC-014"
+  | "AC-015"
+  | "AC-016"
+  | "SCR-002";
+export type Scr002TraceCaseId =
+  | "TC-IT-FR-011-001"
+  | "TC-IT-FR-012-002"
+  | "TC-IT-FR-013-003"
+  | "TC-IT-FR-014-001"
+  | "TC-IT-FR-015-001"
+  | "TC-ST-FR-016-003";
+export type Scr002RequirementId =
+  | "FR-011"
+  | "FR-012"
+  | "FR-013"
+  | "FR-014"
+  | "FR-015"
+  | "FR-016";
+export type Scr002AcceptanceId =
+  | "AC-011"
+  | "AC-012"
+  | "AC-013"
+  | "AC-014"
+  | "AC-015"
+  | "AC-016";
+
+export type Scr002UiRequirementTraceCase = {
+  traceId: string;
+  testCaseId: Scr002TraceCaseId;
+  requirementId: Scr002RequirementId;
+  acceptanceId: Scr002AcceptanceId;
+  screenId: "SCR-002";
+  title: string;
+};
+
+export type Scr002HomeLoadState = "loading" | "loaded" | "error";
+
 export type Scr001TraceabilityId = "FR-001" | "SCR-001" | "IF-001";
 export type Scr001ConsentState = "unknown" | "agreed";
 export type Scr008RequirementId = "FR-003" | "FR-004" | "FR-005";
@@ -420,6 +467,154 @@ export const SCR004_UI_REQUIREMENT_TRACE_CASES: readonly Scr004UiRequirementTrac
 export const T053_C004_COMPLETION_GATE_COMMANDS = [
   "npm run test -- tests/unit/screens/scr-004-habit-edit-page-red.spec.ts tests/integration/ui/scr-004-habit-edit-runtime-red.spec.ts",
   "npm run test -- tests/unit/screens/scr-004-habit-edit-page-red.spec.ts tests/integration/ui/scr-004-habit-edit-runtime-red.spec.ts tests/integration/api/if-002-habits-status-red.spec.ts && npm run typecheck",
+] as const;
+
+export const SCR002_TRACEABILITY_IDS: readonly Scr002TraceabilityId[] = [
+  "FR-011",
+  "FR-012",
+  "FR-013",
+  "FR-014",
+  "FR-015",
+  "FR-016",
+  "AC-011",
+  "AC-012",
+  "AC-013",
+  "AC-014",
+  "AC-015",
+  "AC-016",
+  "SCR-002",
+] as const;
+
+export const SCR002_UI_REQUIREMENT_TRACE_CASES: readonly Scr002UiRequirementTraceCase[] = [
+  {
+    traceId: "T-054/C-004/TC-IT-FR-011-001/FR-011/AC-011/SCR-002/home-list-fetch-and-render",
+    testCaseId: "TC-IT-FR-011-001",
+    requirementId: "FR-011",
+    acceptanceId: "AC-011",
+    screenId: "SCR-002",
+    title: "ホーム初期表示で習慣一覧を取得して描画する観点を固定する",
+  },
+  {
+    traceId: "T-054/C-004/TC-IT-FR-012-002/FR-012/AC-012/SCR-002/checkin-optimistic-update-and-rollback",
+    testCaseId: "TC-IT-FR-012-002",
+    requirementId: "FR-012",
+    acceptanceId: "AC-012",
+    screenId: "SCR-002",
+    title: "チェックイン登録は楽観的更新し失敗時ロールバックする観点を固定する",
+  },
+  {
+    traceId: "T-054/C-004/TC-IT-FR-013-003/FR-013/AC-013/SCR-002/checkin-idempotent-success",
+    testCaseId: "TC-IT-FR-013-003",
+    requirementId: "FR-013",
+    acceptanceId: "AC-013",
+    screenId: "SCR-002",
+    title: "冪等成功時はエラー表示せず当日達成状態のみ更新する観点を固定する",
+  },
+  {
+    traceId: "T-054/C-004/TC-IT-FR-014-001/FR-014/AC-014/SCR-002/cancel-checkin-single-flight",
+    testCaseId: "TC-IT-FR-014-001",
+    requirementId: "FR-014",
+    acceptanceId: "AC-014",
+    screenId: "SCR-002",
+    title: "取消実行中は二重送信を抑止し完了後に再操作可能へ戻す観点を固定する",
+  },
+  {
+    traceId: "T-054/C-004/TC-IT-FR-015-001/FR-015/AC-015/SCR-002/streak-visibility-on-card",
+    testCaseId: "TC-IT-FR-015-001",
+    requirementId: "FR-015",
+    acceptanceId: "AC-015",
+    screenId: "SCR-002",
+    title: "各習慣カードへ継続日数（ストリーク）を表示する観点を固定する",
+  },
+  {
+    traceId: "T-054/C-004/TC-ST-FR-016-003/FR-016/AC-016/SCR-002/empty-error-retry-cta",
+    testCaseId: "TC-ST-FR-016-003",
+    requirementId: "FR-016",
+    acceptanceId: "AC-016",
+    screenId: "SCR-002",
+    title: "空状態CTAとエラー時リトライ導線を表示する観点を固定する",
+  },
+] as const;
+
+export const SCR002_HOME_LIST_REQUIRED_FIELDS = [
+  "habitName",
+  "statusBadge",
+  "todayCheckin",
+  "cancelTodayCheckin",
+  "streakDays",
+] as const;
+
+export const SCR002_HOME_EMPTY_STATE_EXPECTATION = {
+  ctaLabel: "習慣を作成",
+  ctaPath: "/habits/new",
+  helperText: "習慣がまだありません。まずは1つ作成しましょう。",
+} as const;
+
+export const SCR002_HOME_ERROR_STATE_EXPECTATION = {
+  retryLabel: "再試行",
+  fallbackMessage: "ホーム情報の取得に失敗しました",
+} as const;
+
+export const SCR002_HOME_LOAD_STATE_TRANSITIONS: readonly {
+  before: Scr002HomeLoadState;
+  success: Scr002HomeLoadState;
+  failure: Scr002HomeLoadState;
+}[] = [
+  { before: "loading", success: "loaded", failure: "error" },
+] as const;
+
+export const SCR002_HOME_CHECKIN_OPTIMISTIC_EXPECTATION = {
+  habitId: "habit-red-001",
+  previousLogDate: null,
+  optimisticLogDate: "2026-03-04",
+  rollbackLogDate: null,
+} as const;
+
+export const SCR002_HOME_CANCEL_SINGLE_FLIGHT_EXPECTATION = {
+  rejectMessage: "取消失敗: 実行中のため再実行できません",
+  initialSubmitting: false,
+  pendingSubmitting: true,
+  settledSubmitting: false,
+} as const;
+
+export const SCR002_HOME_ARCHIVED_CONFLICT_RECOVERY_EXPECTATION = {
+  status: 409,
+  code: "DOMAIN_CONFLICT",
+  actionLabel: "再開してチェックインする",
+  targetScreenId: "SCR-004",
+} as const;
+
+export const SCR002_HOME_RUNTIME_ENDPOINTS = [
+  "/api/home/habits",
+  "/api/checkins",
+  "/api/checkins/{habitId}",
+] as const;
+
+export const T054_C003_COMPLETION_GATE_COMMANDS = [
+  "npm run test -- tests/integration/ui/scr-002-home-runtime-red.spec.ts",
+  "npm run test -- tests/integration/api/if-002-checkins-register-red.spec.ts tests/integration/api/if-002-checkins-cancel-red.spec.ts",
+] as const;
+
+export const T054_C002_COMPLETION_GATE_COMMANDS = [
+  "npm run test -- tests/unit/screens/scr-002-home-page-red.spec.ts",
+  "npm run typecheck",
+] as const;
+
+export const T054_C001_COMPLETION_GATE_COMMANDS = [
+  "npm run test -- tests/unit/screens/scr-002-home-page-red.spec.ts tests/integration/ui/scr-002-home-runtime-red.spec.ts",
+  "for id in FR-011 FR-012 FR-013 FR-014 FR-015 FR-016 AC-011 AC-012 AC-013 AC-014 AC-015 AC-016 SCR-002; do rg -n \"$id\" tests/helpers/ui/common-ui-fixtures.ts >/dev/null; done",
+] as const;
+
+export const T054_C004_MINIMUM_REGRESSION_SET = [
+  "tests/unit/screens/scr-002-home-page-red.spec.ts",
+  "tests/integration/ui/scr-002-home-runtime-red.spec.ts",
+  "tests/integration/api/if-002-checkins-register-red.spec.ts",
+  "tests/integration/api/if-002-checkins-cancel-red.spec.ts",
+] as const;
+
+export const T054_C004_COMPLETION_GATE_COMMANDS = [
+  "npm run test -- tests/unit/screens/scr-002-home-page-red.spec.ts tests/integration/ui/scr-002-home-runtime-red.spec.ts",
+  "npm run test -- tests/unit/screens/scr-002-home-page-red.spec.ts tests/integration/ui/scr-002-home-runtime-red.spec.ts tests/integration/api/if-002-checkins-register-red.spec.ts tests/integration/api/if-002-checkins-cancel-red.spec.ts && npm run typecheck",
 ] as const;
 
 export const SCR004_FORBIDDEN_REDIRECT_EXPECTATION = {

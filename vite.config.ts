@@ -32,6 +32,13 @@ import {
   isUuidLike,
 } from "./src/server/application/if-002/habits-http";
 
+type HabitLogRow = {
+  id: number;
+  user_id: string;
+  habit_id: number;
+  log_date: string;
+};
+
 function parseRequestBody(req: IncomingMessage): Promise<unknown> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
@@ -189,6 +196,27 @@ async function listSupabaseHabits(userId: string): Promise<HabitRow[]> {
   );
 }
 
+async function listSupabaseHomeHabits(userId: string): Promise<
+  Array<{
+    habit_id: string;
+    name: string;
+    status: "active" | "archived";
+    streak_days: number;
+    last_checkin_log_date: string | null;
+  }>
+> {
+  const habits = await listSupabaseHabits(userId);
+  return habits
+    .filter((habit) => habit.status === "active")
+    .map((habit) => ({
+      habit_id: String(habit.id),
+      name: habit.name,
+      status: habit.status,
+      streak_days: 0,
+      last_checkin_log_date: null,
+    }));
+}
+
 async function createSupabaseHabit(userId: string, name: string, displayOrder: number): Promise<HabitRow> {
   const { baseUrl, serviceRoleKey } = getSupabaseConfig();
   const response = await fetch(`${baseUrl}/rest/v1/habits`, {
@@ -217,6 +245,70 @@ async function createSupabaseHabit(userId: string, name: string, displayOrder: n
     throw new Error("supabase habits insert returned no rows");
   }
   return row;
+}
+
+function parseYmdFromIso(isoLike: string): string | null {
+  if (isoLike.length < 10) {
+    return null;
+  }
+  const ymd = isoLike.slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(ymd) ? ymd : null;
+}
+
+async function loadOwnedHabit(userId: string, habitId: number): Promise<HabitRow | null> {
+  const rows = await fetchSupabaseRest<HabitRow[]>(
+    `habits?select=id,user_id,name,display_order,status,archived_at,created_at,updated_at,version&user_id=eq.${encodeURIComponent(
+      userId,
+    )}&id=eq.${habitId}&deleted_at=is.null&limit=1`,
+  );
+  return rows[0] ?? null;
+}
+
+async function findHabitLog(userId: string, habitId: number, logDate: string): Promise<HabitLogRow | null> {
+  const rows = await fetchSupabaseRest<HabitLogRow[]>(
+    `habit_logs?select=id,user_id,habit_id,log_date&user_id=eq.${encodeURIComponent(userId)}&habit_id=eq.${habitId}&log_date=eq.${logDate}&deleted_at=is.null&limit=1`,
+  );
+  return rows[0] ?? null;
+}
+
+async function createHabitLog(userId: string, habitId: number, logDate: string): Promise<Response> {
+  const { baseUrl, serviceRoleKey } = getSupabaseConfig();
+  return fetch(`${baseUrl}/rest/v1/habit_logs`, {
+    method: "POST",
+    headers: {
+      apikey: serviceRoleKey,
+      authorization: `Bearer ${serviceRoleKey}`,
+      "content-type": "application/json",
+      prefer: "return=representation",
+    },
+    body: JSON.stringify([
+      {
+        user_id: userId,
+        habit_id: habitId,
+        log_date: logDate,
+      },
+    ]),
+  });
+}
+
+async function deleteHabitLog(userId: string, habitId: number, logDate: string): Promise<HabitLogRow[]> {
+  const { baseUrl, serviceRoleKey } = getSupabaseConfig();
+  const response = await fetch(
+    `${baseUrl}/rest/v1/habit_logs?user_id=eq.${encodeURIComponent(userId)}&habit_id=eq.${habitId}&log_date=eq.${logDate}&deleted_at=is.null`,
+    {
+      method: "DELETE",
+      headers: {
+        apikey: serviceRoleKey,
+        authorization: `Bearer ${serviceRoleKey}`,
+        prefer: "return=representation",
+      },
+    },
+  );
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`supabase habit_logs delete error: ${response.status} ${detail}`);
+  }
+  return (await response.json()) as HabitLogRow[];
 }
 
 function normalizeCallbackResponse(
@@ -398,6 +490,97 @@ export default defineConfig(({ mode }) => {
             }
           }
 
+          if (isTargetRequest(req, "POST", "/api/checkins")) {
+            try {
+              const body = await parseRequestBody(req);
+              const requestBody = typeof body === "object" && body !== null ? body as Record<string, unknown> : {};
+              const userId = typeof requestBody.userId === "string" ? requestBody.userId : "";
+              const habitIdRaw = typeof requestBody.habit_id === "string" ? requestBody.habit_id : "";
+              const logDateRaw = typeof requestBody.log_date === "string"
+                ? requestBody.log_date
+                : typeof requestBody.now_utc === "string"
+                  ? parseYmdFromIso(requestBody.now_utc) ?? ""
+                  : "";
+
+              if (!isUuidLike(userId) || !/^\d+$/.test(habitIdRaw) || !/^\d{4}-\d{2}-\d{2}$/.test(logDateRaw)) {
+                respondJson(res, 400, { code: "VALIDATION_ERROR", trace_id: "if002-checkins-register-validation" });
+                return;
+              }
+
+              const habitId = Number(habitIdRaw);
+              const ownedHabit = await loadOwnedHabit(userId, habitId);
+              if (!ownedHabit) {
+                respondJson(res, 403, { code: "FORBIDDEN", trace_id: "if002-checkins-register-forbidden" });
+                return;
+              }
+              if (ownedHabit.status !== "active") {
+                respondJson(res, 409, { code: "DOMAIN_CONFLICT", trace_id: "if002-checkins-register-archived" });
+                return;
+              }
+
+              const insertResponse = await createHabitLog(userId, habitId, logDateRaw);
+              if (insertResponse.ok) {
+                respondJson(res, 201, { checkin: { log_date: logDateRaw, idempotent: false } });
+                return;
+              }
+
+              const existing = await findHabitLog(userId, habitId, logDateRaw);
+              if (existing) {
+                respondJson(res, 201, { checkin: { log_date: existing.log_date, idempotent: true } });
+                return;
+              }
+
+              respondJson(res, 409, { code: "DOMAIN_CONFLICT", trace_id: "if002-checkins-register-conflict" });
+              return;
+            } catch (error: unknown) {
+              console.error("[if-002] register checkin failed", error);
+              respondJson(res, 500, { code: "INTERNAL_ERROR", trace_id: "if002-checkins-register-internal" });
+              return;
+            }
+          }
+
+          if (req.method === "DELETE" && req.url) {
+            const requestUrl = new URL(req.url, "http://localhost");
+            const match = requestUrl.pathname.match(/^\/api\/checkins\/([^/]+)$/);
+            if (match) {
+              try {
+                const body = await parseRequestBody(req);
+                const requestBody = typeof body === "object" && body !== null ? body as Record<string, unknown> : {};
+                const userId = typeof requestBody.userId === "string" ? requestBody.userId : "";
+                const nowUtc = typeof requestBody.now_utc === "string" ? requestBody.now_utc : "";
+                const today = parseYmdFromIso(nowUtc);
+                const habitIdRaw = decodeURIComponent(match[1] ?? "");
+
+                if (!isUuidLike(userId) || !/^\d+$/.test(habitIdRaw) || !today) {
+                  respondJson(res, 400, { code: "VALIDATION_ERROR", trace_id: "if002-checkins-cancel-validation" });
+                  return;
+                }
+
+                const habitId = Number(habitIdRaw);
+                const ownedHabit = await loadOwnedHabit(userId, habitId);
+                if (!ownedHabit) {
+                  respondJson(res, 403, { code: "FORBIDDEN", trace_id: "if002-checkins-cancel-forbidden" });
+                  return;
+                }
+
+                const existing = await findHabitLog(userId, habitId, today);
+                if (!existing) {
+                  respondJson(res, 409, { code: "DOMAIN_CONFLICT", trace_id: "if002-checkins-cancel-not-found" });
+                  return;
+                }
+
+                const deleted = await deleteHabitLog(userId, habitId, today);
+                const logDate = deleted[0]?.log_date ?? today;
+                respondJson(res, 200, { checkin: { log_date: logDate, canceled: true } });
+                return;
+              } catch (error: unknown) {
+                console.error("[if-002] cancel checkin failed", error);
+                respondJson(res, 500, { code: "INTERNAL_ERROR", trace_id: "if002-checkins-cancel-internal" });
+                return;
+              }
+            }
+          }
+
           if (isTargetRequest(req, "GET", "/api/habits")) {
             try {
               const requestUrl = new URL(req.url ?? "", "http://localhost");
@@ -414,6 +597,24 @@ export default defineConfig(({ mode }) => {
             } catch (error: unknown) {
               console.error("[if-002] list habits failed", error);
               respondJson(res, 500, { code: "INTERNAL_ERROR", message: "failed to list habits" });
+              return;
+            }
+          }
+
+          if (isTargetRequest(req, "GET", "/api/home/habits")) {
+            try {
+              const requestUrl = new URL(req.url ?? "", "http://localhost");
+              const listValidation = validateListHabitsQuery(requestUrl.searchParams.get("userId"));
+              if (!listValidation.ok) {
+                respondJson(res, 400, { code: "VALIDATION_ERROR", message: listValidation.message });
+                return;
+              }
+              const habits = await listSupabaseHomeHabits(listValidation.userId);
+              respondJson(res, 200, { habits });
+              return;
+            } catch (error: unknown) {
+              console.error("[if-002] list home habits failed", error);
+              respondJson(res, 500, { code: "INTERNAL_ERROR", message: "failed to list home habits" });
               return;
             }
           }

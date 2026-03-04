@@ -12,7 +12,12 @@ import { SCR001LoginPage } from "./screens/SCR-001LoginPage";
 import { SCR008PolicyConsentPage, type PolicyConsentAuditTrace } from "./screens/SCR-008PolicyConsentPage";
 import { SCR003HabitCreatePage } from "./screens/SCR-003HabitCreatePage";
 import { SCR004HabitEditPage } from "./screens/SCR-004HabitEditPage";
-import { SCR002HomePage, type CheckinResolution } from "./screens/SCR-002HomePage";
+import {
+  SCR002HomePage,
+  type CheckinResolution,
+  type HomeHabitSummary,
+  type HomeListResolution,
+} from "./screens/SCR-002HomePage";
 import type { If001StartApiErrorResponse, If001StartApiSuccessResponse } from "./server/application/if-001/contracts";
 import { resolveErrorPresentation } from "./ui/error-presentation";
 import type { CommonErrorCode, ErrorPresentation, ErrorStatus } from "./ui/error-presentation";
@@ -175,12 +180,37 @@ function renderSimpleRoutePage(root: HTMLDivElement, app: ReturnType<typeof boot
   </main>`;
 }
 
-type HabitSummary = {
-  habitId: string;
-  name: string;
-  status: string;
-  displayOrder: number;
-  lastCheckinLogDate?: string | null;
+type If002HomeHabitItem = {
+  habit_id?: string | number;
+  name?: string;
+  status?: HabitLifecycleStatus;
+  streak_days?: number;
+  last_checkin_log_date?: string | null;
+  streak?: number;
+  log_date?: string | null;
+  is_checked_today?: boolean;
+};
+
+type If002HomeHabitsSuccessPayload = {
+  habits?: If002HomeHabitItem[];
+  items?: If002HomeHabitItem[];
+};
+
+type If002HomeHabitsErrorPayload = {
+  code?: string;
+  trace_id?: string;
+};
+
+type If002RegisterSuccessPayload = {
+  checkin?: {
+    log_date?: string | null;
+    idempotent?: boolean;
+  };
+};
+
+type If002RegisterErrorPayload = {
+  code?: string;
+  trace_id?: string;
 };
 
 type If002CancelSuccessPayload = {
@@ -319,12 +349,13 @@ function inferDomainConflictReason(
 }
 
 async function requestCancelCheckin(
+  fetchFn: typeof fetch,
   userId: string,
   habitId: string,
   nowUtc: string,
 ): Promise<CheckinResolution> {
   try {
-    const response = await fetch(`/api/checkins/${encodeURIComponent(habitId)}`, {
+    const response = await fetchFn(`/api/checkins/${encodeURIComponent(habitId)}`, {
       method: "DELETE",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -368,81 +399,267 @@ async function requestCancelCheckin(
   }
 }
 
+function mapHomeHabitSummary(payload: If002HomeHabitItem, index: number): HomeHabitSummary {
+  const rawHabitId = payload?.habit_id;
+  const habitId = typeof rawHabitId === "string" && rawHabitId.length > 0
+    ? rawHabitId
+    : typeof rawHabitId === "number"
+      ? String(rawHabitId)
+      : `habit-${index + 1}`;
+  const streakDays = typeof payload?.streak_days === "number"
+    ? payload.streak_days
+    : "streak" in payload && typeof payload.streak === "number"
+      ? payload.streak
+      : 0;
+  const lastCheckinLogDate = typeof payload?.last_checkin_log_date === "string" || payload?.last_checkin_log_date === null
+    ? payload.last_checkin_log_date
+    : "log_date" in payload && (typeof payload.log_date === "string" || payload.log_date === null)
+      ? payload.log_date
+      : null;
+
+  return {
+    habitId,
+    name: typeof payload?.name === "string" ? payload.name : "",
+    status: payload?.status === "archived" ? "archived" : "active",
+    streakDays,
+    lastCheckinLogDate,
+  };
+}
+
+function buildTodayLogDate(nowUtcIso: string): string {
+  return nowUtcIso.slice(0, 10);
+}
+
+function resolveScr004Path(habitId: string): string {
+  return ROUTE_MAP["SCR-004"].replace(":habitId", encodeURIComponent(habitId));
+}
+
+export async function requestHomeHabitsRuntime(
+  fetchFn: typeof fetch,
+  input: { userId: string },
+): Promise<HomeListResolution> {
+  try {
+    const response = await fetchFn(`/api/home/habits?userId=${encodeURIComponent(input.userId)}`, {
+      method: "GET",
+    });
+    const payload = await parseJsonResponse<If002HomeHabitsSuccessPayload | If002HomeHabitsErrorPayload>(response);
+    if (response.ok) {
+      const rawHabits = payload !== null && "habits" in payload && Array.isArray(payload.habits)
+        ? payload.habits
+        : payload !== null && "items" in payload && Array.isArray(payload.items)
+          ? payload.items
+          : [];
+      const habits = rawHabits.length > 0
+        ? rawHabits.map((habit, index) => mapHomeHabitSummary(habit, index))
+        : [];
+      return {
+        kind: "success",
+        habits,
+      };
+    }
+    const rawCode = payload !== null && "code" in payload ? payload.code : undefined;
+    const rawTraceId = payload !== null && "trace_id" in payload && typeof payload.trace_id === "string"
+      ? payload.trace_id
+      : undefined;
+    return {
+      kind: "error",
+      status: asErrorStatus(response.status),
+      code: asErrorCode(rawCode),
+      traceId: rawTraceId,
+    };
+  } catch {
+    return {
+      kind: "error",
+      status: 500,
+      code: "INTERNAL_ERROR",
+    };
+  }
+}
+
+export async function requestRegisterCheckinRuntime(
+  fetchFn: typeof fetch,
+  input: { userId: string; habitId: string; logDate: string; nowUtc: string },
+): Promise<CheckinResolution> {
+  try {
+    const response = await fetchFn("/api/checkins", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        userId: input.userId,
+        habit_id: input.habitId,
+        log_date: input.logDate,
+        now_utc: input.nowUtc,
+      }),
+    });
+    const payload = await parseJsonResponse<If002RegisterSuccessPayload | If002RegisterErrorPayload>(response);
+    if (response.ok) {
+      const successPayload = payload as If002RegisterSuccessPayload | null;
+      return {
+        kind: "success",
+        logDate: typeof successPayload?.checkin?.log_date === "string" ? successPayload.checkin.log_date : input.logDate,
+        idempotent: successPayload?.checkin?.idempotent === true,
+      };
+    }
+    const errorPayload = payload as If002RegisterErrorPayload | null;
+    return {
+      kind: "error",
+      status: asErrorStatus(response.status),
+      code: asErrorCode(errorPayload?.code),
+      traceId: typeof errorPayload?.trace_id === "string" ? errorPayload.trace_id : undefined,
+    };
+  } catch {
+    return {
+      kind: "error",
+      status: 500,
+      code: "INTERNAL_ERROR",
+    };
+  }
+}
+
+export async function requestCancelCheckinRuntime(
+  fetchFn: typeof fetch,
+  input: { userId: string; habitId: string; nowUtc: string },
+): Promise<CheckinResolution> {
+  return requestCancelCheckin(fetchFn, input.userId, input.habitId, input.nowUtc);
+}
+
 function renderHomePage(root: HTMLDivElement, app: ReturnType<typeof bootstrapApp>) {
   const userId = resolveHabitFormUserId();
   const page = SCR002HomePage({
     screenId: "SCR-002",
     handlers: {
       onNavigateTo: (target) => window.location.assign(target),
-      onCancelCheckin: async ({ habitId, nowUtc }) => requestCancelCheckin(userId, habitId, nowUtc),
+      onLoadHabits: async () => requestHomeHabitsRuntime(fetch, { userId }),
+      onRegisterCheckin: async ({ habitId, logDate }) => {
+        return requestRegisterCheckinRuntime(fetch, {
+          userId,
+          habitId,
+          logDate,
+          nowUtc: new Date().toISOString(),
+        });
+      },
+      onCancelCheckin: async ({ habitId, nowUtc }) => requestCancelCheckinRuntime(fetch, { userId, habitId, nowUtc }),
     },
   });
 
   root.innerHTML = `<main style="font-family: sans-serif; max-width: 720px; margin: 32px auto; padding: 16px;">
     <h1>${app.name}</h1>
     <h2>SCR-002 Home</h2>
-    <p>当日チェックイン取消（FR-014）</p>
-    <form id="cancel-checkin-form" style="display: grid; gap: 8px; margin: 12px 0;">
-      <label>habit_id <input id="cancel-habit-id" required placeholder="habit-red-001" /></label>
-      <label>now_utc <input id="cancel-now-utc" required /></label>
-      <button id="cancel-checkin-submit" type="submit">当日チェックインを取り消す</button>
-    </form>
-    <pre id="cancel-checkin-status" style="white-space: pre-wrap;"></pre>
-    <div id="cancel-checkin-error" style="color: #b00020; margin-top: 8px;"></div>
-    <h3>Habits</h3>
-    <button id="home-refresh" type="button">一覧を更新</button>
-    <ul id="home-habit-list" style="margin-top: 8px;"></ul>
-    <p><a href="/habits/new">習慣を作成</a></p>
+    <p id="home-status">読み込み中...</p>
+    <section id="home-error" hidden style="border: 1px solid #d79a9a; border-radius: 8px; padding: 12px; margin: 8px 0; color: #8f1d1d;">
+      <p id="home-error-message" style="margin: 0;"></p>
+      <p id="home-error-trace" style="margin: 8px 0 0 0;"></p>
+      <div style="display: flex; gap: 8px; margin-top: 8px;">
+        <button id="home-error-retry" type="button">再試行</button>
+        <a id="home-error-recovery" href="#" hidden></a>
+      </div>
+    </section>
+    <ul id="home-habit-list" style="display: grid; gap: 12px; list-style: none; padding: 0; margin: 0;"></ul>
+    <section id="home-empty-state" hidden style="padding: 12px; border: 1px dashed #999; border-radius: 8px; margin-top: 12px;">
+      <p style="margin-top: 0;">習慣がまだありません。まずは1つ作成しましょう。</p>
+      <p style="margin-bottom: 0;"><a href="/habits/new">習慣を作成</a></p>
+    </section>
   </main>`;
 
-  const form = root.querySelector<HTMLFormElement>("#cancel-checkin-form");
-  const habitIdInput = root.querySelector<HTMLInputElement>("#cancel-habit-id");
-  const nowUtcInput = root.querySelector<HTMLInputElement>("#cancel-now-utc");
-  const submitButton = root.querySelector<HTMLButtonElement>("#cancel-checkin-submit");
-  const status = root.querySelector<HTMLPreElement>("#cancel-checkin-status");
-  const errorContainer = root.querySelector<HTMLDivElement>("#cancel-checkin-error");
-  const refreshButton = root.querySelector<HTMLButtonElement>("#home-refresh");
+  const status = root.querySelector<HTMLParagraphElement>("#home-status");
+  const errorPanel = root.querySelector<HTMLElement>("#home-error");
+  const errorMessage = root.querySelector<HTMLParagraphElement>("#home-error-message");
+  const errorTrace = root.querySelector<HTMLParagraphElement>("#home-error-trace");
+  const retryButton = root.querySelector<HTMLButtonElement>("#home-error-retry");
+  const recoveryLink = root.querySelector<HTMLAnchorElement>("#home-error-recovery");
   const list = root.querySelector<HTMLUListElement>("#home-habit-list");
-  if (!form || !habitIdInput || !nowUtcInput || !submitButton || !status || !errorContainer || !refreshButton || !list) {
+  const emptyState = root.querySelector<HTMLElement>("#home-empty-state");
+  if (!status || !errorPanel || !errorMessage || !errorTrace || !retryButton || !recoveryLink || !list || !emptyState) {
     return;
   }
 
-  nowUtcInput.value = new Date().toISOString();
-
-  let habits: HabitSummary[] = [];
-
-  const renderHabitList = async () => {
-    try {
-      const response = await fetch(`/api/habits?userId=${encodeURIComponent(userId)}`);
-      const payload = (await response.json()) as { habits?: HabitSummary[] };
-      habits = payload.habits ?? [];
-      list.innerHTML = habits
-        .map((habit) => {
-          const statusText = `${escapeHtml(habit.status)} / display_order=${habit.displayOrder}`;
-          const checkinText = habit.lastCheckinLogDate ? `last_checkin=${escapeHtml(habit.lastCheckinLogDate)}` : "last_checkin=none";
-          return `<li>
-            <strong>${escapeHtml(habit.name)}</strong> (#${escapeHtml(habit.habitId)})
-            <br/>
-            <small>${statusText}, ${checkinText}</small>
-            <br/>
-            <button type="button" data-habit-id="${escapeHtml(habit.habitId)}">この習慣を取消対象に設定</button>
-          </li>`;
-        })
-        .join("");
-
-      if (habits.length === 0) {
-        list.innerHTML = "<li>データなし</li>";
-      }
-    } catch (error: unknown) {
-      list.innerHTML = `<li>一覧取得失敗: ${escapeHtml(error instanceof Error ? error.message : "unknown error")}</li>`;
+  const setRuntimeError = (error: ErrorPresentation | null, habitId?: string) => {
+    if (!error) {
+      errorPanel.hidden = true;
+      errorMessage.textContent = "";
+      errorTrace.textContent = "";
+      retryButton.hidden = true;
+      recoveryLink.hidden = true;
+      recoveryLink.textContent = "";
+      recoveryLink.removeAttribute("href");
+      return;
+    }
+    errorPanel.hidden = false;
+    errorMessage.textContent = error.message;
+    errorTrace.textContent = error.visibleTraceId ?? "";
+    retryButton.hidden = error.status !== 500;
+    if (error.recoveryAction && habitId) {
+      recoveryLink.hidden = false;
+      recoveryLink.textContent = error.recoveryAction.label;
+      recoveryLink.href = resolveScr004Path(habitId);
+    } else {
+      recoveryLink.hidden = true;
+      recoveryLink.textContent = "";
+      recoveryLink.removeAttribute("href");
     }
   };
 
-  const syncSubmitState = () => {
-    submitButton.disabled = page.ui.cancelCheckin.isSubmitting;
-    submitButton.textContent = page.ui.cancelCheckin.isSubmitting
-      ? "取消中..."
-      : "当日チェックインを取り消す";
+  const renderHabits = () => {
+    if (page.ui.habits.status === "loading") {
+      status.textContent = "読み込み中...";
+      list.innerHTML = "<li>読み込み中...</li>";
+      emptyState.hidden = true;
+      return;
+    }
+    if (page.ui.habits.status === "error") {
+      status.textContent = "ホーム情報の取得に失敗しました";
+      list.innerHTML = "";
+      emptyState.hidden = true;
+      setRuntimeError(page.ui.habits.error);
+      return;
+    }
+
+    const items = [...page.ui.habits.items];
+    status.textContent = "";
+    setRuntimeError(null);
+
+    if (items.length === 0) {
+      list.innerHTML = "";
+      emptyState.hidden = false;
+      return;
+    }
+
+    emptyState.hidden = true;
+    list.innerHTML = items
+      .map((habit) => {
+        const checkinDisabled = habit.status === "archived" || page.ui.checkin.isSubmitting(habit.habitId);
+        const cancelDisabled = page.ui.cancelCheckin.isSubmitting || !habit.lastCheckinLogDate;
+        const checkinLabel = page.ui.checkin.isSubmitting(habit.habitId) ? "チェックイン中..." : "チェックイン";
+        const cancelLabel = page.ui.cancelCheckin.isSubmitting ? "取消中..." : "取消";
+        return `<li style="border: 1px solid #ddd; border-radius: 8px; padding: 12px;">
+          <strong>${escapeHtml(habit.name)}</strong>
+          <p style="margin: 6px 0 0 0;">status: ${escapeHtml(habit.status)}</p>
+          <p style="margin: 2px 0;">今日の達成: ${habit.lastCheckinLogDate ? "達成済み" : "未達成"}</p>
+          <p style="margin: 2px 0 10px 0;">ストリーク: ${habit.streakDays}日</p>
+          <div style="display: flex; gap: 8px;">
+            <button
+              type="button"
+              data-home-action="checkin"
+              data-habit-id="${escapeHtml(habit.habitId)}"
+              ${checkinDisabled ? "disabled" : ""}
+            >${checkinLabel}</button>
+            <button
+              type="button"
+              data-home-action="cancel"
+              data-habit-id="${escapeHtml(habit.habitId)}"
+              ${cancelDisabled ? "disabled" : ""}
+            >${cancelLabel}</button>
+          </div>
+        </li>`;
+      })
+      .join("");
+  };
+
+  const loadAndRenderHabits = async () => {
+    const loadPromise = page.actions.loadHabits();
+    renderHabits();
+    await loadPromise;
+    renderHabits();
   };
 
   list.addEventListener("click", (event) => {
@@ -450,49 +667,68 @@ function renderHomePage(root: HTMLDivElement, app: ReturnType<typeof bootstrapAp
     if (!(target instanceof HTMLButtonElement)) {
       return;
     }
-    const selectedHabitId = target.dataset.habitId;
-    if (!selectedHabitId) {
+    const habitId = target.dataset.habitId;
+    const action = target.dataset.homeAction;
+    if (!habitId || !action) {
       return;
     }
-    habitIdInput.value = selectedHabitId;
+
+    if (action === "checkin") {
+      if (page.ui.checkin.isSubmitting(habitId)) {
+        return;
+      }
+      const nowUtc = new Date().toISOString();
+      const registerPromise = page.actions.registerTodayCheckin({
+        habitId,
+        logDate: buildTodayLogDate(nowUtc),
+      });
+      renderHabits();
+      void registerPromise.then((result) => {
+        renderHabits();
+        if (result.error) {
+          setRuntimeError(result.error, habitId);
+        } else {
+          setRuntimeError(null);
+        }
+      });
+      return;
+    }
+
+    if (action === "cancel") {
+      if (page.ui.cancelCheckin.isSubmitting) {
+        return;
+      }
+      const cancelPromise = page.actions.cancelTodayCheckin({
+        habitId,
+        nowUtc: new Date().toISOString(),
+      });
+      renderHabits();
+      void cancelPromise.then((result) => {
+        renderHabits();
+        if (result === null) {
+          return;
+        }
+        if (result.error) {
+          setRuntimeError(result.error, habitId);
+          return;
+        }
+        setRuntimeError(null);
+      });
+    }
   });
 
-  form.addEventListener("submit", async (event) => {
+  retryButton.addEventListener("click", () => {
+    void loadAndRenderHabits();
+  });
+
+  recoveryLink.addEventListener("click", (event) => {
     event.preventDefault();
-    const habitId = habitIdInput.value.trim();
-    const nowUtc = nowUtcInput.value.trim() || new Date().toISOString();
-    if (habitId.length === 0) {
-      status.textContent = "取消失敗: habit_id を入力してください";
-      return;
+    if (recoveryLink.href.length > 0) {
+      window.location.assign(recoveryLink.href);
     }
-
-    syncSubmitState();
-    status.textContent = "取消実行中...";
-    errorContainer.textContent = "";
-
-    const result = await page.actions.cancelTodayCheckin({ habitId, nowUtc });
-    syncSubmitState();
-    if (result === null) {
-      status.textContent = "取消失敗: 実行中のため再実行できません";
-      return;
-    }
-
-    if (result.error) {
-      status.textContent = `取消失敗: status=${result.error.status} code=${result.error.code}`;
-      errorContainer.textContent = result.error.message;
-      return;
-    }
-
-    status.textContent = `取消成功: log_date=${result.lastCheckinLogDate ?? "null"}`;
-    await renderHabitList();
   });
 
-  refreshButton.addEventListener("click", () => {
-    void renderHabitList();
-  });
-
-  syncSubmitState();
-  void renderHabitList();
+  void loadAndRenderHabits();
 }
 
 function renderHabitCreatePage(root: HTMLDivElement, app: ReturnType<typeof bootstrapApp>) {
