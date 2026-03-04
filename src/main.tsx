@@ -209,6 +209,31 @@ type If002HabitCreateErrorPayload = {
   trace_id?: string;
 };
 
+type HabitLifecycleStatus = "active" | "archived";
+
+type If002HabitDetailSuccessPayload = {
+  habit?: {
+    habit_id?: string;
+    name?: string;
+    status?: HabitLifecycleStatus;
+    display_order?: number;
+  };
+};
+
+type If002HabitLifecycleSuccessPayload = {
+  habit?: {
+    habit_id?: string;
+    name?: string;
+    status?: HabitLifecycleStatus;
+    display_order?: number;
+  };
+};
+
+type If002HabitRuntimeErrorPayload = {
+  code?: string;
+  trace_id?: string;
+};
+
 export type HabitCreateRuntimeInput = {
   userId: string;
   name: string;
@@ -226,6 +251,42 @@ type HabitCreateRuntimeError = {
 };
 
 export type HabitCreateRuntimeResult = HabitCreateRuntimeSuccess | HabitCreateRuntimeError;
+
+export type HabitEditDetailRuntimeInput = {
+  habitId: string;
+};
+
+export type HabitEditUpdateRuntimeInput = {
+  userId: string;
+  habitId: string;
+  name: string;
+  displayOrder: number;
+};
+
+export type HabitEditStatusTransitionAction = "archive" | "resume";
+
+export type HabitEditStatusTransitionRuntimeInput = {
+  userId: string;
+  habitId: string;
+  action: HabitEditStatusTransitionAction;
+};
+
+type HabitEditRuntimeSuccess = {
+  habitId: string;
+  name: string;
+  status: HabitLifecycleStatus;
+  displayOrder: number;
+};
+
+type HabitEditRuntimeResult =
+  | {
+    kind: "success";
+    habit: HabitEditRuntimeSuccess;
+  }
+  | {
+    kind: "error";
+    error: ErrorPresentation;
+  };
 
 function asErrorStatus(status: number): 400 | 401 | 403 | 409 | 500 {
   if (status === 400 || status === 401 || status === 403 || status === 409) {
@@ -588,6 +649,153 @@ function mapHabitCreateRuntimeError(
   return { status: 500, code: "INTERNAL_ERROR" };
 }
 
+function mapHabitEditRuntimeError(
+  status: number,
+  code: unknown,
+): { status: ErrorStatus; code: CommonErrorCode } {
+  if (status === 400 && code === "VALIDATION_ERROR") {
+    return { status: 400, code: "VALIDATION_ERROR" };
+  }
+  if (status === 403 && code === "FORBIDDEN") {
+    return { status: 403, code: "FORBIDDEN" };
+  }
+  if (status === 409 && code === "DOMAIN_CONFLICT") {
+    return { status: 409, code: "DOMAIN_CONFLICT" };
+  }
+  return { status: 500, code: "INTERNAL_ERROR" };
+}
+
+function mapHabitRuntimeSuccess(
+  payload: If002HabitDetailSuccessPayload | If002HabitLifecycleSuccessPayload | null,
+  fallbackHabitId: string,
+): HabitEditRuntimeSuccess {
+  const habit = payload?.habit;
+  const status = habit?.status === "archived" ? "archived" : "active";
+  return {
+    habitId: typeof habit?.habit_id === "string" ? habit.habit_id : fallbackHabitId,
+    name: typeof habit?.name === "string" ? habit.name : "",
+    status,
+    displayOrder: typeof habit?.display_order === "number" ? habit.display_order : 1,
+  };
+}
+
+async function parseJsonResponse<TPayload>(response: Response): Promise<TPayload | null> {
+  try {
+    return (await response.json()) as TPayload;
+  } catch {
+    return null;
+  }
+}
+
+export async function requestHabitDetailRuntime(
+  fetchFn: typeof fetch,
+  input: HabitEditDetailRuntimeInput,
+): Promise<HabitEditRuntimeResult> {
+  try {
+    const response = await fetchFn(`/api/habits/${encodeURIComponent(input.habitId)}`, {
+      method: "GET",
+    });
+    const payload = await parseJsonResponse<If002HabitDetailSuccessPayload | If002HabitRuntimeErrorPayload>(response);
+    if (response.ok) {
+      return {
+        kind: "success",
+        habit: mapHabitRuntimeSuccess(payload as If002HabitDetailSuccessPayload | null, input.habitId),
+      };
+    }
+    const rawCode = payload !== null && "code" in payload ? payload.code : undefined;
+    const rawTraceId = payload !== null && "trace_id" in payload && typeof payload.trace_id === "string"
+      ? payload.trace_id
+      : "INTERNAL_ERROR";
+    const mapped = mapHabitEditRuntimeError(response.status, rawCode);
+    return {
+      kind: "error",
+      error: resolveErrorPresentation(mapped.status, mapped.code, rawTraceId),
+    };
+  } catch {
+    return {
+      kind: "error",
+      error: resolveErrorPresentation(500, "INTERNAL_ERROR"),
+    };
+  }
+}
+
+export async function requestHabitEditUpdateRuntime(
+  fetchFn: typeof fetch,
+  input: HabitEditUpdateRuntimeInput,
+): Promise<HabitEditRuntimeResult> {
+  try {
+    const response = await fetchFn(`/api/habits/${encodeURIComponent(input.habitId)}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        userId: input.userId,
+        habit_id: input.habitId,
+        name: input.name,
+        display_order: input.displayOrder,
+      }),
+    });
+    const payload = await parseJsonResponse<If002HabitLifecycleSuccessPayload | If002HabitRuntimeErrorPayload>(response);
+    if (response.ok) {
+      return {
+        kind: "success",
+        habit: mapHabitRuntimeSuccess(payload as If002HabitLifecycleSuccessPayload | null, input.habitId),
+      };
+    }
+    const rawCode = payload !== null && "code" in payload ? payload.code : undefined;
+    const rawTraceId = payload !== null && "trace_id" in payload && typeof payload.trace_id === "string"
+      ? payload.trace_id
+      : "INTERNAL_ERROR";
+    const mapped = mapHabitEditRuntimeError(response.status, rawCode);
+    return {
+      kind: "error",
+      error: resolveErrorPresentation(mapped.status, mapped.code, rawTraceId),
+    };
+  } catch {
+    return {
+      kind: "error",
+      error: resolveErrorPresentation(500, "INTERNAL_ERROR"),
+    };
+  }
+}
+
+export async function requestHabitStatusTransitionRuntime(
+  fetchFn: typeof fetch,
+  input: HabitEditStatusTransitionRuntimeInput,
+): Promise<HabitEditRuntimeResult> {
+  const endpoint = input.action === "archive" ? "archive" : "resume";
+  try {
+    const response = await fetchFn(`/api/habits/${encodeURIComponent(input.habitId)}/${endpoint}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        userId: input.userId,
+        habit_id: input.habitId,
+      }),
+    });
+    const payload = await parseJsonResponse<If002HabitLifecycleSuccessPayload | If002HabitRuntimeErrorPayload>(response);
+    if (response.ok) {
+      return {
+        kind: "success",
+        habit: mapHabitRuntimeSuccess(payload as If002HabitLifecycleSuccessPayload | null, input.habitId),
+      };
+    }
+    const rawCode = payload !== null && "code" in payload ? payload.code : undefined;
+    const rawTraceId = payload !== null && "trace_id" in payload && typeof payload.trace_id === "string"
+      ? payload.trace_id
+      : "INTERNAL_ERROR";
+    const mapped = mapHabitEditRuntimeError(response.status, rawCode);
+    return {
+      kind: "error",
+      error: resolveErrorPresentation(mapped.status, mapped.code, rawTraceId),
+    };
+  } catch {
+    return {
+      kind: "error",
+      error: resolveErrorPresentation(500, "INTERNAL_ERROR"),
+    };
+  }
+}
+
 export async function requestHabitCreateRuntime(
   fetchFn: typeof fetch,
   input: HabitCreateRuntimeInput,
@@ -640,18 +848,207 @@ export async function requestHabitCreateRuntime(
 }
 
 function renderHabitEditPage(root: HTMLDivElement, app: ReturnType<typeof bootstrapApp>, habitId: string) {
-  const page = SCR004HabitEditPage({ screenId: "SCR-004", params: { habitId, status: "active" } });
+  const userId = resolveHabitFormUserId();
+  const state: {
+    name: string;
+    displayOrder: number;
+    status: HabitLifecycleStatus;
+    confirmationAction: HabitEditStatusTransitionAction | null;
+    isSubmitting: boolean;
+    errorMessage: string;
+  } = {
+    name: "",
+    displayOrder: 1,
+    status: "active",
+    confirmationAction: null,
+    isSubmitting: false,
+    errorMessage: "",
+  };
+
+  const navigateHome = () => {
+    window.location.assign(ROUTE_MAP["SCR-002"]);
+  };
+
+  const syncFromRuntime = (runtimeHabit: HabitEditRuntimeSuccess) => {
+    state.name = runtimeHabit.name;
+    state.displayOrder = runtimeHabit.displayOrder;
+    state.status = runtimeHabit.status;
+  };
+
+  const render = () => {
+    const page = SCR004HabitEditPage({
+      screenId: "SCR-004",
+      params: {
+        habitId,
+        name: state.name,
+        displayOrder: state.displayOrder,
+        status: state.status,
+      },
+      handlers: {
+        onBack: navigateHome,
+        onNavigateHome: navigateHome,
+      },
+    });
+    const confirmationAction = state.confirmationAction;
+    const isConfirmationOpen = confirmationAction !== null;
+
+    root.innerHTML = `<main style="font-family: sans-serif; max-width: 720px; margin: 32px auto; padding: 16px;">
+      <h1>${app.name}</h1>
+      <h2>SCR-004 Habit Edit</h2>
+      <form id="habit-edit-form" style="display: grid; gap: 8px; margin: 12px 0;">
+        <label>name <input id="habit-edit-name" required value="${escapeHtml(state.name)}" /></label>
+        <label>
+          display_order
+          <input id="habit-edit-display-order" type="number" min="1" max="9999" required value="${state.displayOrder}" />
+        </label>
+        <p id="habit-edit-status-badge">status: ${escapeHtml(page.ui.status)}</p>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <button id="habit-edit-save" type="submit">${state.isSubmitting ? "保存中..." : "保存"}</button>
+          <button id="habit-edit-archive" type="button" ${page.ui.buttons.archive.visible ? "" : "hidden"}>アーカイブ</button>
+          <button id="habit-edit-resume" type="button" ${page.ui.buttons.resume.visible ? "" : "hidden"}>再開</button>
+          <button id="habit-edit-back" type="button">戻る</button>
+        </div>
+      </form>
+      <p id="habit-edit-error" role="alert" style="color: #b00020; min-height: 1.4em;">${escapeHtml(state.errorMessage)}</p>
+      <div id="habit-edit-confirmation-modal" role="dialog" aria-modal="true" ${isConfirmationOpen ? "" : "hidden"}>
+        <p>${confirmationAction === "archive" ? "この習慣をアーカイブしますか？" : "この習慣を再開しますか？"}</p>
+        <div style="display: flex; gap: 8px;">
+          <button id="habit-edit-confirm-ok" type="button">実行</button>
+          <button id="habit-edit-confirm-cancel" type="button">キャンセル</button>
+        </div>
+      </div>
+      <p><a href="/home">/home に戻る</a></p>
+    </main>`;
+
+    const form = root.querySelector<HTMLFormElement>("#habit-edit-form");
+    const nameInput = root.querySelector<HTMLInputElement>("#habit-edit-name");
+    const displayOrderInput = root.querySelector<HTMLInputElement>("#habit-edit-display-order");
+    const saveButton = root.querySelector<HTMLButtonElement>("#habit-edit-save");
+    const archiveButton = root.querySelector<HTMLButtonElement>("#habit-edit-archive");
+    const resumeButton = root.querySelector<HTMLButtonElement>("#habit-edit-resume");
+    const backButton = root.querySelector<HTMLButtonElement>("#habit-edit-back");
+    const confirmOkButton = root.querySelector<HTMLButtonElement>("#habit-edit-confirm-ok");
+    const confirmCancelButton = root.querySelector<HTMLButtonElement>("#habit-edit-confirm-cancel");
+    if (
+      !form
+      || !nameInput
+      || !displayOrderInput
+      || !saveButton
+      || !archiveButton
+      || !resumeButton
+      || !backButton
+      || !confirmOkButton
+      || !confirmCancelButton
+    ) {
+      return;
+    }
+
+    saveButton.disabled = state.isSubmitting;
+    archiveButton.disabled = state.isSubmitting;
+    resumeButton.disabled = state.isSubmitting;
+    backButton.disabled = state.isSubmitting;
+    confirmOkButton.disabled = state.isSubmitting;
+
+    nameInput.addEventListener("input", () => {
+      state.name = nameInput.value;
+    });
+    displayOrderInput.addEventListener("input", () => {
+      state.displayOrder = Number(displayOrderInput.value);
+    });
+    backButton.addEventListener("click", () => {
+      page.actions.back();
+    });
+    archiveButton.addEventListener("click", () => {
+      page.actions.archive();
+      state.confirmationAction = page.ui.confirmationModal.action;
+      render();
+    });
+    resumeButton.addEventListener("click", () => {
+      page.actions.resume();
+      state.confirmationAction = page.ui.confirmationModal.action;
+      render();
+    });
+    confirmCancelButton.addEventListener("click", () => {
+      state.confirmationAction = null;
+      render();
+    });
+
+    confirmOkButton.addEventListener("click", async () => {
+      const action = state.confirmationAction;
+      if (!action) {
+        return;
+      }
+      state.isSubmitting = true;
+      state.errorMessage = "";
+      render();
+      const result = await requestHabitStatusTransitionRuntime(fetch, {
+        userId,
+        habitId,
+        action,
+      });
+      if (result.kind === "error") {
+        if (result.error.status === 403) {
+          navigateHome();
+          return;
+        }
+        state.errorMessage = result.error.message;
+      } else {
+        syncFromRuntime(result.habit);
+      }
+      state.confirmationAction = null;
+      state.isSubmitting = false;
+      render();
+    });
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (state.isSubmitting) {
+        return;
+      }
+      state.name = nameInput.value.trim();
+      state.displayOrder = Number(displayOrderInput.value);
+      state.isSubmitting = true;
+      state.errorMessage = "";
+      render();
+      const result = await requestHabitEditUpdateRuntime(fetch, {
+        userId,
+        habitId,
+        name: state.name,
+        displayOrder: state.displayOrder,
+      });
+      state.isSubmitting = false;
+      if (result.kind === "error") {
+        if (result.error.status === 403) {
+          navigateHome();
+          return;
+        }
+        state.errorMessage = result.error.message;
+        render();
+        return;
+      }
+      navigateHome();
+    });
+  };
+
   root.innerHTML = `<main style="font-family: sans-serif; max-width: 720px; margin: 32px auto; padding: 16px;">
     <h1>${app.name}</h1>
     <h2>SCR-004 Habit Edit</h2>
-    <p>habitId: ${page.params.habitId}</p>
-    <p>status: ${page.ui.status}</p>
-    <ul>
-      <li>archive button visible: ${page.ui.buttons.archive.visible}</li>
-      <li>resume button visible: ${page.ui.buttons.resume.visible}</li>
-    </ul>
-    <p><a href="/home">/home に戻る</a></p>
+    <p>読み込み中...</p>
   </main>`;
+
+  void requestHabitDetailRuntime(fetch, { habitId }).then((result) => {
+    if (result.kind === "error") {
+      if (result.error.status === 403) {
+        navigateHome();
+        return;
+      }
+      state.errorMessage = result.error.message;
+      render();
+      return;
+    }
+    syncFromRuntime(result.habit);
+    render();
+  });
 }
 
 function escapeHtml(text: string): string {

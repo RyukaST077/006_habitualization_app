@@ -49,6 +49,69 @@ export type Scr004StatusButtonVisibility = {
   resumeVisible: boolean;
 };
 
+export type Scr004TraceabilityId =
+  | "FR-007"
+  | "FR-008"
+  | "FR-009"
+  | "AC-007"
+  | "AC-008"
+  | "AC-009"
+  | "SCR-004";
+export type Scr004TraceCaseId = "TC-IT-FR-007-003" | "TC-ST-FR-008-004" | "TC-ST-FR-009-005";
+export type Scr004RequirementId = "FR-007" | "FR-008" | "FR-009";
+export type Scr004AcceptanceId = "AC-007" | "AC-008" | "AC-009";
+
+export type Scr004UiRequirementTraceCase = {
+  traceId: string;
+  testCaseId: Scr004TraceCaseId;
+  requirementId: Scr004RequirementId;
+  acceptanceId: Scr004AcceptanceId;
+  screenId: "SCR-004";
+  title: string;
+};
+
+export type Scr004ConfirmationModalAction = "archive" | "resume";
+
+export type Scr004ConfirmationModalExpectation = {
+  action: Scr004ConfirmationModalAction;
+  status: "active" | "archived";
+  openButtonLabel: "アーカイブ" | "再開";
+  requiresConfirmation: true;
+  confirmButtonLabel: "実行";
+  cancelButtonLabel: "キャンセル";
+};
+
+export type Scr004ApiPrefillExpectation = {
+  status: "active" | "archived";
+  response: {
+    name: string;
+    displayOrder: number;
+    status: "active" | "archived";
+  };
+  expected: {
+    name: string;
+    displayOrder: number;
+    status: "active" | "archived";
+  };
+};
+
+export type Scr004ConfirmationModalStateTransition = {
+  action: Scr004ConfirmationModalAction;
+  status: "active" | "archived";
+  initial: {
+    isOpen: false;
+    action: null;
+  };
+  opened: {
+    isOpen: true;
+    action: Scr004ConfirmationModalAction;
+  };
+  closed: {
+    isOpen: false;
+    action: null;
+  };
+};
+
 export type Scr001TraceabilityId = "FR-001" | "SCR-001" | "IF-001";
 export type Scr001ConsentState = "unknown" | "agreed";
 export type Scr008RequirementId = "FR-003" | "FR-004" | "FR-005";
@@ -315,6 +378,121 @@ export const T052_C004_COMPLETION_GATE_COMMANDS = [
 export const SCR004_STATUS_BUTTON_VISIBILITY: readonly Scr004StatusButtonVisibility[] = [
   { status: "active", archiveVisible: true, resumeVisible: false },
   { status: "archived", archiveVisible: false, resumeVisible: true },
+] as const;
+
+export const SCR004_TRACEABILITY_IDS: readonly Scr004TraceabilityId[] = [
+  "FR-007",
+  "FR-008",
+  "FR-009",
+  "AC-007",
+  "AC-008",
+  "AC-009",
+  "SCR-004",
+] as const;
+
+export const SCR004_UI_REQUIREMENT_TRACE_CASES: readonly Scr004UiRequirementTraceCase[] = [
+  {
+    traceId: "T-053/C-004/TC-IT-FR-007-003/FR-007/AC-007/SCR-004",
+    testCaseId: "TC-IT-FR-007-003",
+    requirementId: "FR-007",
+    acceptanceId: "AC-007",
+    screenId: "SCR-004",
+    title: "active/archived 状態ごとのボタン表示を固定する",
+  },
+  {
+    traceId: "T-053/C-004/TC-ST-FR-008-004/FR-008/AC-008/SCR-004",
+    testCaseId: "TC-ST-FR-008-004",
+    requirementId: "FR-008",
+    acceptanceId: "AC-008",
+    screenId: "SCR-004",
+    title: "アーカイブ/再開は確認モーダル経由で実行する観点を固定する",
+  },
+  {
+    traceId: "T-053/C-004/TC-ST-FR-009-005/FR-009/AC-009/SCR-004",
+    testCaseId: "TC-ST-FR-009-005",
+    requirementId: "FR-009",
+    acceptanceId: "AC-009",
+    screenId: "SCR-004",
+    title: "403 発生時は /home へ遷移する導線を固定する",
+  },
+] as const;
+
+export const T053_C004_COMPLETION_GATE_COMMANDS = [
+  "npm run test -- tests/unit/screens/scr-004-habit-edit-page-red.spec.ts tests/integration/ui/scr-004-habit-edit-runtime-red.spec.ts",
+  "npm run test -- tests/unit/screens/scr-004-habit-edit-page-red.spec.ts tests/integration/ui/scr-004-habit-edit-runtime-red.spec.ts tests/integration/api/if-002-habits-status-red.spec.ts && npm run typecheck",
+] as const;
+
+export const SCR004_FORBIDDEN_REDIRECT_EXPECTATION = {
+  screenId: "SCR-004",
+  requirementId: "FR-009",
+  sourcePath: "/habits/:habitId/edit",
+  triggerStatus: 403,
+  expectedPath: "/home",
+} as const;
+
+export const SCR004_CONFIRMATION_MODAL_EXPECTATIONS: readonly Scr004ConfirmationModalExpectation[] = [
+  {
+    action: "archive",
+    status: "active",
+    openButtonLabel: "アーカイブ",
+    requiresConfirmation: true,
+    confirmButtonLabel: "実行",
+    cancelButtonLabel: "キャンセル",
+  },
+  {
+    action: "resume",
+    status: "archived",
+    openButtonLabel: "再開",
+    requiresConfirmation: true,
+    confirmButtonLabel: "実行",
+    cancelButtonLabel: "キャンセル",
+  },
+] as const;
+
+export const SCR004_API_PREFILL_EXPECTATIONS: readonly Scr004ApiPrefillExpectation[] = [
+  {
+    status: "active",
+    response: {
+      name: "朝の散歩",
+      displayOrder: 2,
+      status: "active",
+    },
+    expected: {
+      name: "朝の散歩",
+      displayOrder: 2,
+      status: "active",
+    },
+  },
+  {
+    status: "archived",
+    response: {
+      name: "読書",
+      displayOrder: 7,
+      status: "archived",
+    },
+    expected: {
+      name: "読書",
+      displayOrder: 7,
+      status: "archived",
+    },
+  },
+] as const;
+
+export const SCR004_CONFIRMATION_MODAL_STATE_TRANSITIONS: readonly Scr004ConfirmationModalStateTransition[] = [
+  {
+    action: "archive",
+    status: "active",
+    initial: { isOpen: false, action: null },
+    opened: { isOpen: true, action: "archive" },
+    closed: { isOpen: false, action: null },
+  },
+  {
+    action: "resume",
+    status: "archived",
+    initial: { isOpen: false, action: null },
+    opened: { isOpen: true, action: "resume" },
+    closed: { isOpen: false, action: null },
+  },
 ] as const;
 
 export function createCommonUiErrorInput(status: CommonUiErrorStatus): CommonUiErrorInput {
