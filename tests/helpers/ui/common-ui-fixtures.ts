@@ -195,6 +195,41 @@ export type Scr006UiRequirementTraceCase = {
   title: string;
 };
 
+export type Scr007TraceabilityId =
+  | "FR-019"
+  | "FR-020"
+  | "FR-021"
+  | "FR-022"
+  | "FR-023"
+  | "FR-024"
+  | "AC-019"
+  | "AC-020"
+  | "AC-021"
+  | "AC-022"
+  | "SCR-007";
+export type Scr007TraceCaseId =
+  | "TC-IT-FR-019-001"
+  | "TC-IT-FR-020-002"
+  | "TC-IT-FR-021-003"
+  | "TC-IT-FR-021-004"
+  | "TC-IT-FR-022-001"
+  | "TC-IT-FR-022-002"
+  | "TC-ST-FR-022-003"
+  | "TC-IT-FR-023-001"
+  | "TC-ST-FR-023-002"
+  | "TC-ST-FR-024-004";
+export type Scr007RequirementId = "FR-019" | "FR-020" | "FR-021" | "FR-022" | "FR-023" | "FR-024";
+export type Scr007AcceptanceId = "AC-019" | "AC-020" | "AC-021" | "AC-022";
+
+export type Scr007UiRequirementTraceCase = {
+  traceId: string;
+  testCaseId: Scr007TraceCaseId;
+  requirementId: Scr007RequirementId;
+  acceptanceId: Scr007AcceptanceId;
+  screenId: "SCR-007";
+  title: string;
+};
+
 export type Scr001TraceabilityId = "FR-001" | "SCR-001" | "IF-001";
 export type Scr001ConsentState = "unknown" | "agreed";
 export type Scr008RequirementId = "FR-003" | "FR-004" | "FR-005";
@@ -686,6 +721,214 @@ export const T057_C003_COMPLETION_GATE_COMMANDS = [
 export const T057_C004_COMPLETION_GATE_COMMANDS = [
   "npm run test -- tests/unit/screens/scr-006-analytics-page-red.spec.ts tests/integration/ui/scr-006-analytics-runtime-red.spec.ts",
   "npm run test -- tests/unit/screens/scr-006-analytics-page-red.spec.ts tests/integration/ui/scr-006-analytics-runtime-red.spec.ts tests/integration/api/if-002-analytics-summary-red.spec.ts && npm run typecheck",
+] as const;
+
+export const SCR007_TRACEABILITY_IDS: readonly Scr007TraceabilityId[] = [
+  "FR-019",
+  "FR-020",
+  "FR-021",
+  "FR-022",
+  "FR-023",
+  "FR-024",
+  "AC-019",
+  "AC-020",
+  "AC-021",
+  "AC-022",
+  "SCR-007",
+] as const;
+
+export const SCR007_UI_REQUIREMENT_TRACE_CASES: readonly Scr007UiRequirementTraceCase[] = [
+  {
+    traceId: "T-056/C-001/TC-IT-FR-019-001/FR-019/AC-019/SCR-007/settings-timezone-iana-select",
+    testCaseId: "TC-IT-FR-019-001",
+    requirementId: "FR-019",
+    acceptanceId: "AC-019",
+    screenId: "SCR-007",
+    title: "IANA タイムゾーン選択のUI観点を固定する",
+  },
+  {
+    traceId: "T-056/C-001/TC-IT-FR-020-002/FR-020/AC-020/SCR-007/day-cutoff-time-dirty-save-enable",
+    testCaseId: "TC-IT-FR-020-002",
+    requirementId: "FR-020",
+    acceptanceId: "AC-020",
+    screenId: "SCR-007",
+    title: "締め時刻変更時のみ保存活性になる観点を固定する",
+  },
+  {
+    traceId: "T-056/C-001/TC-IT-FR-021-003/FR-021/AC-021/SCR-007/input-validation-inline-error",
+    testCaseId: "TC-IT-FR-021-003",
+    requirementId: "FR-021",
+    acceptanceId: "AC-021",
+    screenId: "SCR-007",
+    title: "入力不正時にインラインエラーを表示する観点を固定する",
+  },
+  {
+    traceId: "T-056/C-001/TC-IT-FR-021-004/FR-021/AC-021/SCR-007/error-toast-and-trace-id",
+    testCaseId: "TC-IT-FR-021-004",
+    requirementId: "FR-021",
+    acceptanceId: "AC-021",
+    screenId: "SCR-007",
+    title: "500系で trace_id 付きエラートーストを表示する観点を固定する",
+  },
+  {
+    traceId: "T-056/C-001/TC-IT-FR-022-001/FR-022/AC-022/SCR-007/audit-linked-on-settings-save",
+    testCaseId: "TC-IT-FR-022-001",
+    requirementId: "FR-022",
+    acceptanceId: "AC-022",
+    screenId: "SCR-007",
+    title: "設定保存イベントで監査連携が起点化されるUI境界を固定する",
+  },
+  {
+    traceId: "T-056/C-001/TC-IT-FR-022-002/FR-022/AC-022/SCR-007/audit-linked-on-timezone-change",
+    testCaseId: "TC-IT-FR-022-002",
+    requirementId: "FR-022",
+    acceptanceId: "AC-022",
+    screenId: "SCR-007",
+    title: "タイムゾーン変更保存で監査連携が起点化されるUI境界を固定する",
+  },
+  {
+    traceId: "T-056/C-001/TC-ST-FR-022-003/FR-022/AC-022/SCR-007/audit-boundary-no-direct-log-read",
+    testCaseId: "TC-ST-FR-022-003",
+    requirementId: "FR-022",
+    acceptanceId: "AC-022",
+    screenId: "SCR-007",
+    title: "UI は監査ログ本文を直接参照しない境界を固定する",
+  },
+  {
+    traceId: "T-056/C-001/TC-IT-FR-023-001/FR-023/AC-022/SCR-007/withdrawal-danger-two-step-confirm",
+    testCaseId: "TC-IT-FR-023-001",
+    requirementId: "FR-023",
+    acceptanceId: "AC-022",
+    screenId: "SCR-007",
+    title: "退会導線は danger ボタン + 2段階確認のみをUI責務として固定する",
+  },
+  {
+    traceId: "T-056/C-001/TC-ST-FR-023-002/FR-023/AC-022/SCR-007/withdrawal-ui-boundary-no-sla",
+    testCaseId: "TC-ST-FR-023-002",
+    requirementId: "FR-023",
+    acceptanceId: "AC-022",
+    screenId: "SCR-007",
+    title: "退会SLA計測はUI責務外である境界を固定する",
+  },
+  {
+    traceId: "T-056/C-001/TC-ST-FR-024-004/FR-024/AC-022/SCR-007/withdrawal-ui-boundary-no-job-monitoring",
+    testCaseId: "TC-ST-FR-024-004",
+    requirementId: "FR-024",
+    acceptanceId: "AC-022",
+    screenId: "SCR-007",
+    title: "削除ジョブ監視/再実行はUI責務外である境界を固定する",
+  },
+] as const;
+
+export const SCR007_TEST_PLAN_FOCUS_AREAS = [
+  "settings-timezone-iana-select",
+  "settings-day-cutoff-hhmm-input",
+  "settings-dirty-save-enable",
+  "settings-save-single-flight",
+  "settings-error-toast-trace-id",
+  "settings-audit-linkage-ui-boundary",
+  "withdrawal-danger-button",
+  "withdrawal-two-step-confirm",
+  "withdrawal-ui-boundary-no-sla-job-monitoring",
+] as const;
+
+export const SCR007_AUDIT_UI_BOUNDARY = {
+  coveredTestCaseIds: ["TC-IT-FR-022-001", "TC-IT-FR-022-002", "TC-ST-FR-022-003"] as const,
+  uiResponsibilities: [
+    "設定保存要求の送信トリガーを提供する",
+    "監査連携の成否はAPI応答経由で扱う",
+  ] as const,
+  nonUiResponsibilities: [
+    "監査ログ本文の取得/表示",
+    "監査ストレージの直接参照",
+  ] as const,
+} as const;
+
+export const SCR007_WITHDRAWAL_UI_BOUNDARY = {
+  coveredTestCaseIds: ["TC-IT-FR-023-001", "TC-ST-FR-023-002", "TC-ST-FR-024-004"] as const,
+  uiResponsibilities: [
+    "danger ボタン表示",
+    "2段階確認モーダル完了で退会API呼び出しをトリガーする",
+  ] as const,
+  nonUiResponsibilities: [
+    "60秒不可化/5分削除SLAの計測",
+    "account_deletion_jobs の状態監視/再実行",
+  ] as const,
+} as const;
+
+export const SCR007_SCOPE_GUARD = {
+  forbiddenTouchPoints: [
+    "src/server/application/settings/SettingsService.ts",
+    "src/server/application/withdrawal/**",
+    "tests/e2e/**",
+    "SCR-005",
+    "SCR-006",
+  ] as const,
+} as const;
+
+export const T056_C001_COMPLETION_GATE_COMMANDS = [
+  "npm run test -- tests/unit/screens/scr-007-settings-page-red.spec.ts tests/integration/ui/scr-007-settings-runtime-red.spec.ts",
+  "for id in FR-019 FR-020 FR-021 FR-022 FR-023 FR-024 AC-019 AC-020 AC-021 AC-022 SCR-007; do rg -n \"$id\" tests/helpers/ui/common-ui-fixtures.ts >/dev/null; done",
+] as const;
+
+export const SCR007_IANA_TIMEZONE_OPTIONS = ["Asia/Tokyo", "UTC", "America/Los_Angeles"] as const;
+export const SCR007_DAY_CUTOFF_TIME_BOUNDARIES = [
+  { value: "00:00", valid: true },
+  { value: "23:59", valid: true },
+  { value: "24:00", valid: false },
+  { value: "12:60", valid: false },
+  { value: "9:00", valid: false },
+] as const;
+
+export const SCR007_CONFIRMATION_STEP_SEQUENCE = {
+  initial: {
+    isOpen: false,
+    step: 0,
+  },
+  opened: {
+    isOpen: true,
+    step: 1,
+  },
+  confirmedStep1: {
+    isOpen: true,
+    step: 2,
+  },
+  closed: {
+    isOpen: false,
+    step: 0,
+  },
+} as const;
+
+export const T056_C002_COMPLETION_GATE_COMMANDS = [
+  "npm run test -- tests/unit/screens/scr-007-settings-page-red.spec.ts",
+  "npm run typecheck",
+] as const;
+
+export const SCR007_RUNTIME_USER_ID = "00000000-0000-4000-8000-000000000001" as const;
+export const SCR007_RUNTIME_PROFILE_ENDPOINT = "/api/settings/profile" as const;
+export const SCR007_RUNTIME_WITHDRAWAL_ENDPOINT = "/api/settings/withdrawal" as const;
+export const SCR007_RUNTIME_INITIAL_PROFILE = {
+  timezone: "Asia/Tokyo",
+  dayCutoffTime: "06:00",
+} as const;
+export const SCR007_RUNTIME_UPDATED_PROFILE = {
+  timezone: "UTC",
+  dayCutoffTime: "07:30",
+} as const;
+export const SCR007_RUNTIME_ERROR_CASES = [
+  { status: 400, code: "VALIDATION_ERROR" },
+  { status: 409, code: "DOMAIN_CONFLICT" },
+  { status: 500, code: "INTERNAL_ERROR" },
+] as const;
+
+export const T056_C003_COMPLETION_GATE_COMMANDS = [
+  "npm run test -- tests/integration/ui/scr-007-settings-runtime-red.spec.ts",
+  "npm run test -- tests/integration/api/if-002-settings-profile-red.spec.ts tests/integration/ui/scr-007-settings-runtime-red.spec.ts",
+] as const;
+
+export const T056_C004_COMPLETION_GATE_COMMANDS = [
+  "npm run test -- tests/unit/screens/scr-007-settings-page-red.spec.ts tests/integration/ui/scr-007-settings-runtime-red.spec.ts",
+  "npm run test -- tests/unit/screens/scr-007-settings-page-red.spec.ts tests/integration/ui/scr-007-settings-runtime-red.spec.ts tests/integration/api/if-002-settings-profile-red.spec.ts && npm run typecheck",
 ] as const;
 
 export const SCR002_UI_REQUIREMENT_TRACE_CASES: readonly Scr002UiRequirementTraceCase[] = [

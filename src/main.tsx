@@ -24,6 +24,12 @@ import {
   type AnalyticsSummaryLoadResolution,
 } from "./screens/SCR-006AnalyticsPage";
 import {
+  SCR007SettingsPage,
+  type SettingsProfile,
+  type SettingsSaveResolution,
+  type SettingsWithdrawalResolution,
+} from "./screens/SCR-007SettingsPage";
+import {
   SCR002HomePage,
   type CheckinResolution,
   type HomeHabitSummary,
@@ -77,6 +83,10 @@ function renderAppShell() {
   }
   if (window.location.pathname === ROUTE_MAP["SCR-006"]) {
     renderAnalyticsPage(root, app);
+    return;
+  }
+  if (window.location.pathname === ROUTE_MAP["SCR-007"]) {
+    void renderSettingsPage(root, app);
     return;
   }
   const editMatch = window.location.pathname.match(/^\/habits\/([^/]+)\/edit$/);
@@ -272,6 +282,25 @@ type If002AnalyticsSummarySuccessPayload = {
 };
 
 type If002AnalyticsSummaryErrorPayload = {
+  code?: string;
+  trace_id?: string;
+};
+
+type If002SettingsProfilePayload = {
+  profile?: {
+    timezone?: string;
+    day_cutoff_time?: string;
+  };
+  timezone?: string;
+  day_cutoff_time?: string;
+};
+
+type If002SettingsProfileErrorPayload = {
+  code?: string;
+  trace_id?: string;
+};
+
+type If002SettingsWithdrawalErrorPayload = {
   code?: string;
   trace_id?: string;
 };
@@ -819,6 +848,138 @@ export async function requestAnalyticsSummaryRuntime(
   }
 }
 
+function extractSettingsProfile(payload: If002SettingsProfilePayload | null, fallback?: SettingsProfile): SettingsProfile {
+  const profile = payload?.profile;
+  const timezone = typeof profile?.timezone === "string"
+    ? profile.timezone
+    : typeof payload?.timezone === "string"
+      ? payload.timezone
+      : fallback?.timezone ?? "Asia/Tokyo";
+  const dayCutoffTime = typeof profile?.day_cutoff_time === "string"
+    ? profile.day_cutoff_time
+    : typeof payload?.day_cutoff_time === "string"
+      ? payload.day_cutoff_time
+      : fallback?.dayCutoffTime ?? "00:00";
+  return {
+    timezone,
+    dayCutoffTime,
+  };
+}
+
+export async function requestSettingsProfileRuntime(
+  fetchFn: typeof fetch,
+  userId?: string,
+): Promise<SettingsSaveResolution> {
+  try {
+    const query = new URLSearchParams();
+    if (typeof userId === "string" && userId.length > 0) {
+      query.set("userId", userId);
+    }
+    const queryText = query.toString();
+    const response = await fetchFn(`/api/settings/profile${queryText.length > 0 ? `?${queryText}` : ""}`, {
+      method: "GET",
+      cache: "no-store",
+    });
+    const payload = await parseJsonResponse<If002SettingsProfilePayload | If002SettingsProfileErrorPayload>(response);
+    if (response.ok) {
+      return {
+        kind: "success",
+        profile: extractSettingsProfile(payload as If002SettingsProfilePayload | null),
+      };
+    }
+    const rawCode = payload !== null && "code" in payload ? payload.code : undefined;
+    const rawTraceId = payload !== null && "trace_id" in payload && typeof payload.trace_id === "string"
+      ? payload.trace_id
+      : undefined;
+    return {
+      kind: "error",
+      status: asErrorStatus(response.status),
+      code: asErrorCode(rawCode),
+      traceId: rawTraceId,
+    };
+  } catch {
+    return {
+      kind: "error",
+      status: 500,
+      code: "INTERNAL_ERROR",
+    };
+  }
+}
+
+export async function requestSettingsProfileSaveRuntime(
+  fetchFn: typeof fetch,
+  input: SettingsProfile,
+  userId?: string,
+): Promise<SettingsSaveResolution> {
+  try {
+    const response = await fetchFn("/api/settings/profile", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        userId,
+        timezone: input.timezone,
+        day_cutoff_time: input.dayCutoffTime,
+      }),
+    });
+    const payload = await parseJsonResponse<If002SettingsProfilePayload | If002SettingsProfileErrorPayload>(response);
+    if (response.ok) {
+      return {
+        kind: "success",
+        profile: extractSettingsProfile(payload as If002SettingsProfilePayload | null, input),
+      };
+    }
+    const rawCode = payload !== null && "code" in payload ? payload.code : undefined;
+    const rawTraceId = payload !== null && "trace_id" in payload && typeof payload.trace_id === "string"
+      ? payload.trace_id
+      : undefined;
+    return {
+      kind: "error",
+      status: asErrorStatus(response.status),
+      code: asErrorCode(rawCode),
+      traceId: rawTraceId,
+    };
+  } catch {
+    return {
+      kind: "error",
+      status: 500,
+      code: "INTERNAL_ERROR",
+    };
+  }
+}
+
+export async function requestSettingsWithdrawalRuntime(
+  fetchFn: typeof fetch,
+  userId?: string,
+): Promise<SettingsWithdrawalResolution> {
+  try {
+    const response = await fetchFn("/api/settings/withdrawal", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ userId }),
+    });
+    const payload = await parseJsonResponse<If002SettingsWithdrawalErrorPayload>(response);
+    if (response.ok) {
+      return { kind: "success" };
+    }
+    const rawCode = payload !== null && "code" in payload ? payload.code : undefined;
+    const rawTraceId = payload !== null && "trace_id" in payload && typeof payload.trace_id === "string"
+      ? payload.trace_id
+      : undefined;
+    return {
+      kind: "error",
+      status: asErrorStatus(response.status),
+      code: asErrorCode(rawCode),
+      traceId: rawTraceId,
+    };
+  } catch {
+    return {
+      kind: "error",
+      status: 500,
+      code: "INTERNAL_ERROR",
+    };
+  }
+}
+
 function renderHomePage(root: HTMLDivElement, app: ReturnType<typeof bootstrapApp>) {
   const userId = resolveHabitFormUserId();
   const page = SCR002HomePage({
@@ -1234,6 +1395,248 @@ export function renderAnalyticsPage(root: HTMLDivElement, app: ReturnType<typeof
   });
 
   void runWithRender(() => page.actions.loadSummary());
+}
+
+export async function renderSettingsPage(root: HTMLDivElement, app: ReturnType<typeof bootstrapApp>): Promise<void> {
+  const userId = resolveHabitFormUserId();
+  const initialProfileResult = await requestSettingsProfileRuntime(fetch, userId);
+  const initialProfile = initialProfileResult.kind === "success"
+    ? initialProfileResult.profile
+    : {
+      timezone: "Asia/Tokyo",
+      dayCutoffTime: "00:00",
+    };
+
+  const page = SCR007SettingsPage({
+    screenId: "SCR-007",
+    initialProfile,
+    handlers: {
+      onBackHome: () => {
+        window.location.assign(ROUTE_MAP["SCR-002"]);
+      },
+      onLogout: () => {
+        window.location.assign(ROUTE_MAP["SCR-001"]);
+      },
+      onSaveSettings: (input) => requestSettingsProfileSaveRuntime(fetch, input, userId),
+      onWithdraw: () => requestSettingsWithdrawalRuntime(fetch, userId),
+    },
+  });
+
+  root.innerHTML = `<main style="font-family: sans-serif; max-width: 720px; margin: 32px auto; padding: 16px;">
+    <h1>${app.name}</h1>
+    <h2>SCR-007 Settings</h2>
+    <section style="display: grid; gap: 10px; margin: 12px 0;">
+      <label>タイムゾーン
+        <select id="settings-timezone"></select>
+      </label>
+      <p id="settings-timezone-error" style="margin: 0; color: #8f1d1d; min-height: 1.2em;"></p>
+      <label>締め時刻
+        <input id="settings-day-cutoff-time" type="time" />
+      </label>
+      <p id="settings-day-cutoff-time-error" style="margin: 0; color: #8f1d1d; min-height: 1.2em;"></p>
+      <div style="display: flex; gap: 8px;">
+        <button id="settings-save" type="button">保存</button>
+        <button id="settings-back-home" type="button">ホームへ戻る</button>
+        <button id="settings-logout" type="button">ログアウト</button>
+      </div>
+    </section>
+    <section id="settings-error" hidden style="border: 1px solid #d79a9a; border-radius: 8px; padding: 12px; margin: 8px 0; color: #8f1d1d;">
+      <p id="settings-error-message" style="margin: 0;"></p>
+      <p id="settings-error-trace" style="margin: 8px 0 0 0;"></p>
+      <button id="settings-error-retry" type="button">再試行</button>
+    </section>
+    <section style="margin-top: 16px; border-top: 1px solid #ddd; padding-top: 12px;">
+      <h3 style="color: #8f1d1d;">退会</h3>
+      <button id="settings-withdrawal-open" type="button" style="background: #8f1d1d; color: #fff;">退会する</button>
+    </section>
+    <section id="settings-withdrawal-modal" hidden style="border: 1px solid #ccc; border-radius: 8px; padding: 12px; margin-top: 12px;">
+      <p id="settings-withdrawal-step" style="margin: 0 0 8px 0;"></p>
+      <div style="display: flex; gap: 8px;">
+        <button id="settings-withdrawal-next" type="button">確認を進める</button>
+        <button id="settings-withdrawal-execute" type="button">退会を実行</button>
+        <button id="settings-withdrawal-cancel" type="button">キャンセル</button>
+      </div>
+    </section>
+  </main>`;
+
+  const timezoneSelect = root.querySelector<HTMLSelectElement>("#settings-timezone");
+  const dayCutoffTimeInput = root.querySelector<HTMLInputElement>("#settings-day-cutoff-time");
+  const timezoneError = root.querySelector<HTMLParagraphElement>("#settings-timezone-error");
+  const dayCutoffTimeError = root.querySelector<HTMLParagraphElement>("#settings-day-cutoff-time-error");
+  const saveButton = root.querySelector<HTMLButtonElement>("#settings-save");
+  const backHomeButton = root.querySelector<HTMLButtonElement>("#settings-back-home");
+  const logoutButton = root.querySelector<HTMLButtonElement>("#settings-logout");
+  const errorPanel = root.querySelector<HTMLElement>("#settings-error");
+  const errorMessage = root.querySelector<HTMLParagraphElement>("#settings-error-message");
+  const errorTrace = root.querySelector<HTMLParagraphElement>("#settings-error-trace");
+  const retryButton = root.querySelector<HTMLButtonElement>("#settings-error-retry");
+  const withdrawalOpenButton = root.querySelector<HTMLButtonElement>("#settings-withdrawal-open");
+  const withdrawalModal = root.querySelector<HTMLElement>("#settings-withdrawal-modal");
+  const withdrawalStep = root.querySelector<HTMLParagraphElement>("#settings-withdrawal-step");
+  const withdrawalNextButton = root.querySelector<HTMLButtonElement>("#settings-withdrawal-next");
+  const withdrawalExecuteButton = root.querySelector<HTMLButtonElement>("#settings-withdrawal-execute");
+  const withdrawalCancelButton = root.querySelector<HTMLButtonElement>("#settings-withdrawal-cancel");
+
+  if (
+    !timezoneSelect
+    || !dayCutoffTimeInput
+    || !timezoneError
+    || !dayCutoffTimeError
+    || !saveButton
+    || !backHomeButton
+    || !logoutButton
+    || !errorPanel
+    || !errorMessage
+    || !errorTrace
+    || !retryButton
+    || !withdrawalOpenButton
+    || !withdrawalModal
+    || !withdrawalStep
+    || !withdrawalNextButton
+    || !withdrawalExecuteButton
+    || !withdrawalCancelButton
+  ) {
+    return;
+  }
+
+  let runtimeError = initialProfileResult.kind === "error"
+    ? resolveErrorPresentation(initialProfileResult.status, initialProfileResult.code, initialProfileResult.traceId)
+    : null;
+  let runtimeRetryAction: (() => Promise<void>) | null = null;
+
+  const render = () => {
+    timezoneSelect.innerHTML = page.ui.form.timezoneOptions.map((option) => {
+      const selected = option === page.ui.form.timezone ? "selected" : "";
+      return `<option value="${escapeHtml(option)}" ${selected}>${escapeHtml(option)}</option>`;
+    }).join("");
+    dayCutoffTimeInput.value = page.ui.form.dayCutoffTime;
+    timezoneError.textContent = page.ui.form.errors.timezone ?? "";
+    dayCutoffTimeError.textContent = page.ui.form.errors.dayCutoffTime ?? "";
+
+    saveButton.disabled = !page.ui.save.isEnabled || page.ui.save.isSubmitting;
+    saveButton.textContent = page.ui.save.isSubmitting ? "保存中..." : "保存";
+    timezoneSelect.disabled = page.ui.save.isSubmitting;
+    dayCutoffTimeInput.disabled = page.ui.save.isSubmitting;
+
+    const displayedError = page.ui.error.presentation ?? runtimeError;
+    errorPanel.hidden = displayedError === null;
+    errorMessage.textContent = displayedError?.message ?? "";
+    errorTrace.textContent = displayedError?.visibleTraceId ?? "";
+    retryButton.hidden = page.ui.error.retryAction === null && runtimeRetryAction === null;
+    retryButton.disabled = page.ui.save.isSubmitting || page.ui.withdrawal.isSubmitting;
+
+    withdrawalModal.hidden = !page.ui.withdrawal.isModalOpen;
+    withdrawalStep.textContent = page.ui.withdrawal.confirmStep === 1
+      ? "確認ステップ 1/2: 本当に退会しますか？"
+      : page.ui.withdrawal.confirmStep === 2
+        ? "確認ステップ 2/2: この操作は取り消せません。"
+        : "";
+    withdrawalNextButton.disabled = !page.ui.withdrawal.isModalOpen || page.ui.withdrawal.confirmStep !== 1;
+    withdrawalExecuteButton.disabled = !page.ui.withdrawal.isModalOpen
+      || page.ui.withdrawal.confirmStep !== 2
+      || page.ui.withdrawal.isSubmitting;
+    withdrawalExecuteButton.textContent = page.ui.withdrawal.isSubmitting ? "退会処理中..." : "退会を実行";
+  };
+
+  async function runWithRender<T>(runner: () => Promise<T>): Promise<T> {
+    const promise = runner();
+    render();
+    const result = await promise;
+    render();
+    return result;
+  }
+
+  timezoneSelect.addEventListener("change", () => {
+    page.actions.setTimezone(timezoneSelect.value);
+    runtimeError = null;
+    runtimeRetryAction = null;
+    render();
+  });
+  dayCutoffTimeInput.addEventListener("change", () => {
+    page.actions.setDayCutoffTime(dayCutoffTimeInput.value);
+    runtimeError = null;
+    runtimeRetryAction = null;
+    render();
+  });
+
+  saveButton.addEventListener("click", () => {
+    void runWithRender(() => page.actions.save()).then(() => {
+      runtimeError = null;
+      runtimeRetryAction = null;
+      render();
+    });
+  });
+
+  retryButton.addEventListener("click", () => {
+    const modelRetryAction = page.ui.error.retryAction;
+    if (modelRetryAction) {
+      void runWithRender(() => modelRetryAction.retry()).then((result) => {
+        if (result.kind === "success") {
+          runtimeError = null;
+          runtimeRetryAction = null;
+        }
+        render();
+      });
+      return;
+    }
+    if (runtimeRetryAction) {
+      void runWithRender(async () => {
+        await runtimeRetryAction?.();
+        return null;
+      }).then(() => {
+        render();
+      });
+      return;
+    }
+  });
+
+  backHomeButton.addEventListener("click", () => {
+    page.actions.backHome();
+  });
+  logoutButton.addEventListener("click", () => {
+    page.actions.logout();
+  });
+
+  withdrawalOpenButton.addEventListener("click", () => {
+    page.actions.openWithdrawalModal();
+    runtimeError = null;
+    runtimeRetryAction = null;
+    render();
+  });
+  withdrawalNextButton.addEventListener("click", () => {
+    page.actions.advanceWithdrawalConfirmStep();
+    render();
+  });
+  withdrawalCancelButton.addEventListener("click", () => {
+    page.actions.cancelWithdrawalModal();
+    runtimeError = null;
+    runtimeRetryAction = null;
+    render();
+  });
+  withdrawalExecuteButton.addEventListener("click", () => {
+    void runWithRender(() => page.actions.executeWithdrawal()).then((result) => {
+      if (result.kind === "success") {
+        runtimeError = null;
+        runtimeRetryAction = null;
+        window.location.assign(ROUTE_MAP["SCR-001"]);
+        return;
+      }
+      runtimeError = resolveErrorPresentation(result.status, result.code, result.traceId);
+      runtimeRetryAction = async () => {
+        const retried = await page.actions.executeWithdrawal();
+        if (retried.kind === "success") {
+          runtimeError = null;
+          runtimeRetryAction = null;
+          window.location.assign(ROUTE_MAP["SCR-001"]);
+          return;
+        }
+        runtimeError = resolveErrorPresentation(retried.status, retried.code, retried.traceId);
+      };
+      render();
+    });
+  });
+
+  render();
 }
 
 function renderHabitCreatePage(root: HTMLDivElement, app: ReturnType<typeof bootstrapApp>) {
