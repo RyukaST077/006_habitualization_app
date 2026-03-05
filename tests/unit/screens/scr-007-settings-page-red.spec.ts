@@ -8,6 +8,11 @@ import {
   SCR007_TRACEABILITY_IDS,
   SCR007_UI_REQUIREMENT_TRACE_CASES,
   SCR007_WITHDRAWAL_UI_BOUNDARY,
+  T062_C001_COMPLETION_GATE_COMMANDS,
+  T062_C002_COMPLETION_GATE_COMMANDS,
+  T062_C003_COMPLETION_GATE_COMMANDS,
+  T062_LOGOUT_TRACEABILITY_IDS,
+  T062_LOGOUT_UI_REQUIREMENT_TRACE_CASES,
   T056_C004_COMPLETION_GATE_COMMANDS,
 } from "../../helpers/ui/common-ui-fixtures";
 
@@ -27,6 +32,52 @@ describe("T-056 C-004 SCR-007 settings page regression gate", () => {
       "SCR-007",
     ]);
     expect(SCR007_UI_REQUIREMENT_TRACE_CASES).toHaveLength(10);
+  });
+
+  it("T-062: ログアウト回帰のトレース観点を固定する", () => {
+    expect(T062_LOGOUT_TRACEABILITY_IDS).toEqual([
+      "FR-004",
+      "AC-004",
+      "SCR-007",
+      "SCR-001",
+      "IF-001",
+    ]);
+    expect(T062_LOGOUT_UI_REQUIREMENT_TRACE_CASES).toHaveLength(3);
+    expect(T062_C001_COMPLETION_GATE_COMMANDS).toEqual([
+      "rg -n \"T-062|FR-004|AC-004|settings-logout|ログアウト回帰\" tests/helpers/ui/common-ui-fixtures.ts tests/unit/screens/scr-007-settings-page-red.spec.ts tests/integration/ui/scr-007-settings-runtime-red.spec.ts",
+      "npm run test -- tests/unit/screens/scr-007-settings-page-red.spec.ts tests/integration/ui/scr-007-settings-runtime-red.spec.ts",
+    ]);
+  });
+
+  it("T-062: logout アクションは callback 経由の結果を画面モデルへ返す", async () => {
+    const onLogout = vi.fn().mockResolvedValue({
+      kind: "success",
+      route: "SCR-001",
+    } as const);
+    const page = SCR007SettingsPage({
+      screenId: "SCR-007",
+      handlers: {
+        onLogout,
+      },
+    });
+
+    const result = await page.actions.logout();
+    expect(result).toEqual({
+      kind: "success",
+      route: "SCR-001",
+    });
+    expect(onLogout).toHaveBeenCalledTimes(1);
+    expect(T062_C002_COMPLETION_GATE_COMMANDS).toEqual([
+      "npm run test -- tests/integration/ui/scr-007-settings-runtime-red.spec.ts",
+      "npm run test -- tests/unit/screens/scr-007-settings-page-red.spec.ts",
+    ]);
+  });
+
+  it("T-062: C-003 の最終回帰ゲートコマンドを固定する", () => {
+    expect(T062_C003_COMPLETION_GATE_COMMANDS).toEqual([
+      "npm run test -- tests/unit/screens/scr-007-settings-page-red.spec.ts tests/integration/ui/scr-007-settings-runtime-red.spec.ts",
+      "npm run test -- tests/unit/screens/scr-007-settings-page-red.spec.ts tests/integration/ui/scr-007-settings-runtime-red.spec.ts && npm run typecheck",
+    ]);
   });
 
   it("初期値と編集値の差分で保存活性を制御する", () => {

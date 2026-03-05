@@ -30,6 +30,18 @@ export type SettingsWithdrawalResolution =
       traceId?: string;
     };
 
+export type SettingsLogoutResolution =
+  | {
+      kind: "success";
+      route: "SCR-001" | "SCR-002" | "SCR-008";
+    }
+  | {
+      kind: "error";
+      status: ErrorStatus;
+      code: CommonErrorCode;
+      traceId?: string;
+    };
+
 export type SettingsRetryAction = {
   label: "再試行";
   retry: () => Promise<SettingsSaveResult>;
@@ -50,7 +62,7 @@ export type SettingsWithdrawalConfirmStep = 0 | 1 | 2;
 
 export type SettingsPageHandlers = {
   onBackHome?: () => void;
-  onLogout?: () => void;
+  onLogout?: () => Promise<SettingsLogoutResolution>;
   onSaveSettings?: (input: SettingsProfile) => Promise<SettingsSaveResolution>;
   onWithdraw?: () => Promise<SettingsWithdrawalResolution>;
 };
@@ -86,7 +98,7 @@ export type SettingsPageModel = {
   };
   actions: {
     backHome: () => void;
-    logout: () => void;
+    logout: () => Promise<SettingsLogoutResolution>;
     setTimezone: (timezone: string) => void;
     setDayCutoffTime: (dayCutoffTime: string) => void;
     save: () => Promise<SettingsSaveResult>;
@@ -350,7 +362,17 @@ export function SCR007SettingsPage({
     },
     actions: {
       backHome: () => handlers?.onBackHome?.(),
-      logout: () => handlers?.onLogout?.(),
+      logout: async () => {
+        const result = await handlers?.onLogout?.();
+        if (result) {
+          return result;
+        }
+        return {
+          kind: "error",
+          status: 500,
+          code: "INTERNAL_ERROR",
+        };
+      },
       setTimezone: (nextTimezone) => {
         editingProfile = { ...editingProfile, timezone: nextTimezone };
         revalidate();

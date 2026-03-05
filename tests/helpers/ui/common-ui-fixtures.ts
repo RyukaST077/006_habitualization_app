@@ -907,6 +907,7 @@ export const T056_C002_COMPLETION_GATE_COMMANDS = [
 export const SCR007_RUNTIME_USER_ID = "00000000-0000-4000-8000-000000000001" as const;
 export const SCR007_RUNTIME_PROFILE_ENDPOINT = "/api/settings/profile" as const;
 export const SCR007_RUNTIME_WITHDRAWAL_ENDPOINT = "/api/settings/withdrawal" as const;
+export const SCR007_RUNTIME_LOGOUT_ENDPOINT = "/api/auth/google/callback" as const;
 export const SCR007_RUNTIME_INITIAL_PROFILE = {
   timezone: "Asia/Tokyo",
   dayCutoffTime: "06:00",
@@ -920,6 +921,12 @@ export const SCR007_RUNTIME_ERROR_CASES = [
   { status: 409, code: "DOMAIN_CONFLICT" },
   { status: 500, code: "INTERNAL_ERROR" },
 ] as const;
+export const SCR007_RUNTIME_LOGOUT_SUCCESS_ROUTE = "SCR-001" as const;
+export const SCR007_RUNTIME_LOGOUT_ERROR = {
+  status: 500,
+  code: "INTERNAL_ERROR",
+  traceId: "trace-logout-500",
+} as const;
 
 export const T056_C003_COMPLETION_GATE_COMMANDS = [
   "npm run test -- tests/integration/ui/scr-007-settings-runtime-red.spec.ts",
@@ -929,6 +936,56 @@ export const T056_C003_COMPLETION_GATE_COMMANDS = [
 export const T056_C004_COMPLETION_GATE_COMMANDS = [
   "npm run test -- tests/unit/screens/scr-007-settings-page-red.spec.ts tests/integration/ui/scr-007-settings-runtime-red.spec.ts",
   "npm run test -- tests/unit/screens/scr-007-settings-page-red.spec.ts tests/integration/ui/scr-007-settings-runtime-red.spec.ts tests/integration/api/if-002-settings-profile-red.spec.ts && npm run typecheck",
+] as const;
+
+export const T062_C002_COMPLETION_GATE_COMMANDS = [
+  "npm run test -- tests/integration/ui/scr-007-settings-runtime-red.spec.ts",
+  "npm run test -- tests/unit/screens/scr-007-settings-page-red.spec.ts",
+] as const;
+
+export const T062_C003_COMPLETION_GATE_COMMANDS = [
+  "npm run test -- tests/unit/screens/scr-007-settings-page-red.spec.ts tests/integration/ui/scr-007-settings-runtime-red.spec.ts",
+  "npm run test -- tests/unit/screens/scr-007-settings-page-red.spec.ts tests/integration/ui/scr-007-settings-runtime-red.spec.ts && npm run typecheck",
+] as const;
+
+export const T062_LOGOUT_TRACEABILITY_IDS = [
+  "FR-004",
+  "AC-004",
+  "SCR-007",
+  "SCR-001",
+  "IF-001",
+] as const;
+
+export const T062_LOGOUT_UI_REQUIREMENT_TRACE_CASES = [
+  {
+    traceId: "T-062/C-001/TC-ST-FR-004-004/FR-004/AC-004/SCR-007/header-logout-route",
+    testCaseId: "TC-ST-FR-004-004",
+    requirementId: "FR-004",
+    acceptanceId: "AC-004",
+    screenId: "SCR-007",
+    title: "ヘッダー導線のログアウト押下で /login へ戻す観点を固定する",
+  },
+  {
+    traceId: "T-062/C-001/TC-ST-FR-004-004/FR-004/AC-004/SCR-007/logout-session-clear",
+    testCaseId: "TC-ST-FR-004-004",
+    requirementId: "FR-004",
+    acceptanceId: "AC-004",
+    screenId: "SCR-007",
+    title: "ログアウト時にセッション破棄要求を実行する観点を固定する",
+  },
+  {
+    traceId: "T-062/C-001/TC-ST-FR-004-004/FR-004/AC-004/SCR-007/logout-error-retry",
+    testCaseId: "TC-ST-FR-004-004",
+    requirementId: "FR-004",
+    acceptanceId: "AC-004",
+    screenId: "SCR-007",
+    title: "ログアウト失敗時にエラー表示と再試行導線を保持する観点を固定する",
+  },
+] as const;
+
+export const T062_C001_COMPLETION_GATE_COMMANDS = [
+  "rg -n \"T-062|FR-004|AC-004|settings-logout|ログアウト回帰\" tests/helpers/ui/common-ui-fixtures.ts tests/unit/screens/scr-007-settings-page-red.spec.ts tests/integration/ui/scr-007-settings-runtime-red.spec.ts",
+  "npm run test -- tests/unit/screens/scr-007-settings-page-red.spec.ts tests/integration/ui/scr-007-settings-runtime-red.spec.ts",
 ] as const;
 
 export const SCR002_UI_REQUIREMENT_TRACE_CASES: readonly Scr002UiRequirementTraceCase[] = [

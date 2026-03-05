@@ -25,6 +25,7 @@ import {
 } from "./screens/SCR-006AnalyticsPage";
 import {
   SCR007SettingsPage,
+  type SettingsLogoutResolution,
   type SettingsProfile,
   type SettingsSaveResolution,
   type SettingsWithdrawalResolution,
@@ -301,6 +302,12 @@ type If002SettingsProfileErrorPayload = {
 };
 
 type If002SettingsWithdrawalErrorPayload = {
+  code?: string;
+  trace_id?: string;
+};
+
+type If001CallbackRuntimePayload = {
+  route?: If001CallbackRoute;
   code?: string;
   trace_id?: string;
 };
@@ -980,6 +987,55 @@ export async function requestSettingsWithdrawalRuntime(
   }
 }
 
+function resolveIf001CallbackRoute(route: unknown): If001CallbackRoute {
+  if (route === "SCR-002" || route === "SCR-008") {
+    return route;
+  }
+  return "SCR-001";
+}
+
+export async function requestSettingsLogoutRuntime(
+  fetchFn: typeof fetch,
+  userId?: string,
+): Promise<SettingsLogoutResolution> {
+  try {
+    const response = await fetchFn("/api/auth/google/callback", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        userId,
+        consentState: "rejected",
+      }),
+    });
+    const payload = await parseJsonResponse<If001CallbackRuntimePayload>(response);
+    if (response.ok) {
+      return {
+        kind: "success",
+        route: resolveIf001CallbackRoute(payload?.route),
+      };
+    }
+
+    const rawCode = payload !== null && typeof payload.code === "string"
+      ? payload.code
+      : undefined;
+    const rawTraceId = payload !== null && typeof payload.trace_id === "string"
+      ? payload.trace_id
+      : undefined;
+    return {
+      kind: "error",
+      status: asErrorStatus(response.status),
+      code: asErrorCode(rawCode),
+      traceId: rawTraceId,
+    };
+  } catch {
+    return {
+      kind: "error",
+      status: 500,
+      code: "INTERNAL_ERROR",
+    };
+  }
+}
+
 function renderHomePage(root: HTMLDivElement, app: ReturnType<typeof bootstrapApp>) {
   const userId = resolveHabitFormUserId();
   const page = SCR002HomePage({
@@ -1414,9 +1470,7 @@ export async function renderSettingsPage(root: HTMLDivElement, app: ReturnType<t
       onBackHome: () => {
         window.location.assign(ROUTE_MAP["SCR-002"]);
       },
-      onLogout: () => {
-        window.location.assign(ROUTE_MAP["SCR-001"]);
-      },
+      onLogout: () => requestSettingsLogoutRuntime(fetch, userId),
       onSaveSettings: (input) => requestSettingsProfileSaveRuntime(fetch, input, userId),
       onWithdraw: () => requestSettingsWithdrawalRuntime(fetch, userId),
     },
@@ -1503,6 +1557,29 @@ export async function renderSettingsPage(root: HTMLDivElement, app: ReturnType<t
     ? resolveErrorPresentation(initialProfileResult.status, initialProfileResult.code, initialProfileResult.traceId)
     : null;
   let runtimeRetryAction: (() => Promise<void>) | null = null;
+  let isLoggingOut = false;
+
+  const applyLogoutResolution = (result: SettingsLogoutResolution): void => {
+    if (result.kind === "success") {
+      clearAuthSessionStorage();
+      window.location.assign(mapRouteIdToPath(result.route));
+      return;
+    }
+
+    runtimeError = resolveErrorPresentation(result.status, result.code, result.traceId);
+    runtimeRetryAction = async () => {
+      if (isLoggingOut) {
+        return;
+      }
+      isLoggingOut = true;
+      try {
+        const retried = await page.actions.logout();
+        applyLogoutResolution(retried);
+      } finally {
+        isLoggingOut = false;
+      }
+    };
+  };
 
   const render = () => {
     timezoneSelect.innerHTML = page.ui.form.timezoneOptions.map((option) => {
@@ -1523,7 +1600,10 @@ export async function renderSettingsPage(root: HTMLDivElement, app: ReturnType<t
     errorMessage.textContent = displayedError?.message ?? "";
     errorTrace.textContent = displayedError?.visibleTraceId ?? "";
     retryButton.hidden = page.ui.error.retryAction === null && runtimeRetryAction === null;
-    retryButton.disabled = page.ui.save.isSubmitting || page.ui.withdrawal.isSubmitting;
+    retryButton.disabled = page.ui.save.isSubmitting || page.ui.withdrawal.isSubmitting || isLoggingOut;
+
+    logoutButton.disabled = page.ui.save.isSubmitting || page.ui.withdrawal.isSubmitting || isLoggingOut;
+    logoutButton.textContent = isLoggingOut ? "ログアウト中..." : "ログアウト";
 
     withdrawalModal.hidden = !page.ui.withdrawal.isModalOpen;
     withdrawalStep.textContent = page.ui.withdrawal.confirmStep === 1
@@ -1594,7 +1674,21 @@ export async function renderSettingsPage(root: HTMLDivElement, app: ReturnType<t
     page.actions.backHome();
   });
   logoutButton.addEventListener("click", () => {
-    page.actions.logout();
+    if (isLoggingOut) {
+      return;
+    }
+    runtimeError = null;
+    runtimeRetryAction = null;
+    void runWithRender(async () => {
+      isLoggingOut = true;
+      return page.actions.logout();
+    }).then((result) => {
+      applyLogoutResolution(result);
+      render();
+    }).finally(() => {
+      isLoggingOut = false;
+      render();
+    });
   });
 
   withdrawalOpenButton.addEventListener("click", () => {

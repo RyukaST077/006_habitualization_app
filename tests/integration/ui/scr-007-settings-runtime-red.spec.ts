@@ -4,12 +4,16 @@ import { ROUTE_MAP } from "../../../src/app/route-map";
 import {
   requestSettingsProfileRuntime,
   requestSettingsProfileSaveRuntime,
+  requestSettingsLogoutRuntime,
   requestSettingsWithdrawalRuntime,
 } from "../../../src/main";
 import { SCR007SettingsPage } from "../../../src/screens/SCR-007SettingsPage";
 import {
   SCR007_RUNTIME_ERROR_CASES,
   SCR007_RUNTIME_INITIAL_PROFILE,
+  SCR007_RUNTIME_LOGOUT_ENDPOINT,
+  SCR007_RUNTIME_LOGOUT_ERROR,
+  SCR007_RUNTIME_LOGOUT_SUCCESS_ROUTE,
   SCR007_RUNTIME_PROFILE_ENDPOINT,
   SCR007_RUNTIME_UPDATED_PROFILE,
   SCR007_RUNTIME_USER_ID,
@@ -17,6 +21,9 @@ import {
   SCR007_TRACEABILITY_IDS,
   SCR007_UI_REQUIREMENT_TRACE_CASES,
   SCR007_WITHDRAWAL_UI_BOUNDARY,
+  T062_C002_COMPLETION_GATE_COMMANDS,
+  T062_LOGOUT_TRACEABILITY_IDS,
+  T062_LOGOUT_UI_REQUIREMENT_TRACE_CASES,
   T056_C004_COMPLETION_GATE_COMMANDS,
 } from "../../helpers/ui/common-ui-fixtures";
 
@@ -200,6 +207,57 @@ describe("T-056 C-004 SCR-007 settings runtime regression", () => {
     ]);
   });
 
+  it("ログアウト成功時は callback API で sessionCleared 相当を要求し、SCR-001 を返す", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ route: SCR007_RUNTIME_LOGOUT_SUCCESS_ROUTE, sessionCleared: true }),
+    } as Response);
+
+    const result = await requestSettingsLogoutRuntime(fetchMock, SCR007_RUNTIME_USER_ID);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      SCR007_RUNTIME_LOGOUT_ENDPOINT,
+      expect.objectContaining({
+        method: "POST",
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    const requestBody = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+    expect(requestBody).toEqual({
+      userId: SCR007_RUNTIME_USER_ID,
+      consentState: "rejected",
+    });
+    expect(result).toEqual({
+      kind: "success",
+      route: "SCR-001",
+    });
+  });
+
+  it("ログアウト失敗時は status/code/trace_id をエラーマッピングする", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue({
+      ok: false,
+      status: SCR007_RUNTIME_LOGOUT_ERROR.status,
+      json: async () => ({
+        code: SCR007_RUNTIME_LOGOUT_ERROR.code,
+        trace_id: SCR007_RUNTIME_LOGOUT_ERROR.traceId,
+      }),
+    } as Response);
+
+    const result = await requestSettingsLogoutRuntime(fetchMock, SCR007_RUNTIME_USER_ID);
+
+    expect(result).toEqual({
+      kind: "error",
+      status: SCR007_RUNTIME_LOGOUT_ERROR.status,
+      code: SCR007_RUNTIME_LOGOUT_ERROR.code,
+      traceId: SCR007_RUNTIME_LOGOUT_ERROR.traceId,
+    });
+    expect(T062_C002_COMPLETION_GATE_COMMANDS).toEqual([
+      "npm run test -- tests/integration/ui/scr-007-settings-runtime-red.spec.ts",
+      "npm run test -- tests/unit/screens/scr-007-settings-page-red.spec.ts",
+    ]);
+  });
+
   it("FR-019..024 / AC-019..022 / SCR-007 のトレースと C-004 完了ゲートを固定する", () => {
     expect(SCR007_TRACEABILITY_IDS).toEqual([
       "FR-019",
@@ -219,5 +277,16 @@ describe("T-056 C-004 SCR-007 settings runtime regression", () => {
       "npm run test -- tests/unit/screens/scr-007-settings-page-red.spec.ts tests/integration/ui/scr-007-settings-runtime-red.spec.ts",
       "npm run test -- tests/unit/screens/scr-007-settings-page-red.spec.ts tests/integration/ui/scr-007-settings-runtime-red.spec.ts tests/integration/api/if-002-settings-profile-red.spec.ts && npm run typecheck",
     ]);
+  });
+
+  it("T-062: ログアウト回帰観点（導線/セッション破棄要求/失敗時再試行）を保持する", () => {
+    expect(T062_LOGOUT_TRACEABILITY_IDS).toEqual([
+      "FR-004",
+      "AC-004",
+      "SCR-007",
+      "SCR-001",
+      "IF-001",
+    ]);
+    expect(T062_LOGOUT_UI_REQUIREMENT_TRACE_CASES).toHaveLength(3);
   });
 });
