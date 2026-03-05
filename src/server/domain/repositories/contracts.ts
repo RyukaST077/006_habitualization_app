@@ -25,6 +25,12 @@ import type {
   UserPolicyConsent,
 } from "./types";
 
+export interface ProfileSettingsSnapshot {
+  timezone: string;
+  dayCutoffTime: string;
+  version: number;
+}
+
 export interface HabitCheckinUpsertResult {
   log: HabitLog;
   idempotent: boolean;
@@ -32,7 +38,14 @@ export interface HabitCheckinUpsertResult {
 
 export interface UserRepositoryContract {
   findProfile(userId: string): Promise<Profile | null>;
+  getProfileSettings?(userId: string): Promise<ProfileSettingsSnapshot | null>;
   updateProfileSettings(userId: string, timezone: string, cutoff: string, version: number): Promise<Profile>;
+  updateProfileSettingsSnapshot?(
+    userId: string,
+    timezone: string,
+    cutoff: string,
+    version: number,
+  ): Promise<ProfileSettingsSnapshot>;
   incrementDailyActivity(
     userId: string,
     logDate: string,

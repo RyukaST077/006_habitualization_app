@@ -1,4 +1,7 @@
-import type { UserRepositoryContract } from "../../domain/repositories/contracts";
+import type {
+  ProfileSettingsSnapshot,
+  UserRepositoryContract,
+} from "../../domain/repositories/contracts";
 import { createRepositoryError } from "../../domain/repositories/errors";
 import type { Profile, UserDailyActivity } from "../../domain/repositories/types";
 import {
@@ -13,6 +16,19 @@ export class UserRepository implements UserRepositoryContract {
   public async findProfile(userId: string): Promise<Profile | null> {
     const profile = this.client.profiles.get(userId);
     return profile === undefined ? null : cloneRepositoryValue(profile);
+  }
+
+  public async getProfileSettings(userId: string): Promise<ProfileSettingsSnapshot | null> {
+    const profile = await this.findProfile(userId);
+    if (profile === null) {
+      return null;
+    }
+
+    return {
+      timezone: profile.timezone,
+      dayCutoffTime: profile.dayCutoffTime,
+      version: profile.version,
+    };
   }
 
   public async updateProfileSettings(
@@ -39,6 +55,20 @@ export class UserRepository implements UserRepositoryContract {
 
     this.client.profiles.set(userId, updated);
     return cloneRepositoryValue(updated);
+  }
+
+  public async updateProfileSettingsSnapshot(
+    userId: string,
+    timezone: string,
+    cutoff: string,
+    version: number,
+  ): Promise<ProfileSettingsSnapshot> {
+    const updated = await this.updateProfileSettings(userId, timezone, cutoff, version);
+    return {
+      timezone: updated.timezone,
+      dayCutoffTime: updated.dayCutoffTime,
+      version: updated.version,
+    };
   }
 
   public async incrementDailyActivity(

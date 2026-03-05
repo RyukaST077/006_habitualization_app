@@ -18,6 +18,7 @@ import { resolveLogDate } from "../../domain/time/BusinessDateService";
 import type { OpsRepositoryContract } from "../../domain/repositories/contracts";
 import type { AuditLogRecord, AuditLogRecordInput } from "../../domain/repositories/types";
 import { HistoryService } from "../history/HistoryService";
+import { SettingsService } from "../settings/SettingsService";
 import { HabitRepository } from "../../infrastructure/repositories/HabitRepository";
 import { UserRepository } from "../../infrastructure/repositories/UserRepository";
 import { createSupabaseRepositoryClient } from "../../infrastructure/repositories/supabase-repository-client";
@@ -221,6 +222,7 @@ const if002HabitRepository = new HabitRepository(if002CheckinClient);
 const if002UserRepository = new UserRepository(if002CheckinClient);
 const if002CheckinService = new CheckinService(if002UserRepository, if002HabitRepository);
 const if002HistoryService = new HistoryService(if002HabitRepository, if002UserRepository);
+const if002SettingsService = new SettingsService(if002UserRepository);
 
 let if002AuditSequence = 0;
 const if002AuditLogService = new AuditLogService({
@@ -392,6 +394,11 @@ async function runWithErrorMapping(testCase: {
       return analyticsSuccessResult;
     }
 
+    const settingsSuccessResult = await resolveSettingsProfileSuccessResult(testCase);
+    if (settingsSuccessResult) {
+      return settingsSuccessResult;
+    }
+
     throw new Error("unexpected error");
   } catch (error: unknown) {
     const mapped = mapIf002Error(error, testCase.traceId, testCase.requirementId);
@@ -507,6 +514,78 @@ async function resolveHistorySuccessResult(testCase: {
   );
 
   return createHistoryCalendarSuccessResult(history.days, testCase.traceId, testCase.requirementId);
+}
+
+async function resolveSettingsProfileSuccessResult(testCase: {
+  traceId: string;
+  method: "GET" | "POST" | "PATCH" | "DELETE";
+  requirementId: string;
+  endpoint: string;
+  request: If002RunnerRequest;
+}): Promise<If002ErrorResult | null> {
+  if (testCase.endpoint !== "/api/settings/profile") {
+    return null;
+  }
+
+  if (testCase.method === "GET") {
+    const settings = await if002SettingsService.getProfileSettings(
+      testCase.request.actorUserId,
+      normalizeTraceId(testCase.traceId),
+    );
+
+    return {
+      status: 200,
+      body: {
+        code: "SUCCESS",
+        message: "settings profile retrieval succeeded",
+        trace_id: normalizeTraceId(testCase.traceId),
+        requirement_id: testCase.requirementId,
+        settings: {
+          timezone: settings.timezone,
+          day_cutoff_time: settings.dayCutoffTime,
+          version: settings.version,
+        },
+      } as If002ErrorResult["body"],
+    };
+  }
+
+  if (testCase.method === "PATCH") {
+    const current = await if002SettingsService.getProfileSettings(
+      testCase.request.actorUserId,
+      normalizeTraceId(`${testCase.traceId}-current`),
+    );
+    const versionFromPayload = testCase.request.body.version;
+    const version = Number.isInteger(versionFromPayload) ? (versionFromPayload as number) : current.version;
+
+    const updated = await if002SettingsService.updateProfileSettings(
+      testCase.request.actorUserId,
+      {
+        timezone: testCase.request.body.timezone as string,
+        dayCutoffTime: testCase.request.body.day_cutoff_time as string,
+        version,
+      },
+      normalizeTraceId(testCase.traceId),
+    );
+
+    return {
+      status: 200,
+      body: {
+        code: "SUCCESS",
+        message: "settings profile update succeeded",
+        trace_id: normalizeTraceId(testCase.traceId),
+        requirement_id: testCase.requirementId,
+        settings: {
+          timezone: updated.timezone,
+          day_cutoff_time: updated.dayCutoffTime,
+          version: updated.version,
+          saved: updated.saved,
+          effective_from: updated.effectiveFrom,
+        },
+      } as If002ErrorResult["body"],
+    };
+  }
+
+  return null;
 }
 
 interface CheckinBusinessDateInput {

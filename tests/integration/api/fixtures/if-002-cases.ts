@@ -1,4 +1,4 @@
-export type If002Method = "POST" | "PATCH" | "DELETE";
+export type If002Method = "GET" | "POST" | "PATCH" | "DELETE";
 export type HabitStatus = "active" | "archived";
 export type HabitStatusTransitionAction = "archive" | "resume";
 export type If002ErrorCode =
@@ -7,6 +7,8 @@ export type If002ErrorCode =
   | "DOMAIN_CONFLICT"
   | "INTERNAL_ERROR";
 export type If002RequirementId =
+  | "FR-019"
+  | "FR-020"
   | "FR-010"
   | "FR-006"
   | "FR-007"
@@ -22,6 +24,7 @@ export type If002Perspective = "DTO_REQUIRED" | "DTO_TYPE_RANGE" | "AUTHZ_SELF_O
 export type If002HabitLifecycleAcceptanceId = "AC-006" | "AC-007" | "AC-008" | "AC-009";
 export type If002HabitTransitionRequirementId = "FR-008" | "FR-009";
 export type If002CheckinsBusinessDateAcceptanceId = "AC-010";
+export type If002SettingsProfileAcceptanceId = "AC-019" | "AC-020" | "AC-021";
 
 export interface If002RunnableCase {
   traceId: string;
@@ -96,6 +99,27 @@ export interface If002CheckinsBusinessDateRedCase {
   actors: readonly [If002CheckinsBusinessDateActorCase, If002CheckinsBusinessDateActorCase];
   request: {
     habitId: string;
+  };
+}
+
+export interface If002SettingsProfileCase {
+  traceId: string;
+  endpoint: "/api/settings/profile";
+  method: "GET" | "PATCH";
+  requirementId: "FR-019" | "FR-020" | "FR-021" | "FR-025";
+  acceptanceId: If002SettingsProfileAcceptanceId;
+  expectedStatus: 200;
+  request: {
+    actorUserId: string;
+    targetUserId?: string;
+    body: Record<string, unknown>;
+  };
+  expected: {
+    timezone: string;
+    dayCutoffTime: string;
+    version: number;
+    saved?: true;
+    effectiveFrom?: string;
   };
 }
 
@@ -377,6 +401,47 @@ export const IF002_CHECKINS_BUSINESS_DATE_RED_CASES: readonly If002CheckinsBusin
     ],
     request: {
       habitId: "habit-red-001",
+    },
+  },
+] as const;
+
+export const IF002_SETTINGS_PROFILE_CASES: readonly If002SettingsProfileCase[] = [
+  {
+    traceId: "IF-002/SETTINGS/AC-019/FR-019/get-profile-settings",
+    endpoint: "/api/settings/profile",
+    method: "GET",
+    requirementId: "FR-019",
+    acceptanceId: "AC-019",
+    expectedStatus: 200,
+    request: {
+      actorUserId: "user-red-001",
+      body: {},
+    },
+    expected: {
+      timezone: "Asia/Tokyo",
+      dayCutoffTime: "04:00",
+      version: 1,
+    },
+  },
+  {
+    traceId: "IF-002/SETTINGS/AC-020/FR-020/patch-profile-settings",
+    endpoint: "/api/settings/profile",
+    method: "PATCH",
+    requirementId: "FR-020",
+    acceptanceId: "AC-020",
+    expectedStatus: 200,
+    request: {
+      actorUserId: "user-red-001",
+      body: {
+        timezone: "UTC",
+        day_cutoff_time: "05:30",
+      },
+    },
+    expected: {
+      timezone: "UTC",
+      dayCutoffTime: "05:30",
+      version: 2,
+      saved: true,
     },
   },
 ] as const;

@@ -176,13 +176,20 @@ export function validateProfileSettingsDto(payload: unknown): ValidationResult {
   }
 
   const timezone = payload.timezone;
-  if (typeof timezone !== "string" || !isValidIanaTimeZone(timezone)) {
+  if (typeof timezone !== "string" || timezone.trim().length === 0 || !isValidIanaTimeZone(timezone)) {
     return { message: "timezone is invalid", requirement_id: "FR-021" };
   }
 
   const dayCutoffTime = payload.day_cutoff_time;
   if (typeof dayCutoffTime !== "string" || !HH_MM_PATTERN.test(dayCutoffTime)) {
     return { message: "day_cutoff_time must be hh:mm", requirement_id: "FR-021" };
+  }
+
+  if ("version" in payload) {
+    const version = payload.version;
+    if (!Number.isInteger(version) || (version as number) < 1) {
+      return { message: "version must be integer >= 1", requirement_id: "FR-021" };
+    }
   }
 
   return null;
