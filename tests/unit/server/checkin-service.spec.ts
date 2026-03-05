@@ -26,6 +26,7 @@ function createUserRepository(profile: Profile | null): UserRepositoryContract {
     findProfile: vi.fn(async () => profile),
     updateProfileSettings: vi.fn(),
     incrementDailyActivity: vi.fn(),
+    findDailyActivitiesByDateRange: vi.fn(async () => []),
     markAccountDisabled: vi.fn(),
   };
 }

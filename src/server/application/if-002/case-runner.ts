@@ -1,8 +1,10 @@
 import { assertIf002SelfOnlyAccess } from "./authorization";
 import {
+  validateAnalyticsUserSummaryQueryDto,
   validateCheckinCancelDto,
   validateCheckinDto,
   validateHabitCreateDto,
+  validateHistoryCalendarQueryDto,
   validateHabitUpdateDto,
   validatePolicyConsentsDto,
   validateProfileSettingsDto,
@@ -15,6 +17,7 @@ import { normalizeTraceId } from "../common/trace-id";
 import { resolveLogDate } from "../../domain/time/BusinessDateService";
 import type { OpsRepositoryContract } from "../../domain/repositories/contracts";
 import type { AuditLogRecord, AuditLogRecordInput } from "../../domain/repositories/types";
+import { HistoryService } from "../history/HistoryService";
 import { HabitRepository } from "../../infrastructure/repositories/HabitRepository";
 import { UserRepository } from "../../infrastructure/repositories/UserRepository";
 import { createSupabaseRepositoryClient } from "../../infrastructure/repositories/supabase-repository-client";
@@ -28,7 +31,7 @@ interface If002RunnerRequest {
 interface If002RunnerCase {
   traceId: string;
   endpoint: string;
-  method: "POST" | "PATCH" | "DELETE";
+  method: "GET" | "POST" | "PATCH" | "DELETE";
   requirementId: string;
   expectedMessage: string;
   request: If002RunnerRequest;
@@ -37,7 +40,7 @@ interface If002RunnerCase {
 interface If002RunnerErrorScenario {
   traceId: string;
   endpoint: "/api/checkins" | "/api/habits";
-  method: "POST" | "PATCH" | "DELETE";
+  method: "GET" | "POST" | "PATCH" | "DELETE";
   requirementId: string;
   request: If002RunnerRequest;
 }
@@ -91,6 +94,14 @@ const if002CheckinClient = createSupabaseRepositoryClient({
       accountStatus: "active",
       version: 1,
     },
+    {
+      userId: "user-red-003",
+      displayName: "Red Tester C",
+      timezone: "UTC",
+      dayCutoffTime: "04:00",
+      accountStatus: "active",
+      version: 1,
+    },
   ],
   habits: [
     {
@@ -128,11 +139,88 @@ const if002CheckinClient = createSupabaseRepositoryClient({
       updatedAt: "2026-03-01T00:00:00.000Z",
     },
   ],
+  habitLogs: [
+    {
+      userId: "user-red-001",
+      habitId: "habit-red-001",
+      logDate: "2026-02-01",
+      checkedInAt: "2026-02-01T08:30:00.000Z",
+    },
+    {
+      userId: "user-red-001",
+      habitId: "habit-red-001",
+      logDate: "2026-02-03",
+      checkedInAt: "2026-02-03T08:30:00.000Z",
+    },
+    {
+      userId: "user-red-001",
+      habitId: "habit-archived-001",
+      logDate: "2026-02-05",
+      checkedInAt: "2026-02-05T08:30:00.000Z",
+    },
+    {
+      userId: "user-red-002",
+      habitId: "habit-user-red-002",
+      logDate: "2026-02-02",
+      checkedInAt: "2026-02-02T08:30:00.000Z",
+    },
+  ],
+  userDailyActivities: [
+    {
+      userId: "user-red-001",
+      activityDate: "2026-02-26",
+      loginCount: 1,
+      checkinCount: 1,
+      updatedAt: "2026-02-26T09:00:00.000Z",
+    },
+    {
+      userId: "user-red-001",
+      activityDate: "2026-02-27",
+      loginCount: 1,
+      checkinCount: 0,
+      updatedAt: "2026-02-27T09:00:00.000Z",
+    },
+    {
+      userId: "user-red-001",
+      activityDate: "2026-02-28",
+      loginCount: 1,
+      checkinCount: 1,
+      updatedAt: "2026-02-28T09:00:00.000Z",
+    },
+    {
+      userId: "user-red-001",
+      activityDate: "2026-03-01",
+      loginCount: 1,
+      checkinCount: 1,
+      updatedAt: "2026-03-01T09:00:00.000Z",
+    },
+    {
+      userId: "user-red-001",
+      activityDate: "2026-03-02",
+      loginCount: 1,
+      checkinCount: 1,
+      updatedAt: "2026-03-02T09:00:00.000Z",
+    },
+    {
+      userId: "user-red-001",
+      activityDate: "2026-03-03",
+      loginCount: 1,
+      checkinCount: 0,
+      updatedAt: "2026-03-03T09:00:00.000Z",
+    },
+    {
+      userId: "user-red-001",
+      activityDate: "2026-03-04",
+      loginCount: 1,
+      checkinCount: 1,
+      updatedAt: "2026-03-04T09:00:00.000Z",
+    },
+  ],
 });
-const if002CheckinService = new CheckinService(
-  new UserRepository(if002CheckinClient),
-  new HabitRepository(if002CheckinClient),
-);
+const if002HabitRepository = new HabitRepository(if002CheckinClient);
+const if002UserRepository = new UserRepository(if002CheckinClient);
+const if002CheckinService = new CheckinService(if002UserRepository, if002HabitRepository);
+const if002HistoryService = new HistoryService(if002HabitRepository, if002UserRepository);
 
 let if002AuditSequence = 0;
 const if002AuditLogService = new AuditLogService({
@@ -166,6 +254,16 @@ function isForceThrowRequested(body: Record<string, unknown>): boolean {
 
 function maybeCreateDtoErrorResult(testCase: If002RunnerCase): If002ErrorResult | null {
   const { endpoint, method, request } = testCase;
+
+  if (endpoint === "/api/history/calendar" && method === "GET") {
+    const validationError = validateHistoryCalendarQueryDto(request.body);
+    return validationError ? createValidationErrorResult(validationError, testCase.traceId) : null;
+  }
+
+  if (endpoint === "/api/analytics/user-summary" && method === "GET") {
+    const validationError = validateAnalyticsUserSummaryQueryDto(request.body);
+    return validationError ? createValidationErrorResult(validationError, testCase.traceId) : null;
+  }
 
   if (endpoint === "/api/checkins" && method === "POST") {
     const validationError = validateCheckinDto(request.body);
@@ -254,7 +352,7 @@ function maybeThrowConsentDomainError(testCase: {
 
 async function runWithErrorMapping(testCase: {
   traceId: string;
-  method: "POST" | "PATCH" | "DELETE";
+  method: "GET" | "POST" | "PATCH" | "DELETE";
   requirementId: string;
   request: If002RunnerRequest;
   endpoint: string;
@@ -284,6 +382,16 @@ async function runWithErrorMapping(testCase: {
       return habitSuccessResult;
     }
 
+    const historySuccessResult = await resolveHistorySuccessResult(testCase);
+    if (historySuccessResult) {
+      return historySuccessResult;
+    }
+
+    const analyticsSuccessResult = await resolveAnalyticsSuccessResult(testCase);
+    if (analyticsSuccessResult) {
+      return analyticsSuccessResult;
+    }
+
     throw new Error("unexpected error");
   } catch (error: unknown) {
     const mapped = mapIf002Error(error, testCase.traceId, testCase.requirementId);
@@ -293,9 +401,34 @@ async function runWithErrorMapping(testCase: {
   }
 }
 
+async function resolveAnalyticsSuccessResult(testCase: {
+  traceId: string;
+  method: "GET" | "POST" | "PATCH" | "DELETE";
+  requirementId: string;
+  endpoint: string;
+  request: If002RunnerRequest;
+}): Promise<If002ErrorResult | null> {
+  if (testCase.endpoint !== "/api/analytics/user-summary" || testCase.method !== "GET") {
+    return null;
+  }
+
+  const rangeDays = testCase.request.body.range_days as number;
+  const baseDate = typeof testCase.request.body.base_date === "string"
+    ? testCase.request.body.base_date
+    : undefined;
+
+  const summary = await if002HistoryService.getAnalyticsSummary(
+    testCase.request.actorUserId,
+    rangeDays,
+    baseDate,
+  );
+
+  return createAnalyticsSummarySuccessResult(summary.completionRate, summary.bestStreak, testCase.traceId, testCase.requirementId);
+}
+
 function resolveHabitSuccessResult(testCase: {
   traceId: string;
-  method: "POST" | "PATCH" | "DELETE";
+  method: "GET" | "POST" | "PATCH" | "DELETE";
   requirementId: string;
   endpoint: string;
 }): If002ErrorResult | null {
@@ -310,7 +443,7 @@ function resolveHabitSuccessResult(testCase: {
 
 async function resolveCheckinSuccessResult(testCase: {
   traceId: string;
-  method: "POST" | "PATCH" | "DELETE";
+  method: "GET" | "POST" | "PATCH" | "DELETE";
   requirementId: string;
   endpoint: string;
   request: If002RunnerRequest;
@@ -348,6 +481,32 @@ async function resolveCheckinSuccessResult(testCase: {
   }
 
   return null;
+}
+
+async function resolveHistorySuccessResult(testCase: {
+  traceId: string;
+  method: "GET" | "POST" | "PATCH" | "DELETE";
+  requirementId: string;
+  endpoint: string;
+  request: If002RunnerRequest;
+}): Promise<If002ErrorResult | null> {
+  if (testCase.endpoint !== "/api/history/calendar" || testCase.method !== "GET") {
+    return null;
+  }
+
+  const yearMonth = testCase.request.body.year_month as string;
+  const includeArchived = testCase.request.body.include_archived as boolean | undefined;
+  const habitIdRaw = testCase.request.body.habit_id;
+  const habitId = typeof habitIdRaw === "string" ? habitIdRaw : undefined;
+
+  const history = await if002HistoryService.getCalendarHistory(
+    testCase.request.actorUserId,
+    yearMonth,
+    includeArchived ?? false,
+    habitId,
+  );
+
+  return createHistoryCalendarSuccessResult(history.days, testCase.traceId, testCase.requirementId);
 }
 
 interface CheckinBusinessDateInput {
@@ -445,6 +604,46 @@ function createHabitSuccessResult(
       requirement_id: requirementId,
       habit: {
         status: definition.habitStatus,
+      },
+    } as If002ErrorResult["body"],
+  };
+}
+
+function createHistoryCalendarSuccessResult(
+  days: Array<{ date: string; status: "checked" | "missed" | "grace" }>,
+  traceId: string,
+  requirementId: string,
+): If002ErrorResult {
+  return {
+    status: 200,
+    body: {
+      code: "SUCCESS",
+      message: "history calendar retrieval succeeded",
+      trace_id: normalizeTraceId(traceId),
+      requirement_id: requirementId,
+      history: {
+        days,
+      },
+    } as If002ErrorResult["body"],
+  };
+}
+
+function createAnalyticsSummarySuccessResult(
+  completionRate: number,
+  bestStreak: number,
+  traceId: string,
+  requirementId: string,
+): If002ErrorResult {
+  return {
+    status: 200,
+    body: {
+      code: "SUCCESS",
+      message: "analytics summary retrieval succeeded",
+      trace_id: normalizeTraceId(traceId),
+      requirement_id: requirementId,
+      analytics: {
+        completion_rate: completionRate,
+        best_streak: bestStreak,
       },
     } as If002ErrorResult["body"],
   };

@@ -50,25 +50,6 @@ function toHabitStatusPersistence(status: HabitStatus, now: string): HabitStatus
   };
 }
 
-function listDateRange(fromDate: string, toDate: string): string[] {
-  if (fromDate > toDate) {
-    return [];
-  }
-
-  const current = new Date(`${fromDate}T00:00:00.000Z`);
-  const end = new Date(`${toDate}T00:00:00.000Z`);
-  if (Number.isNaN(current.getTime()) || Number.isNaN(end.getTime())) {
-    return [];
-  }
-
-  const dates: string[] = [];
-  while (current <= end) {
-    dates.push(current.toISOString().slice(0, 10));
-    current.setUTCDate(current.getUTCDate() + 1);
-  }
-  return dates;
-}
-
 export class HabitRepository implements HabitRepositoryContract {
   public constructor(private readonly client: SupabaseRepositoryClient) {}
 
@@ -222,38 +203,51 @@ export class HabitRepository implements HabitRepositoryContract {
     fromDate: string,
     toDate: string,
     includeArchived: boolean,
+    habitId?: string,
   ): Promise<HabitLog[]> {
-    const targetDates = listDateRange(fromDate, toDate);
-    if (targetDates.length === 0) {
+    if (fromDate > toDate) {
       return [];
     }
 
-    const targetHabitIds: string[] = [];
+    const targetHabitIds = new Set<string>();
     for (const habit of this.client.habits.values()) {
       if (habit.userId !== userId) {
+        continue;
+      }
+      if (habitId !== undefined && habit.habitId !== habitId) {
         continue;
       }
       if (!includeArchived && habit.status !== "active") {
         continue;
       }
-      targetHabitIds.push(habit.habitId);
+      targetHabitIds.add(habit.habitId);
+    }
+
+    if (targetHabitIds.size === 0) {
+      return [];
     }
 
     const logs: HabitLog[] = [];
-    for (const habitId of targetHabitIds) {
-      for (const logDate of targetDates) {
-        const log = this.client.habitLogs.get(buildHabitLogKeyForRepository(habitId, logDate));
-        if (log === undefined) {
-          continue;
-        }
-        if (log.userId !== userId) {
-          continue;
-        }
-        logs.push(log);
+    for (const log of this.client.habitLogs.values()) {
+      if (log.userId !== userId) {
+        continue;
       }
+      if (!targetHabitIds.has(log.habitId)) {
+        continue;
+      }
+      if (log.logDate < fromDate || log.logDate > toDate) {
+        continue;
+      }
+      logs.push(log);
     }
 
-    logs.sort((a, b) => a.logDate.localeCompare(b.logDate));
+    logs.sort((a, b) => {
+      const dateCmp = a.logDate.localeCompare(b.logDate);
+      if (dateCmp !== 0) {
+        return dateCmp;
+      }
+      return a.habitId.localeCompare(b.habitId);
+    });
     return logs.map(cloneRepositoryValue);
   }
 }

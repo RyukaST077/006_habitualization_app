@@ -19,7 +19,11 @@ const HABIT_UPDATE_REQUIREMENT_ID = "FR-007";
 const CHECKIN_REGISTER_REQUIREMENT_ID = "FR-011";
 const CHECKIN_IDEMPOTENT_REQUIREMENT_ID = "FR-012";
 const CHECKIN_CANCEL_REQUIREMENT_ID = "FR-014";
+const HISTORY_CALENDAR_REQUIREMENT_ID = "FR-017";
+const ANALYTICS_SUMMARY_REQUIREMENT_ID = "FR-015";
 const YYYY_MM_DD_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const YYYY_MM_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
+const ANALYTICS_RANGE_DAY_SET = new Set([7, 30, 90]);
 
 function isObjectRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -125,6 +129,42 @@ export function validateCheckinCancelDto(payload: unknown): ValidationResult {
 
   if (Number.isNaN(new Date(payload.now_utc).getTime())) {
     return { message: "now_utc must be iso-8601", requirement_id: CHECKIN_CANCEL_REQUIREMENT_ID };
+  }
+
+  return null;
+}
+
+export function validateHistoryCalendarQueryDto(payload: unknown): ValidationResult {
+  if (!isObjectRecord(payload)) {
+    return { message: "year_month is required", requirement_id: HISTORY_CALENDAR_REQUIREMENT_ID };
+  }
+
+  if (typeof payload.year_month !== "string" || !YYYY_MM_PATTERN.test(payload.year_month)) {
+    return { message: "year_month must be yyyy-mm", requirement_id: HISTORY_CALENDAR_REQUIREMENT_ID };
+  }
+
+  if (
+    "habit_id" in payload
+    && payload.habit_id !== null
+    && (typeof payload.habit_id !== "string" || payload.habit_id.length === 0)
+  ) {
+    return { message: "habit_id must be string|null", requirement_id: HISTORY_CALENDAR_REQUIREMENT_ID };
+  }
+
+  if ("include_archived" in payload && typeof payload.include_archived !== "boolean") {
+    return { message: "include_archived must be boolean", requirement_id: HISTORY_CALENDAR_REQUIREMENT_ID };
+  }
+
+  return null;
+}
+
+export function validateAnalyticsUserSummaryQueryDto(payload: unknown): ValidationResult {
+  if (!isObjectRecord(payload)) {
+    return { message: "range_days is required", requirement_id: ANALYTICS_SUMMARY_REQUIREMENT_ID };
+  }
+
+  if (!Number.isInteger(payload.range_days) || !ANALYTICS_RANGE_DAY_SET.has(payload.range_days as number)) {
+    return { message: "range_days must be one of 7, 30, 90", requirement_id: ANALYTICS_SUMMARY_REQUIREMENT_ID };
   }
 
   return null;

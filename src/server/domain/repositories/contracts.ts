@@ -39,6 +39,7 @@ export interface UserRepositoryContract {
     loginDelta: number,
     checkinDelta: number,
   ): Promise<UserDailyActivity>;
+  findDailyActivitiesByDateRange(userId: string, fromDate: string, toDate: string): Promise<UserDailyActivity[]>;
   markAccountDisabled(userId: string, disabledAt: string): Promise<Profile>;
 }
 
@@ -59,6 +60,7 @@ export interface HabitRepositoryContract {
     fromDate: string,
     toDate: string,
     includeArchived: boolean,
+    habitId?: string,
   ): Promise<HabitLog[]>;
 }
 

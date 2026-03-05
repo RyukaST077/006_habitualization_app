@@ -73,6 +73,17 @@ export class UserRepository implements UserRepositoryContract {
     return cloneRepositoryValue(updated);
   }
 
+  public async findDailyActivitiesByDateRange(
+    userId: string,
+    fromDate: string,
+    toDate: string,
+  ): Promise<UserDailyActivity[]> {
+    return Array.from(this.client.userDailyActivities.values())
+      .filter((activity) => activity.userId === userId && activity.activityDate >= fromDate && activity.activityDate <= toDate)
+      .sort((a, b) => a.activityDate.localeCompare(b.activityDate))
+      .map((activity) => cloneRepositoryValue(activity));
+  }
+
   public async markAccountDisabled(userId: string, disabledAt: string): Promise<Profile> {
     void disabledAt;
     const current = this.client.profiles.get(userId);
