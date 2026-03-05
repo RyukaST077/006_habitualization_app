@@ -10,6 +10,7 @@ import type {
   DailyKpiInput,
   DailyKpiRow,
   DeletionJobStatus,
+  DeletionJobStatusUpdateInput,
   KpiReportFilter,
   MonitoringAlertEvent,
   MonitoringAlertEventInput,
@@ -25,7 +26,7 @@ const ALLOWED_TRANSITIONS: Record<DeletionJobStatus, DeletionJobStatus[]> = {
   queued: ["in_progress"],
   in_progress: ["completed", "failed"],
   completed: [],
-  failed: [],
+  failed: ["in_progress"],
 };
 
 function isAllowedTransition(current: DeletionJobStatus, next: DeletionJobStatus): boolean {
@@ -105,13 +106,20 @@ export class OpsRepository implements OpsRepositoryContract {
   }
 
   public async createDeletionJob(job: AccountDeletionJobInput): Promise<AccountDeletionJob> {
+    const hasActiveJob = [...this.client.deletionJobs.values()].some(
+      (existing) => existing.userId === job.userId && existing.status !== "completed",
+    );
+    if (hasActiveJob) {
+      throw createRepositoryError("UNIQUE_CONFLICT", "withdrawal already requested");
+    }
+
     const created: AccountDeletionJob = {
       jobId: this.client.nextDeletionJobId(),
       userId: job.userId,
       status: "queued",
       requestedAt: job.requestedAt,
       disableDueAt: job.disableDueAt,
-      disabledAt: null,
+      disabledAt: job.disabledAt ?? null,
       hardDeleteDueAt: job.hardDeleteDueAt,
       hardDeletedAt: null,
       retryCount: 0,
@@ -122,7 +130,15 @@ export class OpsRepository implements OpsRepositoryContract {
     return cloneRepositoryValue(created);
   }
 
-  public async updateDeletionJobStatus(jobId: string, status: DeletionJobStatus): Promise<AccountDeletionJob> {
+  public async updateDeletionJobStatus(
+    jobId: string,
+    statusOrInput: DeletionJobStatus | DeletionJobStatusUpdateInput,
+  ): Promise<AccountDeletionJob> {
+    const input: DeletionJobStatusUpdateInput = typeof statusOrInput === "string"
+      ? { status: statusOrInput }
+      : statusOrInput;
+    const status = input.status;
+
     const current = this.client.deletionJobs.get(jobId);
     if (current === undefined) {
       throw createRepositoryError("REPOSITORY_ERROR", `deletion job not found: ${jobId}`);
@@ -140,9 +156,10 @@ export class OpsRepository implements OpsRepositoryContract {
     const updated: AccountDeletionJob = {
       ...current,
       status,
-      disabledAt: status === "in_progress" ? now : current.disabledAt,
+      disabledAt: status === "in_progress" ? (current.disabledAt ?? now) : current.disabledAt,
       hardDeletedAt: status === "completed" ? now : current.hardDeletedAt,
       retryCount: status === "failed" ? current.retryCount + 1 : current.retryCount,
+      lastError: status === "failed" ? (input.lastError ?? current.lastError ?? "hard delete failed") : current.lastError,
     };
 
     this.client.deletionJobs.set(jobId, updated);

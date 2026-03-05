@@ -152,6 +152,25 @@ describe("T-025 PR-003 M-104 ops repository CRUD", () => {
     expect(completed.status).toBe("completed");
   });
 
+  it("M-104/CRUD/deletionJob failed再実行時に retry_count と last_error を保持する", async () => {
+    const { repository, queuedJobId } = createOpsRepository();
+
+    await repository.updateDeletionJobStatus(queuedJobId, "in_progress");
+    const failed = await repository.updateDeletionJobStatus(queuedJobId, {
+      status: "failed",
+      lastError: "auth.users delete failed",
+    });
+
+    expect(failed.status).toBe("failed");
+    expect(failed.retryCount).toBe(1);
+    expect(failed.lastError).toBe("auth.users delete failed");
+
+    const rerun = await repository.updateDeletionJobStatus(queuedJobId, "in_progress");
+    expect(rerun.status).toBe("in_progress");
+    expect(rerun.retryCount).toBe(1);
+    expect(rerun.lastError).toBe("auth.users delete failed");
+  });
+
   it("M-104/CRUD/insertMonitoringAlertEvent/markAlertDispatched: 通知イベント更新", async () => {
     const { repository, alertEventId } = createOpsRepository();
 

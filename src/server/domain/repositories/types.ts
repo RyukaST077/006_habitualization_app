@@ -174,6 +174,12 @@ export interface AccountDeletionJobInput {
   requestedAt: ISODateTime;
   disableDueAt: ISODateTime;
   hardDeleteDueAt: ISODateTime;
+  disabledAt?: ISODateTime | null;
+}
+
+export interface DeletionJobStatusUpdateInput {
+  status: DeletionJobStatus;
+  lastError?: string | null;
 }
 
 export type AlertLevel = "P1" | "P2";

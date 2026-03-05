@@ -127,6 +127,10 @@ function toIf002ResponseCode(code: AppErrorCode): If002ResponseCode {
     return "DOMAIN_CONFLICT";
   }
 
+  if (code === "WITHDRAWAL_ALREADY_REQUESTED") {
+    return "DOMAIN_CONFLICT";
+  }
+
   if (code === "POLICY_VERSION_MISMATCH" || code === "POLICY_VERSION_CONFLICT") {
     return "DOMAIN_CONFLICT";
   }

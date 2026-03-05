@@ -66,6 +66,9 @@ function createUserRepository(profile: Profile | null): UserRepositoryContract {
     markAccountDisabled: vi.fn(async () => {
       throw new Error("not implemented");
     }),
+    hardDeleteAccountData: vi.fn(async () => {
+      throw new Error("not implemented");
+    }),
   };
 }
 

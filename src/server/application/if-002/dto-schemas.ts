@@ -21,6 +21,7 @@ const CHECKIN_IDEMPOTENT_REQUIREMENT_ID = "FR-012";
 const CHECKIN_CANCEL_REQUIREMENT_ID = "FR-014";
 const HISTORY_CALENDAR_REQUIREMENT_ID = "FR-017";
 const ANALYTICS_SUMMARY_REQUIREMENT_ID = "FR-015";
+const WITHDRAWAL_REQUIREMENT_ID = "FR-023";
 const YYYY_MM_DD_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const YYYY_MM_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
 const ANALYTICS_RANGE_DAY_SET = new Set([7, 30, 90]);
@@ -243,6 +244,18 @@ export function validatePolicyConsentsDto(payload: unknown): ValidationResult {
     }
 
     seenPolicyTypes.add(policyType);
+  }
+
+  return null;
+}
+
+export function validateWithdrawalDto(payload: unknown): ValidationResult {
+  if (!isObjectRecord(payload)) {
+    return { message: "reason must be string", requirement_id: WITHDRAWAL_REQUIREMENT_ID };
+  }
+
+  if ("reason" in payload && payload.reason !== undefined && typeof payload.reason !== "string") {
+    return { message: "reason must be string", requirement_id: WITHDRAWAL_REQUIREMENT_ID };
   }
 
   return null;

@@ -19,6 +19,8 @@ export type If002RequirementId =
   | "FR-013"
   | "FR-014"
   | "FR-021"
+  | "FR-023"
+  | "FR-024"
   | "FR-025";
 export type If002Perspective = "DTO_REQUIRED" | "DTO_TYPE_RANGE" | "AUTHZ_SELF_ONLY" | "DOMAIN_STATE" | "SYSTEM";
 export type If002HabitLifecycleAcceptanceId = "AC-006" | "AC-007" | "AC-008" | "AC-009";
@@ -120,6 +122,25 @@ export interface If002SettingsProfileCase {
     version: number;
     saved?: true;
     effectiveFrom?: string;
+  };
+}
+
+export interface If002WithdrawalCase {
+  traceId: string;
+  endpoint: "/api/settings/withdrawal";
+  method: "POST";
+  requirementId: "FR-023" | "FR-024";
+  acceptanceId: "AC-023" | "AC-024";
+  expectedStatus: 202 | 409;
+  expectedCode?: "DOMAIN_CONFLICT";
+  request: {
+    actorUserId: string;
+    body: Record<string, unknown>;
+  };
+  expected: {
+    jobStatus: "queued" | "failed_retriable";
+    disableSlaSeconds: 60;
+    hardDeleteSlaSeconds: 300;
   };
 }
 
@@ -442,6 +463,61 @@ export const IF002_SETTINGS_PROFILE_CASES: readonly If002SettingsProfileCase[] =
       dayCutoffTime: "05:30",
       version: 2,
       saved: true,
+    },
+  },
+] as const;
+
+export const IF002_WITHDRAWAL_CASES: readonly If002WithdrawalCase[] = [
+  {
+    traceId: "IF-002/WITHDRAWAL/AC-023/FR-023/request-accepted-with-sla-metadata",
+    endpoint: "/api/settings/withdrawal",
+    method: "POST",
+    requirementId: "FR-023",
+    acceptanceId: "AC-023",
+    expectedStatus: 202,
+    request: {
+      actorUserId: "user-red-003",
+      body: { reason: "cleanup" },
+    },
+    expected: {
+      jobStatus: "queued",
+      disableSlaSeconds: 60,
+      hardDeleteSlaSeconds: 300,
+    },
+  },
+  {
+    traceId: "IF-002/WITHDRAWAL/AC-023/FR-023/duplicate-request-domain-conflict",
+    endpoint: "/api/settings/withdrawal",
+    method: "POST",
+    requirementId: "FR-023",
+    acceptanceId: "AC-023",
+    expectedStatus: 409,
+    expectedCode: "DOMAIN_CONFLICT",
+    request: {
+      actorUserId: "user-red-002",
+      body: { reason: "duplicate-check", force_duplicate_withdrawal: true },
+    },
+    expected: {
+      jobStatus: "failed_retriable",
+      disableSlaSeconds: 60,
+      hardDeleteSlaSeconds: 300,
+    },
+  },
+  {
+    traceId: "IF-002/WITHDRAWAL/AC-024/FR-024/post-delete-login-blocked",
+    endpoint: "/api/settings/withdrawal",
+    method: "POST",
+    requirementId: "FR-024",
+    acceptanceId: "AC-024",
+    expectedStatus: 202,
+    request: {
+      actorUserId: "user-red-003",
+      body: { reason: "login-block-contract" },
+    },
+    expected: {
+      jobStatus: "queued",
+      disableSlaSeconds: 60,
+      hardDeleteSlaSeconds: 300,
     },
   },
 ] as const;

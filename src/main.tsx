@@ -1581,6 +1581,16 @@ export async function renderSettingsPage(root: HTMLDivElement, app: ReturnType<t
     };
   };
 
+  const redirectToLoginAfterWithdrawal = async (): Promise<void> => {
+    const logoutResult = await requestSettingsLogoutRuntime(fetch, userId);
+    clearAuthSessionStorage();
+    if (logoutResult.kind === "success") {
+      window.location.assign(mapRouteIdToPath(logoutResult.route));
+      return;
+    }
+    window.location.assign(ROUTE_MAP["SCR-001"]);
+  };
+
   const render = () => {
     timezoneSelect.innerHTML = page.ui.form.timezoneOptions.map((option) => {
       const selected = option === page.ui.form.timezone ? "selected" : "";
@@ -1712,7 +1722,7 @@ export async function renderSettingsPage(root: HTMLDivElement, app: ReturnType<t
       if (result.kind === "success") {
         runtimeError = null;
         runtimeRetryAction = null;
-        window.location.assign(ROUTE_MAP["SCR-001"]);
+        void redirectToLoginAfterWithdrawal();
         return;
       }
       runtimeError = resolveErrorPresentation(result.status, result.code, result.traceId);
@@ -1721,7 +1731,7 @@ export async function renderSettingsPage(root: HTMLDivElement, app: ReturnType<t
         if (retried.kind === "success") {
           runtimeError = null;
           runtimeRetryAction = null;
-          window.location.assign(ROUTE_MAP["SCR-001"]);
+          await redirectToLoginAfterWithdrawal();
           return;
         }
         runtimeError = resolveErrorPresentation(retried.status, retried.code, retried.traceId);

@@ -115,10 +115,16 @@ export class UserRepository implements UserRepositoryContract {
   }
 
   public async markAccountDisabled(userId: string, disabledAt: string): Promise<Profile> {
-    void disabledAt;
+    if (Number.isNaN(Date.parse(disabledAt))) {
+      throw createRepositoryError("REPOSITORY_ERROR", "invalid disabledAt");
+    }
+
     const current = this.client.profiles.get(userId);
     if (current === undefined) {
       throw createRepositoryError("REPOSITORY_ERROR", `profile not found: ${userId}`);
+    }
+    if (current.accountStatus !== "active") {
+      throw createRepositoryError("UNIQUE_CONFLICT", "withdrawal already requested");
     }
 
     const updated: Profile = {
@@ -129,5 +135,40 @@ export class UserRepository implements UserRepositoryContract {
 
     this.client.profiles.set(userId, updated);
     return cloneRepositoryValue(updated);
+  }
+
+  public async hardDeleteAccountData(userId: string, hardDeletedAt: string): Promise<void> {
+    if (Number.isNaN(Date.parse(hardDeletedAt))) {
+      throw createRepositoryError("REPOSITORY_ERROR", "invalid hardDeletedAt");
+    }
+    if (!this.client.profiles.has(userId)) {
+      throw createRepositoryError("REPOSITORY_ERROR", `profile not found: ${userId}`);
+    }
+
+    this.client.profiles.delete(userId);
+
+    for (const [habitId, habit] of this.client.habits.entries()) {
+      if (habit.userId === userId) {
+        this.client.habits.delete(habitId);
+      }
+    }
+
+    for (const [key, log] of this.client.habitLogs.entries()) {
+      if (log.userId === userId) {
+        this.client.habitLogs.delete(key);
+      }
+    }
+
+    for (const [key, activity] of this.client.userDailyActivities.entries()) {
+      if (activity.userId === userId) {
+        this.client.userDailyActivities.delete(key);
+      }
+    }
+
+    for (const [key, consent] of this.client.policyConsents.entries()) {
+      if (consent.userId === userId) {
+        this.client.policyConsents.delete(key);
+      }
+    }
   }
 }

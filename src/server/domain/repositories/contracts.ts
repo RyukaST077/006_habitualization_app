@@ -9,6 +9,7 @@ import type {
   DailyKpiInput,
   DailyKpiRow,
   DeletionJobStatus,
+  DeletionJobStatusUpdateInput,
   Habit,
   HabitLog,
   HabitStatus,
@@ -54,6 +55,7 @@ export interface UserRepositoryContract {
   ): Promise<UserDailyActivity>;
   findDailyActivitiesByDateRange(userId: string, fromDate: string, toDate: string): Promise<UserDailyActivity[]>;
   markAccountDisabled(userId: string, disabledAt: string): Promise<Profile>;
+  hardDeleteAccountData(userId: string, hardDeletedAt: string): Promise<void>;
 }
 
 export interface HabitRepositoryContract {
@@ -111,10 +113,16 @@ export interface OpsRepositoryContract {
   insertAuditLog(auditRecord: AuditLogRecordInput): Promise<AuditLogRecord>;
   upsertDailyKpi(rows: DailyKpiInput[]): Promise<DailyKpiRow[]>;
   createDeletionJob(job: AccountDeletionJobInput): Promise<AccountDeletionJob>;
-  updateDeletionJobStatus(jobId: string, status: DeletionJobStatus): Promise<AccountDeletionJob>;
+  updateDeletionJobStatus(
+    jobId: string,
+    statusOrInput: DeletionJobStatus | DeletionJobStatusUpdateInput,
+  ): Promise<AccountDeletionJob>;
   listPendingDeletionJobs(now: string): Promise<AccountDeletionJob[]>;
   insertMonitoringAlertEvent(event: MonitoringAlertEventInput): Promise<MonitoringAlertEvent>;
   markAlertDispatched(id: string, result: AlertDispatchResult): Promise<MonitoringAlertEvent>;
   queryKpiForReport(filter: KpiReportFilter): Promise<DailyKpiRow[]>;
   queryAuditLogsForReport(filter: AuditLogReportFilter): Promise<AuditLogRecord[]>;
 }
+
+export type WithdrawalUserRepositoryContract = Pick<UserRepositoryContract, "markAccountDisabled">;
+export type WithdrawalOpsRepositoryContract = Pick<OpsRepositoryContract, "createDeletionJob">;

@@ -5,6 +5,7 @@ import type {
   If002RequirementId,
   If002RunnableCase,
   If002SettingsProfileCase,
+  If002WithdrawalCase,
 } from "../fixtures/if-002-cases";
 import type { If002ErrorScenario } from "../fixtures/if-002-error-scenarios";
 import type { If002InvalidPayloadCase } from "../fixtures/if-002-invalid-payloads";
@@ -40,6 +41,12 @@ export interface If002PlannedResult {
       saved?: boolean;
       effective_from?: string;
     };
+    withdrawal?: {
+      job_id?: string;
+      job_status?: string;
+      disable_due_at?: string;
+      hard_delete_due_at?: string;
+    };
   };
 }
 
@@ -56,6 +63,7 @@ export interface If002TestHarness {
   ): void;
   runPlannedCase(testCase: If002RunnableCase): Promise<If002PlannedResult>;
   runSettingsProfileCase(testCase: If002SettingsProfileCase): Promise<If002PlannedResult>;
+  runWithdrawalCase(testCase: If002WithdrawalCase): Promise<If002PlannedResult>;
   runHabitLifecycleCase(testCase: If002HabitLifecycleCase): Promise<If002PlannedResult>;
   runInvalidPayloadCase(testCase: If002InvalidPayloadCase): Promise<If002PlannedResult>;
   runErrorScenarioCase(testCase: If002ErrorScenario): Promise<If002PlannedResult>;
@@ -69,6 +77,7 @@ export interface If002TestHarness {
     expected: { timezone: string; dayCutoffTime: string; version: number },
   ): void;
   assertSettingsSaveResult(payload: unknown, expected: { saved: true }): void;
+  assertWithdrawalQueued(payload: unknown): void;
 }
 
 export function createIf002TestHarness(): If002TestHarness {
@@ -119,6 +128,16 @@ export function createIf002TestHarness(): If002TestHarness {
         method: testCase.method,
         requirementId: testCase.requirementId,
         expectedMessage: "settings profile scenario",
+        request: testCase.request,
+      });
+    },
+    async runWithdrawalCase(testCase: If002WithdrawalCase): Promise<If002PlannedResult> {
+      return runPlannedCaseImpl({
+        traceId: testCase.traceId,
+        endpoint: testCase.endpoint,
+        method: testCase.method,
+        requirementId: testCase.requirementId,
+        expectedMessage: "withdrawal scenario",
         request: testCase.request,
       });
     },
@@ -189,6 +208,17 @@ export function createIf002TestHarness(): If002TestHarness {
       expect(response.settings?.saved).toBe(expected.saved);
       expect(typeof response.settings?.effective_from).toBe("string");
       expect((response.settings?.effective_from ?? "").length).toBeGreaterThan(0);
+    },
+    assertWithdrawalQueued(payload: unknown): void {
+      expect(payload).toBeTypeOf("object");
+      expect(payload).not.toBeNull();
+
+      const response = payload as If002PlannedResult["body"];
+      expect(response.withdrawal?.job_status).toBe("queued");
+      expect(typeof response.withdrawal?.job_id).toBe("string");
+      expect((response.withdrawal?.job_id ?? "").length).toBeGreaterThan(0);
+      expect(typeof response.withdrawal?.disable_due_at).toBe("string");
+      expect(typeof response.withdrawal?.hard_delete_due_at).toBe("string");
     },
   };
 }

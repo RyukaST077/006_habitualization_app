@@ -8,6 +8,7 @@ import {
   validateHabitUpdateDto,
   validatePolicyConsentsDto,
   validateProfileSettingsDto,
+  validateWithdrawalDto,
 } from "./dto-schemas";
 import { createIf002HandledError, mapIf002Error } from "./error-mapper";
 import { createValidationErrorResult, type If002ErrorResult } from "./error-response";
@@ -19,8 +20,10 @@ import type { OpsRepositoryContract } from "../../domain/repositories/contracts"
 import type { AuditLogRecord, AuditLogRecordInput } from "../../domain/repositories/types";
 import { HistoryService } from "../history/HistoryService";
 import { SettingsService } from "../settings/SettingsService";
+import { WithdrawalService } from "../withdrawal/WithdrawalService";
 import { HabitRepository } from "../../infrastructure/repositories/HabitRepository";
 import { UserRepository } from "../../infrastructure/repositories/UserRepository";
+import { OpsRepository } from "../../infrastructure/repositories/OpsRepository";
 import { createSupabaseRepositoryClient } from "../../infrastructure/repositories/supabase-repository-client";
 
 interface If002RunnerRequest {
@@ -220,9 +223,11 @@ const if002CheckinClient = createSupabaseRepositoryClient({
 });
 const if002HabitRepository = new HabitRepository(if002CheckinClient);
 const if002UserRepository = new UserRepository(if002CheckinClient);
+const if002OpsRepository = new OpsRepository(if002CheckinClient);
 const if002CheckinService = new CheckinService(if002UserRepository, if002HabitRepository);
 const if002HistoryService = new HistoryService(if002HabitRepository, if002UserRepository);
 const if002SettingsService = new SettingsService(if002UserRepository);
+const if002WithdrawalService = new WithdrawalService(if002UserRepository, if002OpsRepository);
 
 let if002AuditSequence = 0;
 const if002AuditLogService = new AuditLogService({
@@ -289,6 +294,11 @@ function maybeCreateDtoErrorResult(testCase: If002RunnerCase): If002ErrorResult 
 
   if (endpoint === "/api/settings/profile" && method === "PATCH") {
     const validationError = validateProfileSettingsDto(request.body);
+    return validationError ? createValidationErrorResult(validationError, testCase.traceId) : null;
+  }
+
+  if (endpoint === "/api/settings/withdrawal" && method === "POST") {
+    const validationError = validateWithdrawalDto(request.body);
     return validationError ? createValidationErrorResult(validationError, testCase.traceId) : null;
   }
 
@@ -397,6 +407,11 @@ async function runWithErrorMapping(testCase: {
     const settingsSuccessResult = await resolveSettingsProfileSuccessResult(testCase);
     if (settingsSuccessResult) {
       return settingsSuccessResult;
+    }
+
+    const withdrawalSuccessResult = await resolveWithdrawalSuccessResult(testCase);
+    if (withdrawalSuccessResult) {
+      return withdrawalSuccessResult;
     }
 
     throw new Error("unexpected error");
@@ -586,6 +601,48 @@ async function resolveSettingsProfileSuccessResult(testCase: {
   }
 
   return null;
+}
+
+async function resolveWithdrawalSuccessResult(testCase: {
+  traceId: string;
+  method: "GET" | "POST" | "PATCH" | "DELETE";
+  requirementId: string;
+  endpoint: string;
+  request: If002RunnerRequest;
+}): Promise<If002ErrorResult | null> {
+  if (testCase.endpoint !== "/api/settings/withdrawal" || testCase.method !== "POST") {
+    return null;
+  }
+
+  const traceId = normalizeTraceId(testCase.traceId);
+  const requestedAt = "2026-03-05T00:00:00.000Z";
+  const shouldForceDuplicate = testCase.request.body.force_duplicate_withdrawal === true;
+
+  if (shouldForceDuplicate) {
+    await if002WithdrawalService.requestWithdrawal(testCase.request.actorUserId, requestedAt, `${traceId}-first`);
+  }
+
+  const result = await if002WithdrawalService.requestWithdrawal(
+    testCase.request.actorUserId,
+    requestedAt,
+    traceId,
+  );
+
+  return {
+    status: 202,
+    body: {
+      code: "SUCCESS",
+      message: "withdrawal request accepted",
+      trace_id: traceId,
+      requirement_id: testCase.requirementId,
+      withdrawal: {
+        job_id: result.jobId,
+        job_status: result.jobStatus,
+        disable_due_at: result.disableDueAt,
+        hard_delete_due_at: result.hardDeleteDueAt,
+      },
+    } as If002ErrorResult["body"],
+  };
 }
 
 interface CheckinBusinessDateInput {
