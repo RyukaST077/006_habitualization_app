@@ -181,6 +181,20 @@ export type Scr005ReloadInputCase = {
   includeArchived: boolean;
 };
 
+export type Scr006TraceabilityId = "FNC-008" | "SCR-006" | "IF-002";
+export type Scr006TraceCaseId =
+  | "TC-UI-SCR006-001"
+  | "TC-UI-SCR006-002"
+  | "TC-UI-SCR006-003"
+  | "TC-UI-SCR006-004";
+
+export type Scr006UiRequirementTraceCase = {
+  traceId: string;
+  testCaseId: Scr006TraceCaseId;
+  traceability: readonly Scr006TraceabilityId[];
+  title: string;
+};
+
 export type Scr001TraceabilityId = "FR-001" | "SCR-001" | "IF-001";
 export type Scr001ConsentState = "unknown" | "agreed";
 export type Scr008RequirementId = "FR-003" | "FR-004" | "FR-005";
@@ -591,6 +605,87 @@ export const T055_C001_COMPLETION_GATE_COMMANDS = [
 export const T055_C004_COMPLETION_GATE_COMMANDS = [
   "npm run test -- tests/unit/screens/scr-005-history-page-red.spec.ts tests/integration/ui/scr-005-history-runtime-red.spec.ts",
   "npm run test -- tests/unit/screens/scr-005-history-page-red.spec.ts tests/integration/ui/scr-005-history-runtime-red.spec.ts tests/integration/api/if-002-history-calendar-red.spec.ts && npm run typecheck",
+] as const;
+
+export const SCR006_TRACEABILITY_IDS: readonly Scr006TraceabilityId[] = ["FNC-008", "SCR-006", "IF-002"] as const;
+
+export const SCR006_UI_REQUIREMENT_TRACE_CASES: readonly Scr006UiRequirementTraceCase[] = [
+  {
+    traceId: "T-057/C-004/TC-UI-SCR006-001/FNC-008/SCR-006/IF-002/range-days-7-30-90",
+    testCaseId: "TC-UI-SCR006-001",
+    traceability: ["FNC-008", "SCR-006", "IF-002"],
+    title: "期間選択 7/30/90 日の切替観点を固定する",
+  },
+  {
+    traceId: "T-057/C-004/TC-UI-SCR006-002/FNC-008/SCR-006/IF-002/completion-rate-card",
+    testCaseId: "TC-UI-SCR006-002",
+    traceability: ["FNC-008", "SCR-006", "IF-002"],
+    title: "達成率カード表示観点を固定する",
+  },
+  {
+    traceId: "T-057/C-004/TC-UI-SCR006-003/FNC-008/SCR-006/IF-002/best-streak-card",
+    testCaseId: "TC-UI-SCR006-003",
+    traceability: ["FNC-008", "SCR-006", "IF-002"],
+    title: "最長ストリークカード表示観点を固定する",
+  },
+  {
+    traceId: "T-057/C-004/TC-UI-SCR006-004/FNC-008/SCR-006/IF-002/error-retry-flow",
+    testCaseId: "TC-UI-SCR006-004",
+    traceability: ["FNC-008", "SCR-006", "IF-002"],
+    title: "通信失敗時の再試行導線観点を固定する",
+  },
+] as const;
+
+export const SCR006_TEST_PLAN_FOCUS_AREAS = [
+  "range-days-7-30-90",
+  "completion-rate-card",
+  "best-streak-card",
+  "runtime-if-002-user-summary",
+  "error-retry-action",
+] as const;
+
+export const SCR006_RUNTIME_ENDPOINT = "/api/analytics/user-summary" as const;
+export const SCR006_RANGE_DAYS_OPTIONS = [7, 30, 90] as const;
+export const SCR006_DEFAULT_RANGE_DAYS = 30 as const;
+
+export const SCR006_CARD_DISPLAY_EXPECTATION = {
+  input: {
+    completionRate: 82.4,
+    bestStreak: 14,
+  },
+  expected: {
+    completionRate: "82%",
+    bestStreak: "14日",
+  },
+} as const;
+
+export const SCR006_ERROR_RETRY_EXPECTATION = {
+  label: "再試行",
+  status: 500,
+  code: "INTERNAL_ERROR",
+} as const;
+
+export const SCR006_RUNTIME_USER_ID = "00000000-0000-4000-8000-000000000001" as const;
+export const SCR006_RUNTIME_RANGE_SEQUENCE = [30, 7, 90] as const;
+
+export const T057_C001_COMPLETION_GATE_COMMANDS = [
+  "npm run test -- tests/unit/screens/scr-006-analytics-page-red.spec.ts tests/integration/ui/scr-006-analytics-runtime-red.spec.ts",
+  "for id in FNC-008 SCR-006 IF-002; do rg -n \"$id\" tests/helpers/ui/common-ui-fixtures.ts >/dev/null; done",
+] as const;
+
+export const T057_C002_COMPLETION_GATE_COMMANDS = [
+  "npm run test -- tests/unit/screens/scr-006-analytics-page-red.spec.ts",
+  "npm run typecheck",
+] as const;
+
+export const T057_C003_COMPLETION_GATE_COMMANDS = [
+  "npm run test -- tests/integration/ui/scr-006-analytics-runtime-red.spec.ts",
+  "npm run test -- tests/integration/api/if-002-analytics-summary-red.spec.ts tests/integration/ui/scr-006-analytics-runtime-red.spec.ts",
+] as const;
+
+export const T057_C004_COMPLETION_GATE_COMMANDS = [
+  "npm run test -- tests/unit/screens/scr-006-analytics-page-red.spec.ts tests/integration/ui/scr-006-analytics-runtime-red.spec.ts",
+  "npm run test -- tests/unit/screens/scr-006-analytics-page-red.spec.ts tests/integration/ui/scr-006-analytics-runtime-red.spec.ts tests/integration/api/if-002-analytics-summary-red.spec.ts && npm run typecheck",
 ] as const;
 
 export const SCR002_UI_REQUIREMENT_TRACE_CASES: readonly Scr002UiRequirementTraceCase[] = [

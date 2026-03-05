@@ -282,6 +282,44 @@ function buildHistoryDays(fromDate: string, toDate: string, logs: HabitLogRow[])
   });
 }
 
+function resolveLastNDaysRange(baseDate: Date, rangeDays: number): { fromDate: string; toDate: string } {
+  const to = new Date(Date.UTC(baseDate.getUTCFullYear(), baseDate.getUTCMonth(), baseDate.getUTCDate()));
+  const from = new Date(to);
+  from.setUTCDate(from.getUTCDate() - (rangeDays - 1));
+  return {
+    fromDate: from.toISOString().slice(0, 10),
+    toDate: to.toISOString().slice(0, 10),
+  };
+}
+
+function computeBestStreakFromDates(sortedDates: string[]): number {
+  if (sortedDates.length === 0) {
+    return 0;
+  }
+
+  let best = 1;
+  let current = 1;
+  for (let index = 1; index < sortedDates.length; index += 1) {
+    if (dayDiff(sortedDates[index], sortedDates[index - 1]) === 1) {
+      current += 1;
+      if (current > best) {
+        best = current;
+      }
+      continue;
+    }
+    current = 1;
+  }
+  return best;
+}
+
+function computeAnalyticsSummary(logs: HabitLogRow[], rangeDays: number): { completionRate: number; bestStreak: number } {
+  const checkedDates = Array.from(new Set(logs.map((log) => log.log_date))).sort((a, b) => a.localeCompare(b));
+  const completionRateRaw = checkedDates.length === 0 ? 0 : (checkedDates.length / rangeDays) * 100;
+  const completionRate = Math.round(completionRateRaw * 10) / 10;
+  const bestStreak = computeBestStreakFromDates(checkedDates);
+  return { completionRate, bestStreak };
+}
+
 async function listSupabaseHistoryLogs(
   userId: string,
   fromDate: string,
@@ -751,6 +789,42 @@ export default defineConfig(({ mode }) => {
             } catch (error: unknown) {
               console.error("[if-002] history calendar failed", error);
               respondJson(res, 500, { code: "INTERNAL_ERROR", message: "failed to load history calendar" });
+              return;
+            }
+          }
+
+          if (isTargetRequest(req, "GET", "/api/analytics/user-summary")) {
+            try {
+              const requestUrl = new URL(req.url ?? "", "http://localhost");
+              const userId = requestUrl.searchParams.get("userId");
+              const rangeDaysRaw = requestUrl.searchParams.get("range_days");
+              const rangeDays = Number(rangeDaysRaw);
+
+              if (!userId || !isUuidLike(userId)) {
+                respondJson(res, 400, { code: "VALIDATION_ERROR", message: "userId is required" });
+                return;
+              }
+              if (rangeDays !== 7 && rangeDays !== 30 && rangeDays !== 90) {
+                respondJson(res, 400, { code: "VALIDATION_ERROR", message: "range_days must be one of 7/30/90" });
+                return;
+              }
+
+              const { fromDate, toDate } = resolveLastNDaysRange(new Date(), rangeDays);
+              const logs = await listSupabaseHistoryLogs(userId, fromDate, toDate, false);
+              const summary = computeAnalyticsSummary(logs, rangeDays);
+
+              respondJson(res, 200, {
+                code: "SUCCESS",
+                message: "analytics summary success",
+                analytics: {
+                  completion_rate: summary.completionRate,
+                  best_streak: summary.bestStreak,
+                },
+              });
+              return;
+            } catch (error: unknown) {
+              console.error("[if-002] analytics summary failed", error);
+              respondJson(res, 500, { code: "INTERNAL_ERROR", message: "failed to load analytics summary" });
               return;
             }
           }

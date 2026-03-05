@@ -19,6 +19,11 @@ import {
   type HistoryCalendarUiCell,
 } from "./screens/SCR-005HistoryPage";
 import {
+  SCR006AnalyticsPage,
+  type AnalyticsSummaryLoadInput,
+  type AnalyticsSummaryLoadResolution,
+} from "./screens/SCR-006AnalyticsPage";
+import {
   SCR002HomePage,
   type CheckinResolution,
   type HomeHabitSummary,
@@ -68,6 +73,10 @@ function renderAppShell() {
   }
   if (window.location.pathname === ROUTE_MAP["SCR-005"]) {
     renderHistoryPage(root, app);
+    return;
+  }
+  if (window.location.pathname === ROUTE_MAP["SCR-006"]) {
+    renderAnalyticsPage(root, app);
     return;
   }
   const editMatch = window.location.pathname.match(/^\/habits\/([^/]+)\/edit$/);
@@ -251,6 +260,18 @@ type If002HistoryCalendarSuccessPayload = {
 };
 
 type If002HistoryCalendarErrorPayload = {
+  code?: string;
+  trace_id?: string;
+};
+
+type If002AnalyticsSummarySuccessPayload = {
+  analytics?: {
+    completion_rate?: number;
+    best_streak?: number;
+  };
+};
+
+type If002AnalyticsSummaryErrorPayload = {
   code?: string;
   trace_id?: string;
 };
@@ -743,6 +764,61 @@ export async function requestHistoryCalendarRuntime(
   }
 }
 
+function extractAnalyticsSummary(
+  payload: If002AnalyticsSummarySuccessPayload | If002AnalyticsSummaryErrorPayload | null,
+): { completionRate: number; bestStreak: number } {
+  const analytics = payload !== null && "analytics" in payload ? payload.analytics : undefined;
+  return {
+    completionRate: typeof analytics?.completion_rate === "number" ? analytics.completion_rate : 0,
+    bestStreak: typeof analytics?.best_streak === "number" ? analytics.best_streak : 0,
+  };
+}
+
+export async function requestAnalyticsSummaryRuntime(
+  fetchFn: typeof fetch,
+  input: AnalyticsSummaryLoadInput,
+  userId?: string,
+): Promise<AnalyticsSummaryLoadResolution> {
+  try {
+    const query = new URLSearchParams();
+    query.set("range_days", String(input.rangeDays));
+    if (typeof userId === "string" && userId.length > 0) {
+      query.set("userId", userId);
+    }
+
+    const response = await fetchFn(`/api/analytics/user-summary?${query.toString()}`, {
+      method: "GET",
+      cache: "no-store",
+    });
+    const payload = await parseJsonResponse<If002AnalyticsSummarySuccessPayload | If002AnalyticsSummaryErrorPayload>(response);
+
+    if (response.ok) {
+      const analytics = extractAnalyticsSummary(payload);
+      return {
+        kind: "success",
+        analytics,
+      };
+    }
+
+    const rawCode = payload !== null && "code" in payload ? payload.code : undefined;
+    const rawTraceId = payload !== null && "trace_id" in payload && typeof payload.trace_id === "string"
+      ? payload.trace_id
+      : undefined;
+    return {
+      kind: "error",
+      status: asErrorStatus(response.status),
+      code: asErrorCode(rawCode),
+      traceId: rawTraceId,
+    };
+  } catch {
+    return {
+      kind: "error",
+      status: 500,
+      code: "INTERNAL_ERROR",
+    };
+  }
+}
+
 function renderHomePage(root: HTMLDivElement, app: ReturnType<typeof bootstrapApp>) {
   const userId = resolveHabitFormUserId();
   const page = SCR002HomePage({
@@ -1068,6 +1144,96 @@ export function renderHistoryPage(root: HTMLDivElement, app: ReturnType<typeof b
   });
 
   void runWithRender(() => page.actions.loadCalendar());
+}
+
+export function renderAnalyticsPage(root: HTMLDivElement, app: ReturnType<typeof bootstrapApp>) {
+  const userId = resolveHabitFormUserId();
+  const page = SCR006AnalyticsPage({
+    screenId: "SCR-006",
+    handlers: {
+      onBackHome: () => {
+        window.location.assign(ROUTE_MAP["SCR-002"]);
+      },
+      onLoadSummary: (input) => requestAnalyticsSummaryRuntime(fetch, input, userId),
+    },
+  });
+
+  root.innerHTML = `<main style="font-family: sans-serif; max-width: 720px; margin: 32px auto; padding: 16px;">
+    <h1>${app.name}</h1>
+    <h2>SCR-006 Analytics</h2>
+    <section style="display: grid; gap: 10px; margin: 12px 0;">
+      <label>期間
+        <select id="analytics-range-days">
+          <option value="7">7日</option>
+          <option value="30">30日</option>
+          <option value="90">90日</option>
+        </select>
+      </label>
+      <div style="display: flex; gap: 8px;">
+        <button id="analytics-back-home" type="button">ホームに戻る</button>
+      </div>
+    </section>
+    <p id="analytics-load-status">読み込み中...</p>
+    <section id="analytics-error" hidden style="border: 1px solid #d79a9a; border-radius: 8px; padding: 12px; margin: 8px 0; color: #8f1d1d;">
+      <p id="analytics-error-message" style="margin: 0;"></p>
+      <button id="analytics-error-retry" type="button">再試行</button>
+    </section>
+    <section style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px;">
+      <article style="border: 1px solid #ddd; border-radius: 8px; padding: 12px;">
+        <h3 style="margin: 0 0 8px 0;">達成率</h3>
+        <p id="analytics-completion-rate" style="font-size: 24px; margin: 0;">--%</p>
+      </article>
+      <article style="border: 1px solid #ddd; border-radius: 8px; padding: 12px;">
+        <h3 style="margin: 0 0 8px 0;">最長ストリーク</h3>
+        <p id="analytics-best-streak" style="font-size: 24px; margin: 0;">--日</p>
+      </article>
+    </section>
+  </main>`;
+
+  const rangeSelect = root.querySelector<HTMLSelectElement>("#analytics-range-days");
+  const backHomeButton = root.querySelector<HTMLButtonElement>("#analytics-back-home");
+  const loadStatus = root.querySelector<HTMLParagraphElement>("#analytics-load-status");
+  const errorPanel = root.querySelector<HTMLElement>("#analytics-error");
+  const errorMessage = root.querySelector<HTMLParagraphElement>("#analytics-error-message");
+  const retryButton = root.querySelector<HTMLButtonElement>("#analytics-error-retry");
+  const completionRate = root.querySelector<HTMLParagraphElement>("#analytics-completion-rate");
+  const bestStreak = root.querySelector<HTMLParagraphElement>("#analytics-best-streak");
+  if (!rangeSelect || !backHomeButton || !loadStatus || !errorPanel || !errorMessage || !retryButton || !completionRate || !bestStreak) {
+    return;
+  }
+
+  const render = () => {
+    rangeSelect.value = String(page.ui.filters.rangeDays);
+    rangeSelect.disabled = page.ui.loading.isFetching;
+    retryButton.disabled = page.ui.loading.isFetching;
+    loadStatus.textContent = page.ui.loading.isFetching ? "読み込み中..." : "";
+    completionRate.textContent = page.ui.cards.completionRate;
+    bestStreak.textContent = page.ui.cards.bestStreak;
+
+    const retryAction = page.ui.error.retryAction;
+    errorPanel.hidden = !page.ui.error.isVisible || retryAction === null;
+    errorMessage.textContent = page.ui.error.presentation?.message ?? "";
+  };
+
+  const runWithRender = async (runner: () => Promise<unknown>) => {
+    const promise = runner();
+    render();
+    await promise;
+    render();
+  };
+
+  rangeSelect.addEventListener("change", () => {
+    const nextRangeDays = Number(rangeSelect.value);
+    void runWithRender(() => page.actions.setRangeDays(nextRangeDays));
+  });
+  retryButton.addEventListener("click", () => {
+    void runWithRender(() => page.actions.retryLoad());
+  });
+  backHomeButton.addEventListener("click", () => {
+    page.actions.backHome();
+  });
+
+  void runWithRender(() => page.actions.loadSummary());
 }
 
 function renderHabitCreatePage(root: HTMLDivElement, app: ReturnType<typeof bootstrapApp>) {
