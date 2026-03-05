@@ -126,6 +126,101 @@ async function ensureSupabaseProfileExists(userId: string): Promise<void> {
   }
 }
 
+type SettingsProfileRow = {
+  timezone?: string | null;
+  day_cutoff_time?: string | null;
+};
+
+type PolicyCurrentSettingRow = {
+  policy_type: string;
+  current_version: string;
+  document_url: string;
+};
+
+async function loadSupabaseSettingsProfile(userId: string): Promise<SettingsProfileRow | null> {
+  const rows = await fetchSupabaseRest<SettingsProfileRow[]>(
+    `profiles?select=timezone,day_cutoff_time&user_id=eq.${encodeURIComponent(userId)}&limit=1`,
+  );
+  return rows[0] ?? null;
+}
+
+async function loadCurrentPolicies(): Promise<{ terms: { version: string; url: string }; privacy: { version: string; url: string } }> {
+  const rows = await fetchSupabaseRest<PolicyCurrentSettingRow[]>(
+    "policy_settings?select=policy_type,current_version,document_url&policy_type=in.(terms,privacy)",
+  );
+  const byType = new Map(rows.map((row) => [normalizePolicyType(row.policy_type), row] as const));
+  const terms = byType.get("terms");
+  const privacy = byType.get("privacy");
+  if (!terms || !privacy) {
+    throw new Error("policy_settings missing terms/privacy rows");
+  }
+  return {
+    terms: {
+      version: terms.current_version,
+      url: terms.document_url,
+    },
+    privacy: {
+      version: privacy.current_version,
+      url: privacy.document_url,
+    },
+  };
+}
+
+async function upsertSupabaseSettingsProfile(
+  userId: string,
+  timezone: string,
+  dayCutoffTime: string,
+): Promise<SettingsProfileRow | null> {
+  const { baseUrl, serviceRoleKey } = getSupabaseConfig();
+  const response = await fetch(`${baseUrl}/rest/v1/profiles?on_conflict=user_id`, {
+    method: "POST",
+    headers: {
+      apikey: serviceRoleKey,
+      authorization: `Bearer ${serviceRoleKey}`,
+      "content-type": "application/json",
+      prefer: "resolution=merge-duplicates,return=representation",
+    },
+    body: JSON.stringify([{
+      user_id: userId,
+      timezone,
+      day_cutoff_time: dayCutoffTime,
+    }]),
+  });
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`upsert settings profile error: ${response.status} ${detail}`);
+  }
+  const rows = (await response.json()) as SettingsProfileRow[];
+  return rows[0] ?? null;
+}
+
+async function deleteSupabaseRowsByUserId(table: string, userId: string, userColumn = "user_id"): Promise<void> {
+  const { baseUrl, serviceRoleKey } = getSupabaseConfig();
+  const response = await fetch(`${baseUrl}/rest/v1/${table}?${userColumn}=eq.${encodeURIComponent(userId)}`, {
+    method: "DELETE",
+    headers: {
+      apikey: serviceRoleKey,
+      authorization: `Bearer ${serviceRoleKey}`,
+      prefer: "return=minimal",
+    },
+  });
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`delete ${table} error: ${response.status} ${detail}`);
+  }
+}
+
+async function executeSupabaseWithdrawal(userId: string): Promise<void> {
+  // FK順序に従って削除する（profiles を最後に削除）。
+  await deleteSupabaseRowsByUserId("audit_logs", userId, "actor_user_id");
+  await deleteSupabaseRowsByUserId("policy_consents", userId);
+  await deleteSupabaseRowsByUserId("habit_logs", userId);
+  await deleteSupabaseRowsByUserId("habits", userId);
+  await deleteSupabaseRowsByUserId("user_daily_activity", userId);
+  await deleteSupabaseRowsByUserId("account_deletion_jobs", userId);
+  await deleteSupabaseRowsByUserId("profiles", userId);
+}
+
 const authGateway: SupabaseAuthGatewayContract = {
   async buildGoogleOAuthUrl(redirectTo: string): Promise<string> {
     const supabaseUrl = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -615,6 +710,106 @@ export default defineConfig(({ mode }) => {
                   detail: error instanceof Error ? error.message : "unknown",
                 }),
               );
+              return;
+            }
+          }
+
+          if (isTargetRequest(req, "GET", "/api/policies/current")) {
+            try {
+              const policies = await loadCurrentPolicies();
+              respondJson(res, 200, policies);
+              return;
+            } catch (error: unknown) {
+              console.error("[if-002] current policies fetch failed", error);
+              respondJson(res, 500, { code: "INTERNAL_ERROR", message: "failed to load current policies" });
+              return;
+            }
+          }
+
+          if (isTargetRequest(req, "GET", "/api/settings/profile")) {
+            try {
+              const requestUrl = new URL(req.url ?? "", "http://localhost");
+              const userId = requestUrl.searchParams.get("userId");
+              if (!userId || !isUuidLike(userId)) {
+                respondJson(res, 400, { code: "VALIDATION_ERROR", trace_id: "if002-settings-profile-get-validation" });
+                return;
+              }
+
+              await ensureSupabaseProfileExists(userId);
+              const profile = await loadSupabaseSettingsProfile(userId);
+              respondJson(res, 200, {
+                profile: {
+                  timezone: typeof profile?.timezone === "string" ? profile.timezone : "Asia/Tokyo",
+                  day_cutoff_time: typeof profile?.day_cutoff_time === "string" ? profile.day_cutoff_time : "00:00",
+                },
+              });
+              return;
+            } catch (error: unknown) {
+              console.error("[if-002] get settings profile failed", error);
+              respondJson(res, 500, { code: "INTERNAL_ERROR", trace_id: "if002-settings-profile-get-internal" });
+              return;
+            }
+          }
+
+          if (isTargetRequest(req, "PATCH", "/api/settings/profile")) {
+            try {
+              const body = await parseRequestBody(req);
+              const requestBody = typeof body === "object" && body !== null ? body as Record<string, unknown> : {};
+              const userId = typeof requestBody.userId === "string" ? requestBody.userId : "";
+              const timezone = typeof requestBody.timezone === "string" ? requestBody.timezone : "";
+              const dayCutoffTime = typeof requestBody.day_cutoff_time === "string" ? requestBody.day_cutoff_time : "";
+              if (!isUuidLike(userId)) {
+                respondJson(res, 400, { code: "VALIDATION_ERROR", trace_id: "if002-settings-profile-patch-user-validation" });
+                return;
+              }
+              if (timezone.length === 0 || !/^\d{2}:\d{2}$/.test(dayCutoffTime)) {
+                respondJson(res, 400, { code: "VALIDATION_ERROR", trace_id: "if002-settings-profile-patch-payload-validation" });
+                return;
+              }
+
+              const [hourText, minuteText] = dayCutoffTime.split(":");
+              const hour = Number(hourText);
+              const minute = Number(minuteText);
+              if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+                respondJson(res, 400, { code: "VALIDATION_ERROR", trace_id: "if002-settings-profile-patch-time-validation" });
+                return;
+              }
+
+              await ensureSupabaseProfileExists(userId);
+              const updated = await upsertSupabaseSettingsProfile(userId, timezone, dayCutoffTime);
+              respondJson(res, 200, {
+                profile: {
+                  timezone: typeof updated?.timezone === "string" ? updated.timezone : timezone,
+                  day_cutoff_time: typeof updated?.day_cutoff_time === "string" ? updated.day_cutoff_time : dayCutoffTime,
+                },
+              });
+              return;
+            } catch (error: unknown) {
+              console.error("[if-002] patch settings profile failed", error);
+              respondJson(res, 500, { code: "INTERNAL_ERROR", trace_id: "if002-settings-profile-patch-internal" });
+              return;
+            }
+          }
+
+          if (isTargetRequest(req, "POST", "/api/settings/withdrawal")) {
+            try {
+              const body = await parseRequestBody(req);
+              const requestBody = typeof body === "object" && body !== null ? body as Record<string, unknown> : {};
+              const userId = typeof requestBody.userId === "string" ? requestBody.userId : "";
+              if (!isUuidLike(userId)) {
+                respondJson(res, 400, { code: "VALIDATION_ERROR", trace_id: "if002-settings-withdrawal-validation" });
+                return;
+              }
+
+              await executeSupabaseWithdrawal(userId);
+              respondJson(res, 200, {
+                accepted: true,
+                trace_id: "if002-settings-withdrawal-completed",
+              });
+              return;
+            } catch (error: unknown) {
+              console.error("[if-002] settings withdrawal failed", error);
+              respondJson(res, 500, { code: "INTERNAL_ERROR", trace_id: "if002-settings-withdrawal-internal" });
               return;
             }
           }
