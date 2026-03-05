@@ -39,6 +39,8 @@ type HabitLogRow = {
   log_date: string;
 };
 
+type HistoryDayStatus = "checked" | "missed" | "grace";
+
 function parseRequestBody(req: IncomingMessage): Promise<unknown> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
@@ -215,6 +217,95 @@ async function listSupabaseHomeHabits(userId: string): Promise<
       streak_days: 0,
       last_checkin_log_date: null,
     }));
+}
+
+function resolveMonthRange(yearMonth: string): { fromDate: string; toDate: string } | null {
+  const match = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(yearMonth);
+  if (!match) {
+    return null;
+  }
+  const year = Number.parseInt(match[1], 10);
+  const monthIndex = Number.parseInt(match[2], 10) - 1;
+  const start = new Date(Date.UTC(year, monthIndex, 1));
+  const end = new Date(Date.UTC(year, monthIndex + 1, 0));
+  return {
+    fromDate: start.toISOString().slice(0, 10),
+    toDate: end.toISOString().slice(0, 10),
+  };
+}
+
+function buildMonthDays(fromDate: string, toDate: string): string[] {
+  const days: string[] = [];
+  const cursor = new Date(`${fromDate}T00:00:00.000Z`);
+  const end = new Date(`${toDate}T00:00:00.000Z`);
+  while (cursor <= end) {
+    days.push(cursor.toISOString().slice(0, 10));
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return days;
+}
+
+function dayDiff(laterDate: string, earlierDate: string): number {
+  const later = new Date(`${laterDate}T00:00:00.000Z`).getTime();
+  const earlier = new Date(`${earlierDate}T00:00:00.000Z`).getTime();
+  return Math.floor((later - earlier) / 86_400_000);
+}
+
+function buildGraceDateSet(sortedCheckedDates: string[]): Set<string> {
+  const graceDates = new Set<string>();
+  for (let index = 1; index < sortedCheckedDates.length; index += 1) {
+    const previous = sortedCheckedDates[index - 1];
+    const current = sortedCheckedDates[index];
+    if (dayDiff(current, previous) === 2) {
+      const grace = new Date(`${previous}T00:00:00.000Z`);
+      grace.setUTCDate(grace.getUTCDate() + 1);
+      graceDates.add(grace.toISOString().slice(0, 10));
+    }
+  }
+  return graceDates;
+}
+
+function buildHistoryDays(fromDate: string, toDate: string, logs: HabitLogRow[]): Array<{ date: string; status: HistoryDayStatus }> {
+  const monthDays = buildMonthDays(fromDate, toDate);
+  const checkedDateSet = new Set(logs.map((log) => log.log_date));
+  const checkedDates = Array.from(checkedDateSet).sort((a, b) => a.localeCompare(b));
+  const graceDates = buildGraceDateSet(checkedDates);
+
+  return monthDays.map((date) => {
+    if (checkedDateSet.has(date)) {
+      return { date, status: "checked" as const };
+    }
+    if (graceDates.has(date)) {
+      return { date, status: "grace" as const };
+    }
+    return { date, status: "missed" as const };
+  });
+}
+
+async function listSupabaseHistoryLogs(
+  userId: string,
+  fromDate: string,
+  toDate: string,
+  includeArchived: boolean,
+  habitId?: number,
+): Promise<HabitLogRow[]> {
+  const habits = await listSupabaseHabits(userId);
+  const filteredHabits = habits.filter((habit) => includeArchived || habit.status === "active");
+  const targetHabitIds = filteredHabits
+    .map((habit) => habit.id)
+    .filter((id) => habitId === undefined || id === habitId);
+
+  if (targetHabitIds.length === 0) {
+    return [];
+  }
+
+  const habitFilter = targetHabitIds.length === 1
+    ? `habit_id=eq.${targetHabitIds[0]}`
+    : `habit_id=in.(${targetHabitIds.join(",")})`;
+
+  return fetchSupabaseRest<HabitLogRow[]>(
+    `habit_logs?select=id,user_id,habit_id,log_date&user_id=eq.${encodeURIComponent(userId)}&log_date=gte.${fromDate}&log_date=lte.${toDate}&${habitFilter}&deleted_at=is.null&order=log_date.asc`,
+  );
 }
 
 async function createSupabaseHabit(userId: string, name: string, displayOrder: number): Promise<HabitRow> {
@@ -615,6 +706,51 @@ export default defineConfig(({ mode }) => {
             } catch (error: unknown) {
               console.error("[if-002] list home habits failed", error);
               respondJson(res, 500, { code: "INTERNAL_ERROR", message: "failed to list home habits" });
+              return;
+            }
+          }
+
+          if (isTargetRequest(req, "GET", "/api/history/calendar")) {
+            try {
+              const requestUrl = new URL(req.url ?? "", "http://localhost");
+              const userId = requestUrl.searchParams.get("userId");
+              const yearMonth = requestUrl.searchParams.get("year_month");
+              const includeArchived = requestUrl.searchParams.get("include_archived") === "true";
+              const habitIdText = requestUrl.searchParams.get("habit_id");
+              const habitId = habitIdText && /^\d+$/.test(habitIdText) ? Number(habitIdText) : undefined;
+
+              if (!userId || !isUuidLike(userId)) {
+                respondJson(res, 400, { code: "VALIDATION_ERROR", message: "userId is required" });
+                return;
+              }
+              if (!yearMonth) {
+                respondJson(res, 400, { code: "VALIDATION_ERROR", message: "year_month is required" });
+                return;
+              }
+              const monthRange = resolveMonthRange(yearMonth);
+              if (!monthRange) {
+                respondJson(res, 400, { code: "VALIDATION_ERROR", message: "year_month must be yyyy-mm" });
+                return;
+              }
+
+              const logs = await listSupabaseHistoryLogs(
+                userId,
+                monthRange.fromDate,
+                monthRange.toDate,
+                includeArchived,
+                habitId,
+              );
+              const days = buildHistoryDays(monthRange.fromDate, monthRange.toDate, logs);
+
+              respondJson(res, 200, {
+                code: "SUCCESS",
+                message: "history calendar retrieval succeeded",
+                history: { days },
+              });
+              return;
+            } catch (error: unknown) {
+              console.error("[if-002] history calendar failed", error);
+              respondJson(res, 500, { code: "INTERNAL_ERROR", message: "failed to load history calendar" });
               return;
             }
           }

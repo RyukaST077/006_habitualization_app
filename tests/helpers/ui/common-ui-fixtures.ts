@@ -158,6 +158,28 @@ export type Scr002UiRequirementTraceCase = {
 };
 
 export type Scr002HomeLoadState = "loading" | "loaded" | "error";
+export type Scr005TraceabilityId = "FR-017" | "AC-017" | "SCR-005";
+export type Scr005TraceCaseId = "TC-ST-FR-017-004" | "TC-ST-FR-017-005";
+
+export type Scr005UiRequirementTraceCase = {
+  traceId: string;
+  testCaseId: Scr005TraceCaseId;
+  requirementId: "FR-017";
+  acceptanceId: "AC-017";
+  screenId: "SCR-005";
+  title: string;
+};
+
+export type Scr005CalendarStatusMappingCase = {
+  source: "checked" | "missed" | "grace";
+  display: "checked" | "unchecked" | "grace";
+};
+
+export type Scr005ReloadInputCase = {
+  yearMonth: string;
+  habitId: string | null;
+  includeArchived: boolean;
+};
 
 export type Scr001TraceabilityId = "FR-001" | "SCR-001" | "IF-001";
 export type Scr001ConsentState = "unknown" | "agreed";
@@ -483,6 +505,92 @@ export const SCR002_TRACEABILITY_IDS: readonly Scr002TraceabilityId[] = [
   "AC-015",
   "AC-016",
   "SCR-002",
+] as const;
+
+export const SCR005_TRACEABILITY_IDS: readonly Scr005TraceabilityId[] = ["FR-017", "AC-017", "SCR-005"] as const;
+
+export const SCR005_UI_REQUIREMENT_TRACE_CASES: readonly Scr005UiRequirementTraceCase[] = [
+  {
+    traceId: "T-055/C-004/TC-ST-FR-017-004/FR-017/AC-017/SCR-005/month-calendar-filter-archived",
+    testCaseId: "TC-ST-FR-017-004",
+    requirementId: "FR-017",
+    acceptanceId: "AC-017",
+    screenId: "SCR-005",
+    title: "月カレンダー/月ピッカー/習慣フィルター/includeArchived 切替の観点を固定する",
+  },
+  {
+    traceId: "T-055/C-004/TC-ST-FR-017-005/FR-017/AC-017/SCR-005/empty-month-and-error-retry",
+    testCaseId: "TC-ST-FR-017-005",
+    requirementId: "FR-017",
+    acceptanceId: "AC-017",
+    screenId: "SCR-005",
+    title: "空月の枠表示とエラー再読込導線の観点を固定する",
+  },
+] as const;
+
+export const SCR005_TEST_PLAN_FOCUS_AREAS = [
+  "month-calendar-grid",
+  "month-picker",
+  "habit-filter",
+  "include-archived-toggle",
+  "empty-month-frame",
+  "error-retry-action",
+] as const;
+
+export const SCR005_DEFAULT_FILTERS = {
+  yearMonth: "2026-03",
+  habitId: null,
+  includeArchived: false,
+} as const;
+
+export const SCR005_CALENDAR_STATUS_MAPPINGS: readonly Scr005CalendarStatusMappingCase[] = [
+  { source: "checked", display: "checked" },
+  { source: "missed", display: "unchecked" },
+  { source: "grace", display: "grace" },
+] as const;
+
+export const SCR005_RELOAD_INPUT_CASES: readonly Scr005ReloadInputCase[] = [
+  { yearMonth: "2026-02", habitId: null, includeArchived: false },
+  { yearMonth: "2026-02", habitId: "habit-001", includeArchived: false },
+  { yearMonth: "2026-02", habitId: "habit-001", includeArchived: true },
+] as const;
+
+export const SCR005_EMPTY_MONTH_FRAME_EXPECTATION = {
+  yearMonth: "2026-02",
+  daysInMonth: 28,
+  emptyStatus: "empty",
+} as const;
+
+export const SCR005_ERROR_RETRY_EXPECTATION = {
+  label: "再読込",
+  yearMonth: "2026-02",
+  habitId: "habit-001",
+  includeArchived: true,
+} as const;
+
+export const SCR005_RUNTIME_USER_ID = "00000000-0000-4000-8000-000000000001" as const;
+export const SCR005_RUNTIME_ENDPOINT = "/api/history/calendar" as const;
+
+export const SCR005_RUNTIME_RELOAD_SEQUENCE: readonly Scr005ReloadInputCase[] = [
+  { yearMonth: "2026-03", habitId: null, includeArchived: false },
+  { yearMonth: "2026-02", habitId: null, includeArchived: false },
+  { yearMonth: "2026-02", habitId: "habit-001", includeArchived: false },
+  { yearMonth: "2026-02", habitId: "habit-001", includeArchived: true },
+] as const;
+
+export const T055_C003_COMPLETION_GATE_COMMANDS = [
+  "npm run test -- tests/integration/ui/scr-005-history-runtime-red.spec.ts",
+  "npm run test -- tests/integration/api/if-002-history-calendar-red.spec.ts tests/integration/ui/scr-005-history-runtime-red.spec.ts",
+] as const;
+
+export const T055_C001_COMPLETION_GATE_COMMANDS = [
+  "npm run test -- tests/unit/screens/scr-005-history-page-red.spec.ts tests/integration/ui/scr-005-history-runtime-red.spec.ts",
+  "for id in FR-017 AC-017 SCR-005 TC-ST-FR-017-004 TC-ST-FR-017-005; do rg -n \"$id\" tests/helpers/ui/common-ui-fixtures.ts >/dev/null; done",
+] as const;
+
+export const T055_C004_COMPLETION_GATE_COMMANDS = [
+  "npm run test -- tests/unit/screens/scr-005-history-page-red.spec.ts tests/integration/ui/scr-005-history-runtime-red.spec.ts",
+  "npm run test -- tests/unit/screens/scr-005-history-page-red.spec.ts tests/integration/ui/scr-005-history-runtime-red.spec.ts tests/integration/api/if-002-history-calendar-red.spec.ts && npm run typecheck",
 ] as const;
 
 export const SCR002_UI_REQUIREMENT_TRACE_CASES: readonly Scr002UiRequirementTraceCase[] = [

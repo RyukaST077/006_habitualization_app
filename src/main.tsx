@@ -13,6 +13,12 @@ import { SCR008PolicyConsentPage, type PolicyConsentAuditTrace } from "./screens
 import { SCR003HabitCreatePage } from "./screens/SCR-003HabitCreatePage";
 import { SCR004HabitEditPage } from "./screens/SCR-004HabitEditPage";
 import {
+  SCR005HistoryPage,
+  type HistoryCalendarLoadInput,
+  type HistoryCalendarLoadResolution,
+  type HistoryCalendarUiCell,
+} from "./screens/SCR-005HistoryPage";
+import {
   SCR002HomePage,
   type CheckinResolution,
   type HomeHabitSummary,
@@ -29,6 +35,9 @@ export function bootstrapApp() {
 const CALLBACK_USER_ID_STORAGE_KEY = "if001-callback-user-id";
 const CALLBACK_ACCESS_TOKEN_STORAGE_KEY = "if001-callback-access-token";
 const POLICY_CONSENT_TRACE_STORAGE_KEY = "if001-policy-consent-trace";
+const LOCAL_USER_ID_STORAGE_KEY = "habit-local-user-id";
+const LOCAL_USER_ID_FALLBACK = "00000000-0000-4000-8000-000000000001";
+const HOME_CHECKIN_OVERRIDE_STORAGE_KEY = "habit-home-checkin-overrides-v1";
 
 function renderAppShell() {
   if (typeof document === "undefined") {
@@ -55,6 +64,10 @@ function renderAppShell() {
   }
   if (window.location.pathname === ROUTE_MAP["SCR-003"]) {
     renderHabitCreatePage(root, app);
+    return;
+  }
+  if (window.location.pathname === ROUTE_MAP["SCR-005"]) {
+    renderHistoryPage(root, app);
     return;
   }
   const editMatch = window.location.pathname.match(/^\/habits\/([^/]+)\/edit$/);
@@ -224,6 +237,41 @@ type If002CancelErrorPayload = {
   code?: string;
   trace_id?: string;
 };
+
+type If002HistoryCalendarCellPayload = {
+  date?: string;
+  status?: "checked" | "missed" | "grace";
+};
+
+type If002HistoryCalendarSuccessPayload = {
+  days?: If002HistoryCalendarCellPayload[];
+  history?: {
+    days?: If002HistoryCalendarCellPayload[];
+  };
+};
+
+type If002HistoryCalendarErrorPayload = {
+  code?: string;
+  trace_id?: string;
+};
+
+function normalizeCalendarDate(value: string): string | null {
+  const ymdMatch = /^(\d{4}-\d{2}-\d{2})/.exec(value);
+  if (ymdMatch) {
+    return ymdMatch[1];
+  }
+  return null;
+}
+
+function normalizeCalendarStatus(value: unknown): "checked" | "missed" | "grace" | null {
+  if (value === "checked" || value === "missed" || value === "grace") {
+    return value;
+  }
+  if (value === "unchecked") {
+    return "missed";
+  }
+  return null;
+}
 
 type If002HabitCreateSuccessPayload = {
   habit?: {
@@ -430,6 +478,102 @@ function buildTodayLogDate(nowUtcIso: string): string {
   return nowUtcIso.slice(0, 10);
 }
 
+type HomeCheckinOverrides = Record<string, Record<string, string>>;
+
+function readHomeCheckinOverrides(): HomeCheckinOverrides {
+  if (typeof window === "undefined") {
+    return {};
+  }
+  try {
+    const raw = window.localStorage.getItem(HOME_CHECKIN_OVERRIDE_STORAGE_KEY);
+    if (!raw) {
+      return {};
+    }
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object") {
+      return {};
+    }
+    return parsed as HomeCheckinOverrides;
+  } catch {
+    return {};
+  }
+}
+
+function writeHomeCheckinOverrides(overrides: HomeCheckinOverrides): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+  try {
+    window.localStorage.setItem(HOME_CHECKIN_OVERRIDE_STORAGE_KEY, JSON.stringify(overrides));
+  } catch {
+    return;
+  }
+}
+
+function setHomeCheckinOverride(userId: string, habitId: string, logDate: string): void {
+  const overrides = readHomeCheckinOverrides();
+  const userOverrides = overrides[userId] ?? {};
+  userOverrides[habitId] = logDate;
+  overrides[userId] = userOverrides;
+  writeHomeCheckinOverrides(overrides);
+}
+
+function clearHomeCheckinOverride(userId: string, habitId: string): void {
+  const overrides = readHomeCheckinOverrides();
+  const userOverrides = overrides[userId];
+  if (!userOverrides) {
+    return;
+  }
+  delete userOverrides[habitId];
+  if (Object.keys(userOverrides).length === 0) {
+    delete overrides[userId];
+  } else {
+    overrides[userId] = userOverrides;
+  }
+  writeHomeCheckinOverrides(overrides);
+}
+
+function applyHomeCheckinOverrides(userId: string, habits: HomeHabitSummary[]): HomeHabitSummary[] {
+  const overrides = readHomeCheckinOverrides()[userId] ?? {};
+  if (Object.keys(overrides).length === 0) {
+    return habits;
+  }
+
+  return habits.map((habit) => {
+    const overrideDate = overrides[habit.habitId];
+    if (!overrideDate) {
+      return habit;
+    }
+    if (habit.lastCheckinLogDate) {
+      clearHomeCheckinOverride(userId, habit.habitId);
+      return habit;
+    }
+    return {
+      ...habit,
+      lastCheckinLogDate: overrideDate,
+    };
+  });
+}
+
+function applyHistoryCheckinOverrides(
+  userId: string,
+  input: HistoryCalendarLoadInput,
+  days: Array<{ date: string; status: "checked" | "missed" | "grace" }>,
+): Array<{ date: string; status: "checked" | "missed" | "grace" }> {
+  const userOverrides = readHomeCheckinOverrides()[userId] ?? {};
+  const overrideDates = Object.entries(userOverrides)
+    .filter(([habitId]) => input.habitId === null || input.habitId === habitId)
+    .map(([, logDate]) => logDate)
+    .filter((logDate) => logDate.startsWith(`${input.yearMonth}-`));
+
+  if (overrideDates.length === 0) {
+    return days;
+  }
+
+  const overrideSet = new Set(overrideDates);
+  return days.map((day) => (overrideSet.has(day.date) ? { ...day, status: "checked" as const } : day));
+}
+
 function resolveScr004Path(habitId: string): string {
   return ROUTE_MAP["SCR-004"].replace(":habitId", encodeURIComponent(habitId));
 }
@@ -441,6 +585,7 @@ export async function requestHomeHabitsRuntime(
   try {
     const response = await fetchFn(`/api/home/habits?userId=${encodeURIComponent(input.userId)}`, {
       method: "GET",
+      cache: "no-store",
     });
     const payload = await parseJsonResponse<If002HomeHabitsSuccessPayload | If002HomeHabitsErrorPayload>(response);
     if (response.ok) {
@@ -454,7 +599,7 @@ export async function requestHomeHabitsRuntime(
         : [];
       return {
         kind: "success",
-        habits,
+        habits: applyHomeCheckinOverrides(input.userId, habits),
       };
     }
     const rawCode = payload !== null && "code" in payload ? payload.code : undefined;
@@ -521,6 +666,81 @@ export async function requestCancelCheckinRuntime(
   input: { userId: string; habitId: string; nowUtc: string },
 ): Promise<CheckinResolution> {
   return requestCancelCheckin(fetchFn, input.userId, input.habitId, input.nowUtc);
+}
+
+function extractHistoryCalendarDays(
+  payload: If002HistoryCalendarSuccessPayload | If002HistoryCalendarErrorPayload | null,
+): If002HistoryCalendarCellPayload[] {
+  if (payload === null) {
+    return [];
+  }
+  if ("days" in payload && Array.isArray(payload.days)) {
+    return payload.days;
+  }
+  if ("history" in payload && payload.history && Array.isArray(payload.history.days)) {
+    return payload.history.days;
+  }
+  return [];
+}
+
+export async function requestHistoryCalendarRuntime(
+  fetchFn: typeof fetch,
+  input: HistoryCalendarLoadInput,
+  userId?: string,
+): Promise<HistoryCalendarLoadResolution> {
+  try {
+    const query = new URLSearchParams();
+    query.set("year_month", input.yearMonth);
+    query.set("include_archived", String(input.includeArchived));
+    if (typeof userId === "string" && userId.length > 0) {
+      query.set("userId", userId);
+    }
+    if (input.habitId !== null) {
+      query.set("habit_id", input.habitId);
+    }
+
+    const response = await fetchFn(`/api/history/calendar?${query.toString()}`, {
+      method: "GET",
+      cache: "no-store",
+    });
+    const payload = await parseJsonResponse<If002HistoryCalendarSuccessPayload | If002HistoryCalendarErrorPayload>(response);
+    if (response.ok) {
+      let days = extractHistoryCalendarDays(payload)
+        .map((day) => {
+          const date = typeof day.date === "string" ? normalizeCalendarDate(day.date) : null;
+          const status = normalizeCalendarStatus(day.status);
+          if (!date || !status) {
+            return null;
+          }
+          return { date, status };
+        })
+        .filter((day): day is { date: string; status: "checked" | "missed" | "grace" } => day !== null);
+      if (typeof userId === "string" && userId.length > 0) {
+        days = applyHistoryCheckinOverrides(userId, input, days);
+      }
+      return {
+        kind: "success",
+        days,
+      };
+    }
+
+    const errorCode = payload !== null && "code" in payload ? payload.code : undefined;
+    const traceId = payload !== null && "trace_id" in payload && typeof payload.trace_id === "string"
+      ? payload.trace_id
+      : undefined;
+    return {
+      kind: "error",
+      status: asErrorStatus(response.status),
+      code: asErrorCode(errorCode),
+      traceId,
+    };
+  } catch {
+    return {
+      kind: "error",
+      status: 500,
+      code: "INTERNAL_ERROR",
+    };
+  }
 }
 
 function renderHomePage(root: HTMLDivElement, app: ReturnType<typeof bootstrapApp>) {
@@ -627,7 +847,9 @@ function renderHomePage(root: HTMLDivElement, app: ReturnType<typeof bootstrapAp
     emptyState.hidden = true;
     list.innerHTML = items
       .map((habit) => {
-        const checkinDisabled = habit.status === "archived" || page.ui.checkin.isSubmitting(habit.habitId);
+        const checkinDisabled = habit.status === "archived"
+          || page.ui.checkin.isSubmitting(habit.habitId)
+          || Boolean(habit.lastCheckinLogDate);
         const cancelDisabled = page.ui.cancelCheckin.isSubmitting || !habit.lastCheckinLogDate;
         const checkinLabel = page.ui.checkin.isSubmitting(habit.habitId) ? "チェックイン中..." : "チェックイン";
         const cancelLabel = page.ui.cancelCheckin.isSubmitting ? "取消中..." : "取消";
@@ -688,6 +910,9 @@ function renderHomePage(root: HTMLDivElement, app: ReturnType<typeof bootstrapAp
         if (result.error) {
           setRuntimeError(result.error, habitId);
         } else {
+          if (result.lastCheckinLogDate) {
+            setHomeCheckinOverride(userId, habitId, result.lastCheckinLogDate);
+          }
           setRuntimeError(null);
         }
       });
@@ -712,6 +937,7 @@ function renderHomePage(root: HTMLDivElement, app: ReturnType<typeof bootstrapAp
           setRuntimeError(result.error, habitId);
           return;
         }
+        clearHomeCheckinOverride(userId, habitId);
         setRuntimeError(null);
       });
     }
@@ -729,6 +955,119 @@ function renderHomePage(root: HTMLDivElement, app: ReturnType<typeof bootstrapAp
   });
 
   void loadAndRenderHabits();
+}
+
+export function renderHistoryPage(root: HTMLDivElement, app: ReturnType<typeof bootstrapApp>) {
+  const userId = resolveHabitFormUserId();
+  const page = SCR005HistoryPage({
+    screenId: "SCR-005",
+    handlers: {
+      onBackHome: () => {
+        window.location.assign(ROUTE_MAP["SCR-002"]);
+      },
+      onLoadCalendar: (input) => requestHistoryCalendarRuntime(fetch, input, userId),
+    },
+  });
+
+  root.innerHTML = `<main style="font-family: sans-serif; max-width: 720px; margin: 32px auto; padding: 16px;">
+    <h1>${app.name}</h1>
+    <h2>SCR-005 History</h2>
+    <section style="display: grid; gap: 10px; margin: 12px 0;">
+      <label>表示年月 <input id="history-year-month" type="month" /></label>
+      <label>習慣フィルター（habit_id） <input id="history-habit-id" placeholder="未指定で全習慣" /></label>
+      <label><input id="history-include-archived" type="checkbox" /> archived を表示</label>
+      <div style="display: flex; gap: 8px;">
+        <button id="history-back-home" type="button">ホームへ戻る</button>
+      </div>
+    </section>
+    <p id="history-load-status">読み込み中...</p>
+    <section id="history-error" hidden style="border: 1px solid #d79a9a; border-radius: 8px; padding: 12px; margin: 8px 0; color: #8f1d1d;">
+      <p id="history-error-message" style="margin: 0;"></p>
+      <button id="history-error-retry" type="button">再読込</button>
+    </section>
+    <section id="history-calendar-grid" style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px;"></section>
+  </main>`;
+
+  const yearMonthInput = root.querySelector<HTMLInputElement>("#history-year-month");
+  const habitIdInput = root.querySelector<HTMLInputElement>("#history-habit-id");
+  const includeArchivedInput = root.querySelector<HTMLInputElement>("#history-include-archived");
+  const backHomeButton = root.querySelector<HTMLButtonElement>("#history-back-home");
+  const loadStatus = root.querySelector<HTMLParagraphElement>("#history-load-status");
+  const errorPanel = root.querySelector<HTMLElement>("#history-error");
+  const errorMessage = root.querySelector<HTMLParagraphElement>("#history-error-message");
+  const retryButton = root.querySelector<HTMLButtonElement>("#history-error-retry");
+  const grid = root.querySelector<HTMLElement>("#history-calendar-grid");
+
+  if (
+    !yearMonthInput
+    || !habitIdInput
+    || !includeArchivedInput
+    || !backHomeButton
+    || !loadStatus
+    || !errorPanel
+    || !errorMessage
+    || !retryButton
+    || !grid
+  ) {
+    return;
+  }
+
+  const renderCalendarCell = (cell: HistoryCalendarUiCell): string => {
+    const label = cell.status === "checked"
+      ? "達成"
+      : cell.status === "unchecked"
+        ? "未達成"
+        : cell.status === "grace"
+          ? "猶予"
+          : "未記録";
+    return `<div style="border: 1px solid #ddd; border-radius: 6px; padding: 6px;">
+      <p style="margin: 0; font-size: 12px;">${escapeHtml(cell.date)}</p>
+      <p style="margin: 4px 0 0 0; font-weight: 600;">${label}</p>
+    </div>`;
+  };
+
+  const render = () => {
+    yearMonthInput.value = page.ui.filters.yearMonth;
+    habitIdInput.value = page.ui.filters.habitId ?? "";
+    includeArchivedInput.checked = page.ui.filters.includeArchived;
+    yearMonthInput.disabled = page.ui.loading.isFetching;
+    habitIdInput.disabled = page.ui.loading.isFetching;
+    includeArchivedInput.disabled = page.ui.loading.isFetching;
+    retryButton.disabled = page.ui.loading.isFetching;
+    loadStatus.textContent = page.ui.loading.isFetching ? "読み込み中..." : "";
+
+    const retryAction = page.ui.error.retryAction;
+    errorPanel.hidden = !page.ui.error.isVisible || retryAction === null;
+    errorMessage.textContent = retryAction ? "履歴の取得に失敗しました。" : "";
+
+    grid.innerHTML = page.ui.calendar.days.map((cell) => renderCalendarCell(cell)).join("");
+  };
+
+  const runWithRender = async (runner: () => Promise<unknown>) => {
+    const promise = runner();
+    render();
+    await promise;
+    render();
+  };
+
+  yearMonthInput.addEventListener("change", () => {
+    void runWithRender(() => page.actions.setYearMonth(yearMonthInput.value));
+  });
+  habitIdInput.addEventListener("change", () => {
+    const habitId = habitIdInput.value.trim();
+    void runWithRender(() => page.actions.setHabitFilter(habitId.length > 0 ? habitId : null));
+  });
+  includeArchivedInput.addEventListener("change", () => {
+    void runWithRender(() => page.actions.setIncludeArchived(includeArchivedInput.checked));
+  });
+  retryButton.addEventListener("click", () => {
+    void runWithRender(() => page.actions.retryLoad());
+  });
+  backHomeButton.addEventListener("click", () => {
+    page.actions.backHome();
+  });
+
+  void runWithRender(() => page.actions.loadCalendar());
 }
 
 function renderHabitCreatePage(root: HTMLDivElement, app: ReturnType<typeof bootstrapApp>) {
@@ -1309,23 +1648,39 @@ function toSafeHttpUrl(url: string): string {
 }
 
 function getOrCreateLocalUserId(): string {
-  const key = "habit-local-user-id";
+  const key = LOCAL_USER_ID_STORAGE_KEY;
+  const sessionScoped = readSessionStorage(key);
+  if (sessionScoped) {
+    return sessionScoped;
+  }
+
   try {
     const existing = window.localStorage.getItem(key);
     if (existing) {
+      writeSessionStorage(key, existing);
       return existing;
     }
     const generated =
       typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
         ? crypto.randomUUID()
-        : `00000000-0000-4000-8000-${Date.now().toString().slice(-12).padStart(12, "0")}`;
+        : LOCAL_USER_ID_FALLBACK;
     window.localStorage.setItem(key, generated);
+    writeSessionStorage(key, generated);
     return generated;
   } catch {
-    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-      return crypto.randomUUID();
+    const existingSessionScoped = readSessionStorage(key);
+    if (existingSessionScoped) {
+      return existingSessionScoped;
     }
-    return "00000000-0000-4000-8000-000000000001";
+
+    const generated =
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : LOCAL_USER_ID_FALLBACK;
+    writeSessionStorage(key, generated);
+
+    // storage が完全に使えない環境では固定IDで user 文脈のぶれを防ぐ
+    return readSessionStorage(key) ?? LOCAL_USER_ID_FALLBACK;
   }
 }
 
